@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "IRISSAM HOSPITAL ERP"
+description = "A professional hospital ERP dashboard for IRISSAM HOSPITAL, replicating the provided UI screenshot with sidebar navigation, stats cards, charts, alerts, patient tables, and bottom widgets. Uses mock data only."
+version = "1.0.0"
+id = "artifacts/irissam-erp"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26048
+
+[services.development]
+run = "pnpm --filter @workspace/irissam-erp run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/irissam-erp", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/irissam-erp/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26048"
+BASE_PATH = "/"
