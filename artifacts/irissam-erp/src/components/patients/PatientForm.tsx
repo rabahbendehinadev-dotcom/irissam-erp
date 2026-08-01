@@ -64,6 +64,26 @@ const selectCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 fo
 const labelCls = 'block text-xs font-medium text-gray-600 mb-1';
 const autoCls = 'w-full text-sm border border-gray-100 rounded-lg px-3 py-2 bg-gray-50 text-gray-500 font-mono cursor-not-allowed';
 
+// ─── Field wrapper — défini EN DEHORS du composant parent pour éviter le
+//     remount à chaque frappe (un composant défini à l'intérieur = nouvelle
+//     référence à chaque render = démontage/remontage = perte du focus). ──────
+interface FieldProps {
+  k: keyof FormData;
+  label: string;
+  req?: boolean;
+  errors: Partial<Record<keyof FormData, string>>;
+  children: React.ReactNode;
+}
+function Field({ k, label, req, errors, children }: FieldProps) {
+  return (
+    <div>
+      <label className={labelCls}>{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
+      {children}
+      {errors[k] && <p className="text-xs text-red-500 mt-0.5">{errors[k]}</p>}
+    </div>
+  );
+}
+
 interface Props {
   patient?: Patient;
   onSave: (data: Partial<Patient>) => void;
@@ -194,14 +214,6 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
     t('pat.form.step4'), t('pat.form.step5'), t('pat.form.step6'), t('pat.form.step7'),
   ];
 
-  const Field = ({ k, label, req, children }: { k: keyof FormData; label: string; req?: boolean; children: React.ReactNode }) => (
-    <div>
-      <label className={labelCls}>{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      {children}
-      {errors[k] && <p className="text-xs text-red-500 mt-0.5">{errors[k]}</p>}
-    </div>
-  );
-
   return (
     <>
       <div className="fixed inset-0 z-40 flex">
@@ -230,36 +242,36 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
             {/* Step 0 — Identity */}
             {step === 0 && <>
               <div className="grid grid-cols-2 gap-4">
-                <Field k="lastName" label={t('pat.form.lastName')} req>
+                <Field errors={errors} k="lastName" label={t('pat.form.lastName')} req>
                   <input value={form.lastName} onChange={set('lastName')} className={inputCls} />
                 </Field>
-                <Field k="firstName" label={t('pat.form.firstName')} req>
+                <Field errors={errors} k="firstName" label={t('pat.form.firstName')} req>
                   <input value={form.firstName} onChange={set('firstName')} className={inputCls} />
                 </Field>
               </div>
-              <Field k="maidenName" label={t('pat.form.maidenName')}>
+              <Field errors={errors} k="maidenName" label={t('pat.form.maidenName')}>
                 <input value={form.maidenName} onChange={set('maidenName')} className={inputCls} />
               </Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field k="gender" label={t('pat.form.gender')} req>
+                <Field errors={errors} k="gender" label={t('pat.form.gender')} req>
                   <select value={form.gender} onChange={set('gender')} className={selectCls}>
                     <option value="M">{t('pat.gender.m')}</option>
                     <option value="F">{t('pat.gender.f')}</option>
                   </select>
                 </Field>
-                <Field k="dateOfBirth" label={t('pat.form.dateOfBirth')} req>
+                <Field errors={errors} k="dateOfBirth" label={t('pat.form.dateOfBirth')} req>
                   <input type="date" value={form.dateOfBirth} onChange={set('dateOfBirth')} className={inputCls} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Field k="placeOfBirth" label={t('pat.form.placeOfBirth')}>
+                <Field errors={errors} k="placeOfBirth" label={t('pat.form.placeOfBirth')}>
                   <input value={form.placeOfBirth} onChange={set('placeOfBirth')} className={inputCls} />
                 </Field>
-                <Field k="nationality" label={t('pat.form.nationality')} req>
+                <Field errors={errors} k="nationality" label={t('pat.form.nationality')} req>
                   <input value={form.nationality} onChange={set('nationality')} className={inputCls} />
                 </Field>
               </div>
-              <Field k="maritalStatus" label={t('pat.form.maritalStatus')}>
+              <Field errors={errors} k="maritalStatus" label={t('pat.form.maritalStatus')}>
                 <select value={form.maritalStatus} onChange={set('maritalStatus')} className={selectCls}>
                   <option value="">—</option>
                   <option value="celibataire">{t('pat.marital.celibataire')}</option>
@@ -273,7 +285,7 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
             {/* Step 1 — Identifiers */}
             {step === 1 && <>
               <div className="grid grid-cols-2 gap-4">
-                <Field k="idDocumentType" label={t('pat.form.idType')}>
+                <Field errors={errors} k="idDocumentType" label={t('pat.form.idType')}>
                   <select value={form.idDocumentType} onChange={set('idDocumentType')} className={selectCls}>
                     <option value="">—</option>
                     <option value="cni">{t('pat.id_type.cni')}</option>
@@ -282,11 +294,11 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
                     <option value="autre">{t('pat.id_type.autre')}</option>
                   </select>
                 </Field>
-                <Field k="idDocumentNumber" label={t('pat.form.idNumber')}>
+                <Field errors={errors} k="idDocumentNumber" label={t('pat.form.idNumber')}>
                   <input value={form.idDocumentNumber} onChange={set('idDocumentNumber')} className={inputCls} />
                 </Field>
               </div>
-              <Field k="socialSecurityNumber" label={t('pat.form.socialSecurity')}>
+              <Field errors={errors} k="socialSecurityNumber" label={t('pat.form.socialSecurity')}>
                 <input value={form.socialSecurityNumber} onChange={set('socialSecurityNumber')} className={inputCls} />
               </Field>
               <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-3">
@@ -311,24 +323,24 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
             {/* Step 2 — Contacts */}
             {step === 2 && <>
               <div className="grid grid-cols-2 gap-4">
-                <Field k="phone" label={t('pat.form.phone')} req>
+                <Field errors={errors} k="phone" label={t('pat.form.phone')} req>
                   <input value={form.phone} onChange={set('phone')} className={inputCls} placeholder="0555 XX XX XX" />
                 </Field>
-                <Field k="phoneSecondary" label={t('pat.form.phoneSecondary')}>
+                <Field errors={errors} k="phoneSecondary" label={t('pat.form.phoneSecondary')}>
                   <input value={form.phoneSecondary} onChange={set('phoneSecondary')} className={inputCls} />
                 </Field>
               </div>
-              <Field k="email" label={t('pat.form.email')}>
+              <Field errors={errors} k="email" label={t('pat.form.email')}>
                 <input type="email" value={form.email} onChange={set('email')} className={inputCls} />
               </Field>
-              <Field k="address" label={t('pat.form.address')}>
+              <Field errors={errors} k="address" label={t('pat.form.address')}>
                 <input value={form.address} onChange={set('address')} className={inputCls} />
               </Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field k="commune" label={t('pat.form.commune')}>
+                <Field errors={errors} k="commune" label={t('pat.form.commune')}>
                   <input value={form.commune} onChange={set('commune')} className={inputCls} />
                 </Field>
-                <Field k="wilaya" label={t('pat.form.wilaya')}>
+                <Field errors={errors} k="wilaya" label={t('pat.form.wilaya')}>
                   <select value={form.wilaya} onChange={set('wilaya')} className={selectCls}>
                     <option value="">—</option>
                     {WILAYAS.map(w => <option key={w} value={w}>{w}</option>)}
@@ -336,10 +348,10 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Field k="postalCode" label={t('pat.form.postalCode')}>
+                <Field errors={errors} k="postalCode" label={t('pat.form.postalCode')}>
                   <input value={form.postalCode} onChange={set('postalCode')} className={inputCls} />
                 </Field>
-                <Field k="country" label={t('pat.form.country')}>
+                <Field errors={errors} k="country" label={t('pat.form.country')}>
                   <input value={form.country} onChange={set('country')} className={inputCls} />
                 </Field>
               </div>
@@ -349,14 +361,14 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
             {step === 3 && <>
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2">
-                  <Field k="bloodType" label={t('pat.form.bloodType')}>
+                  <Field errors={errors} k="bloodType" label={t('pat.form.bloodType')}>
                     <select value={form.bloodType} onChange={set('bloodType')} className={selectCls}>
                       <option value="">—</option>
                       {BLOOD_TYPES.map(bt => <option key={bt} value={bt}>{bt}</option>)}
                     </select>
                   </Field>
                 </div>
-                <Field k="rhesus" label={t('pat.form.rhesus')}>
+                <Field errors={errors} k="rhesus" label={t('pat.form.rhesus')}>
                   <select value={form.rhesus} onChange={set('rhesus')} className={selectCls}>
                     <option value="">—</option>
                     <option value="+">Positif (+)</option>
@@ -364,16 +376,16 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
                   </select>
                 </Field>
               </div>
-              <Field k="allergies" label={t('pat.form.allergies')}>
+              <Field errors={errors} k="allergies" label={t('pat.form.allergies')}>
                 <input value={form.allergies} onChange={set('allergies')} className={inputCls} placeholder={t('pat.form.allergies.hint')} />
               </Field>
-              <Field k="chronicDiseases" label={t('pat.form.chronicDiseases')}>
+              <Field errors={errors} k="chronicDiseases" label={t('pat.form.chronicDiseases')}>
                 <textarea value={form.chronicDiseases} onChange={set('chronicDiseases')} rows={2} className={`${inputCls} resize-none`} placeholder={t('pat.form.allergies.hint')} />
               </Field>
-              <Field k="majorHistory" label={t('pat.form.majorHistory')}>
+              <Field errors={errors} k="majorHistory" label={t('pat.form.majorHistory')}>
                 <textarea value={form.majorHistory} onChange={set('majorHistory')} rows={2} className={`${inputCls} resize-none`} placeholder={t('pat.form.allergies.hint')} />
               </Field>
-              <Field k="disability" label={t('pat.form.disability')}>
+              <Field errors={errors} k="disability" label={t('pat.form.disability')}>
                 <input value={form.disability} onChange={set('disability')} className={inputCls} />
               </Field>
               {form.criticalNotes && (
@@ -382,32 +394,32 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
                   <p className="text-xs text-red-600">{t('pat.form.criticalNotes.hint')}</p>
                 </div>
               )}
-              <Field k="criticalNotes" label={t('pat.form.criticalNotes')}>
+              <Field errors={errors} k="criticalNotes" label={t('pat.form.criticalNotes')}>
                 <textarea value={form.criticalNotes} onChange={set('criticalNotes')} rows={2} className={`${inputCls} resize-none`} />
               </Field>
             </>}
 
             {/* Step 4 — Emergency contact */}
             {step === 4 && <>
-              <Field k="emergencyName" label={t('pat.form.emergency.name')}>
+              <Field errors={errors} k="emergencyName" label={t('pat.form.emergency.name')}>
                 <input value={form.emergencyName} onChange={set('emergencyName')} className={inputCls} />
               </Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field k="emergencyRelation" label={t('pat.form.emergency.relation')}>
+                <Field errors={errors} k="emergencyRelation" label={t('pat.form.emergency.relation')}>
                   <input value={form.emergencyRelation} onChange={set('emergencyRelation')} className={inputCls} placeholder="Épouse, Fils, Père..." />
                 </Field>
-                <Field k="emergencyPhone" label={t('pat.form.emergency.phone')}>
+                <Field errors={errors} k="emergencyPhone" label={t('pat.form.emergency.phone')}>
                   <input value={form.emergencyPhone} onChange={set('emergencyPhone')} className={inputCls} />
                 </Field>
               </div>
-              <Field k="emergencyAddress" label={t('pat.form.emergency.address')}>
+              <Field errors={errors} k="emergencyAddress" label={t('pat.form.emergency.address')}>
                 <input value={form.emergencyAddress} onChange={set('emergencyAddress')} className={inputCls} />
               </Field>
             </>}
 
             {/* Step 5 — Insurance */}
             {step === 5 && <>
-              <Field k="insuranceType" label={t('pat.form.insurance.type')}>
+              <Field errors={errors} k="insuranceType" label={t('pat.form.insurance.type')}>
                 <select value={form.insuranceType} onChange={set('insuranceType')} className={selectCls}>
                   <option value="">—</option>
                   <option value="cnas">{t('pat.insurance.cnas')}</option>
@@ -419,14 +431,14 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
                 </select>
               </Field>
               {form.insuranceType && form.insuranceType !== 'payant' && form.insuranceType !== 'gratuite' && <>
-                <Field k="insuranceOrg" label={t('pat.form.insurance.org')}>
+                <Field errors={errors} k="insuranceOrg" label={t('pat.form.insurance.org')}>
                   <input value={form.insuranceOrg} onChange={set('insuranceOrg')} className={inputCls} />
                 </Field>
                 <div className="grid grid-cols-2 gap-4">
-                  <Field k="memberNumber" label={t('pat.form.insurance.memberNumber')}>
+                  <Field errors={errors} k="memberNumber" label={t('pat.form.insurance.memberNumber')}>
                     <input value={form.memberNumber} onChange={set('memberNumber')} className={inputCls} />
                   </Field>
-                  <Field k="validUntil" label={t('pat.form.insurance.validUntil')}>
+                  <Field errors={errors} k="validUntil" label={t('pat.form.insurance.validUntil')}>
                     <input type="date" value={form.validUntil} onChange={set('validUntil')} className={inputCls} />
                   </Field>
                 </div>
