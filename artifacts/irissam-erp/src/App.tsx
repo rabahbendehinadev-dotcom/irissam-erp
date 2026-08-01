@@ -4,6 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import Dashboard from '@/pages/Dashboard';
 import PatientsPage from '@/pages/Patients';
 import PatientDetailPage from '@/pages/PatientDetail';
+import AdmissionsPage from '@/pages/Admissions';
 import NotFound from '@/pages/not-found';
 import { useLanguage } from '@/i18n';
 
@@ -28,7 +29,7 @@ function Router() {
       <Route path="/patients/:id" component={PatientDetailPage} />
       <Route path="/patients" component={PatientsPage} />
       <Route path="/appointments" component={PlaceholderPage} />
-      <Route path="/admissions" component={PlaceholderPage} />
+      <Route path="/admissions" component={AdmissionsPage} />
       <Route path="/emergencies" component={PlaceholderPage} />
       <Route path="/consultations" component={PlaceholderPage} />
       <Route path="/hospitalization" component={PlaceholderPage} />

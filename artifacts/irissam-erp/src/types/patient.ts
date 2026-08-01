@@ -2,7 +2,7 @@ export type PatientGender = 'M' | 'F';
 export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
 export type PatientStatus = 'active' | 'inactive' | 'archived' | 'deceased';
 export type SyncStatus = 'synced' | 'pending' | 'conflict' | 'error';
-export type AdmissionStatus = 'active' | 'discharged' | 'transferred' | 'deceased';
+// AdmissionStatus moved to ./admission
 export type AppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'no_show';
 export type MaritalStatus = 'celibataire' | 'marie' | 'divorce' | 'veuf';
 export type IdDocumentType = 'cni' | 'passeport' | 'permis' | 'autre';
@@ -103,18 +103,7 @@ export interface PatientTimelineEvent {
   siteName: string;
 }
 
-export interface Admission {
-  id: string;
-  patientId: string;
-  patient: Patient;
-  departmentId: string;
-  bedNumber?: string;
-  admittedAt: string;
-  dischargedAt?: string;
-  status: AdmissionStatus;
-  diagnosis?: string;
-  attendingDoctorId?: string;
-}
+// Admission moved to ./admission (full type)
 
 export interface Appointment {
   id: string;

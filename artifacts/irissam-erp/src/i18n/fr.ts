@@ -431,4 +431,187 @@ export default {
   "pat.success.created": "Patient créé avec succès",
   "pat.success.updated": "Dossier mis à jour",
   "pat.success.archived": "Patient archivé",
+
+  // ── MODULE 2 : ADMISSIONS ─────────────────────────────────────────────────
+
+  // Page
+  "adm.page.title": "Admissions & Préadmissions",
+  "adm.page.subtitle": "Gestion des entrées, hospitalisations et sorties",
+  "adm.page.demo": "Données de démonstration",
+  "adm.page.no_permission": "Accès non autorisé au module Admissions",
+  "adm.add": "Nouvelle admission",
+  "adm.export": "Exporter",
+  "adm.back_to_list": "Retour à la liste",
+
+  // Mini-dashboard stats
+  "adm.stats.today_admissions": "Admissions aujourd'hui",
+  "adm.stats.today_discharges": "Sorties aujourd'hui",
+  "adm.stats.hospitalized": "Patients hospitalisés",
+  "adm.stats.free_beds": "Lits disponibles",
+  "adm.stats.occupancy": "Taux d'occupation",
+  "adm.stats.urgent": "Urgences actives",
+
+  // Types d'admission
+  "adm.type.hospitalisation": "Hospitalisation",
+  "adm.type.ambulatoire": "Ambulatoire",
+  "adm.type.preadmission": "Préadmission",
+  "adm.type.urgence": "Urgence",
+  "adm.type.maternite": "Maternité",
+  "adm.type.chirurgie": "Chirurgie",
+
+  // Statuts
+  "adm.status.active": "Hospitalisé",
+  "adm.status.preadmission": "Préadmis",
+  "adm.status.ambulatoire": "Ambulatoire",
+  "adm.status.transferred": "Transféré",
+  "adm.status.discharged": "Sorti",
+  "adm.status.cancelled": "Annulé",
+
+  // Priorités
+  "adm.priority.normal": "Normal",
+  "adm.priority.urgent": "Urgent",
+  "adm.priority.tres_urgent": "Très urgent",
+  "adm.priority.vital": "Vital — SMUR",
+
+  // Colonnes du tableau
+  "adm.col.number": "N° Admission",
+  "adm.col.mpi": "MPI",
+  "adm.col.patient": "Patient",
+  "adm.col.service": "Service",
+  "adm.col.doctor": "Médecin",
+  "adm.col.bed": "Chambre / Lit",
+  "adm.col.date": "Date admission",
+  "adm.col.type": "Type",
+  "adm.col.priority": "Priorité",
+  "adm.col.status": "Statut",
+  "adm.col.actions": "Actions",
+
+  // Filtres
+  "adm.filter.search": "Rechercher par N° admission, MPI, patient…",
+  "adm.filter.type": "Type — Tous",
+  "adm.filter.status": "Statut — Tous",
+  "adm.filter.priority": "Priorité — Toutes",
+  "adm.filter.service": "Service — Tous",
+  "adm.filter.date_from": "Du",
+  "adm.filter.date_to": "Au",
+  "adm.filter.reset": "Réinitialiser",
+  "adm.filter.results": "résultat(s)",
+
+  // Formulaire — étapes
+  "adm.form.title.create": "Nouvelle admission",
+  "adm.form.title.edit": "Modifier l'admission",
+  "adm.form.step1": "Recherche patient",
+  "adm.form.step2": "Informations admission",
+  "adm.form.step3": "Attribution lit",
+  "adm.form.step_of": "Étape",
+  "adm.form.of": "sur",
+  "adm.form.prev": "Précédent",
+  "adm.form.next": "Suivant",
+  "adm.form.save": "Confirmer l'admission",
+  "adm.form.saving": "Enregistrement…",
+  "adm.form.cancel": "Annuler",
+  "adm.form.required": "Champ obligatoire",
+
+  // Step 1 — Recherche patient
+  "adm.form.search.label": "Rechercher un patient existant",
+  "adm.form.search.placeholder": "Entrez le N° MPI, nom ou téléphone…",
+  "adm.form.search.button": "Rechercher",
+  "adm.form.search.hint": "Chaque admission doit être liée à un patient enregistré.",
+  "adm.form.search.not_found": "Aucun patient trouvé pour cette recherche.",
+  "adm.form.search.select": "Sélectionner ce patient",
+  "adm.form.search.selected": "Patient sélectionné",
+  "adm.form.search.change": "Changer de patient",
+  "adm.form.search.required": "Veuillez sélectionner un patient avant de continuer.",
+
+  // Step 2 — Infos admission
+  "adm.form.type": "Type d'admission",
+  "adm.form.service": "Service",
+  "adm.form.doctor": "Médecin responsable",
+  "adm.form.motif": "Motif d'admission",
+  "adm.form.motif.placeholder": "Décrivez le motif principal d'admission…",
+  "adm.form.priority": "Niveau de priorité",
+  "adm.form.date": "Date d'admission",
+  "adm.form.time": "Heure d'admission",
+  "adm.form.expected_discharge": "Date de sortie prévisionnelle",
+  "adm.form.preadmission_date": "Date d'admission prévue",
+  "adm.form.notes": "Notes complémentaires",
+  "adm.form.notes.placeholder": "Informations supplémentaires…",
+
+  // Step 3 — Lit
+  "adm.form.bed.title": "Attribution d'un lit (optionnel)",
+  "adm.form.bed.hint": "Sélectionnez un bâtiment, un étage, puis un lit disponible.",
+  "adm.form.bed.building": "Bâtiment",
+  "adm.form.bed.floor": "Étage",
+  "adm.form.bed.room": "Chambre",
+  "adm.form.bed.skip": "Continuer sans lit (attribuer plus tard)",
+  "adm.form.bed.selected": "Lit sélectionné",
+  "adm.form.bed.none": "Aucun lit sélectionné",
+
+  // Statuts de lits
+  "adm.bed.libre": "Libre",
+  "adm.bed.occupe": "Occupé",
+  "adm.bed.nettoyage": "Nettoyage",
+  "adm.bed.maintenance": "Maintenance",
+  "adm.bed.occupied_by": "Occupé par",
+
+  // Actions rapides
+  "adm.action.view": "Voir détail",
+  "adm.action.edit": "Modifier",
+  "adm.action.discharge": "Sortie patient",
+  "adm.action.transfer": "Transférer",
+  "adm.action.cancel": "Annuler",
+  "adm.action.print": "Imprimer fiche",
+  "adm.action.timeline": "Historique",
+
+  // Sortie
+  "adm.discharge.title": "Sortie du patient",
+  "adm.discharge.type": "Type de sortie",
+  "adm.discharge.type.domicile": "Retour à domicile",
+  "adm.discharge.type.transfert_interne": "Transfert interne",
+  "adm.discharge.type.transfert_externe": "Transfert externe",
+  "adm.discharge.type.deces": "Décès",
+  "adm.discharge.type.fugue": "Fugue",
+  "adm.discharge.type.contre_avis": "Contre avis médical",
+  "adm.discharge.date": "Date de sortie",
+  "adm.discharge.time": "Heure de sortie",
+  "adm.discharge.notes": "Résumé / notes de sortie",
+  "adm.discharge.confirm": "Confirmer la sortie",
+
+  // Transfert
+  "adm.transfer.title": "Transfert du patient",
+  "adm.transfer.to": "Destination (service ou établissement)",
+  "adm.transfer.date": "Date de transfert",
+  "adm.transfer.notes": "Motif du transfert",
+  "adm.transfer.confirm": "Confirmer le transfert",
+
+  // Timeline
+  "adm.timeline.title": "Historique des événements",
+  "adm.timeline.empty": "Aucun événement enregistré",
+  "adm.timeline.admission": "Admission",
+  "adm.timeline.transfer": "Transfert",
+  "adm.timeline.bed_change": "Changement de lit",
+  "adm.timeline.discharge": "Sortie",
+  "adm.timeline.status_change": "Changement de statut",
+  "adm.timeline.note": "Note clinique",
+  "adm.timeline.exam_ordered": "Examen prescrit",
+  "adm.timeline.exam_result": "Résultat d'examen",
+
+  // Messages
+  "adm.empty.title": "Aucune admission",
+  "adm.empty.desc": "Aucune admission ne correspond aux critères de recherche.",
+  "adm.success.created": "Admission créée avec succès",
+  "adm.success.discharged": "Sortie enregistrée",
+  "adm.success.transferred": "Transfert enregistré",
+  "adm.success.cancelled": "Admission annulée",
+
+  // Pagination
+  "adm.pagination.of": "sur",
+  "adm.pagination.prev": "Précédent",
+  "adm.pagination.next": "Suivant",
+
+  // Confirm dialogs
+  "adm.confirm.cancel.title": "Annuler l'admission",
+  "adm.confirm.cancel.desc": "Êtes-vous sûr de vouloir annuler cette admission ?",
+  "adm.confirm.cancel.yes": "Oui, annuler",
+  "adm.confirm.cancel.no": "Non, garder",
 };

@@ -4,3 +4,4 @@ export * from './patient';
 export * from './medical';
 export * from './api';
 export * from './ui';
+export * from './admission';

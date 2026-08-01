@@ -14,7 +14,9 @@ export type Permission =
   // Appointments
   | 'appointments.view' | 'appointments.create' | 'appointments.edit' | 'appointments.cancel'
   // Admissions
-  | 'admissions.view' | 'admissions.create' | 'admissions.discharge'
+  | 'admissions.view' | 'admissions.create' | 'admissions.edit'
+  | 'admissions.discharge' | 'admissions.transfer' | 'admissions.cancel'
+  | 'admissions.export' | 'admissions.view_audit'
   // Emergencies
   | 'emergencies.view' | 'emergencies.triage'
   // Consultations
@@ -54,7 +56,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'patients.view', 'patients.create', 'patients.edit', 'patients.archive',
     'patients.export', 'patients.view_sensitive', 'patients.override_duplicate', 'patients.view_audit',
     'appointments.view', 'appointments.create', 'appointments.edit', 'appointments.cancel',
-    'admissions.view', 'admissions.create', 'admissions.discharge',
+    'admissions.view', 'admissions.create', 'admissions.edit',
+    'admissions.discharge', 'admissions.transfer', 'admissions.cancel',
+    'admissions.export', 'admissions.view_audit',
     'emergencies.view', 'emergencies.triage',
     'consultations.view', 'consultations.create', 'consultations.edit',
     'operating_room.view', 'operating_room.schedule',
@@ -93,7 +97,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'dashboard.view',
     'patients.view', 'patients.create', 'patients.edit', 'patients.view_sensitive',
     'appointments.view', 'appointments.create', 'appointments.edit', 'appointments.cancel',
-    'admissions.view', 'admissions.create', 'admissions.discharge',
+    'admissions.view', 'admissions.create', 'admissions.edit',
+    'admissions.discharge', 'admissions.transfer', 'admissions.cancel',
     'emergencies.view', 'emergencies.triage',
     'consultations.view', 'consultations.create', 'consultations.edit',
     'operating_room.view',
@@ -119,7 +124,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'dashboard.view',
     'patients.view', 'patients.create', 'patients.edit', 'patients.export', 'patients.override_duplicate',
     'appointments.view', 'appointments.create', 'appointments.edit', 'appointments.cancel',
-    'admissions.view', 'admissions.create',
+    'admissions.view', 'admissions.create', 'admissions.edit', 'admissions.cancel',
     'emergencies.view',
     'finance.view', 'finance.create_invoice',
   ],
