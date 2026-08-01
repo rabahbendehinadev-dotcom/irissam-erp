@@ -386,7 +386,7 @@ function PatientExpandedCard({ patient, isDark, onClose }: {
 
       {/* Start care button */}
       <button
-        onClick={() => alert(`Prise en charge démarrée pour ${patient.lastName} ${patient.firstName} — intégration backend disponible prochainement`)}
+        onClick={() => setLocation(`/emergencies/${patient.id}`)}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
       >
         <Play size={15} fill="white" /> Démarrer la prise en charge
@@ -515,7 +515,7 @@ function PatientRow({ patient, tick, isDark }: { patient: EmergencyPatient; tick
         {/* Start care + expand */}
         <div className="flex-shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
           <button
-            onClick={() => alert(`Prise en charge démarrée — ${patient.lastName} ${patient.firstName}`)}
+            onClick={() => setLocation(`/emergencies/${patient.id}`)}
             className={cn(
               'flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors whitespace-nowrap',
               patient.status === 'attente_soins' || patient.status === 'attente_triage'
