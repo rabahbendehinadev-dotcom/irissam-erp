@@ -35,7 +35,8 @@ const FILTER_GROUPS: { key: string; label: string; types: TimelineEventType[] }[
   { key: 'clinical',     label: 'Clinique',          types: ['consultation', 'prescription', 'laboratory', 'result', 'imaging', 'emergency'] },
   { key: 'hospitalizations', label: 'Hospitalisations', types: ['admission', 'hospitalization', 'discharge'] },
   { key: 'prevention',   label: 'Prévention',        types: ['vaccination', 'appointment'] },
-  { key: 'admin',        label: 'Administratif',     types: ['creation', 'update', 'document', 'document_update', 'invoice', 'payment'] },
+  { key: 'financier',    label: 'Financier',          types: ['invoice', 'payment'] },
+  { key: 'admin',        label: 'Administratif',     types: ['creation', 'update', 'document', 'document_update'] },
 ];
 
 const MEDICAL_PATHWAY: Array<{ type: TimelineEventType; label: string }> = [
