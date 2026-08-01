@@ -1,64 +1,155 @@
 # IRISSAM HOSPITAL ERP
 
-Tableau de bord professionnel pour la gestion hospitalière IRISSAM — statistiques en temps réel, alertes critiques, patients récents et rendez-vous à venir.
+Système de gestion hospitalière IRISSAM — tableau de bord professionnel avec fondation architecturale complète prête pour l'ajout de modules métier.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/irissam-erp run dev` — lancer le frontend (port auto)
+- `pnpm --filter @workspace/api-server run dev` — lancer le serveur API
+- `pnpm run typecheck` — vérification TypeScript complète
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Frontend: React 18 + Vite + Tailwind CSS v4
+- Charts: Recharts
+- Routing: Wouter
+- State: React Context (multi-provider pattern)
+- Icons: lucide-react
+- API: Express 5 (api-server artifact)
+- DB (futur): PostgreSQL + Drizzle ORM
 
-## Where things live
+## Structure du projet (src/)
 
-- `artifacts/irissam-erp/src/i18n/` — système i18n (fr/ar/en) avec support RTL automatique
-- `artifacts/irissam-erp/src/components/layout/` — Sidebar, Topbar, DashboardLayout
-- `artifacts/irissam-erp/src/components/dashboard/` — StatsCard, charts (recharts), widgets
-- `artifacts/irissam-erp/src/pages/Dashboard.tsx` — page principale
-- `attached_assets/` — logo + screenshot de référence du design
-- `lib/api-spec/openapi.yaml` — contrat API (à étendre pour les vrais modules)
+```
+src/
+├── config/                     # Configuration globale
+│   ├── constants.ts            # APP_NAME, STORAGE_KEYS, couleurs, etc.
+│   ├── routes.ts               # Toutes les routes (ROUTES.PATIENTS, etc.)
+│   └── permissions.ts          # Matrice rôle→permissions (ROLE_PERMISSIONS)
+│
+├── types/                      # Types TypeScript globaux
+│   ├── auth.ts                 # User, UserRole, Session
+│   ├── hospital.ts             # Site, Building, Floor, Department, SiteFilter
+│   ├── patient.ts              # Patient, Admission, Appointment
+│   ├── medical.ts              # MedicalAlert, Medication, BedOccupancy
+│   ├── api.ts                  # ApiResponse<T>, PaginatedResponse<T>, ApiError
+│   ├── ui.ts                   # TableColumn, BreadcrumbItem, NavItem, BadgeVariant
+│   └── index.ts                # Barrel export (export * from './...')
+│
+├── i18n/                       # Internationalisation
+│   ├── index.tsx               # I18nProvider + useLanguage() hook
+│   ├── fr.ts                   # Français (langue par défaut)
+│   ├── ar.ts                   # العربية (RTL auto via document.dir)
+│   └── en.ts                   # English
+│
+├── mock/                       # Données de test centralisées et typées
+│   ├── sites.ts                # MOCK_SITES, MOCK_BUILDINGS, MOCK_FLOORS, MOCK_DEPARTMENTS
+│   ├── patients.ts             # MOCK_PATIENTS (6 patients typés)
+│   ├── appointments.ts         # MOCK_APPOINTMENTS (5 rdv avec patients imbriqués)
+│   ├── alerts.ts               # MOCK_ALERTS (5 alertes critiques/moyennes)
+│   ├── dashboard.ts            # MOCK_DASHBOARD_STATS, charts data
+│   ├── inventory.ts            # MOCK_MEDICATIONS_LOW_STOCK, blood bank, ambulances
+│   └── index.ts                # Barrel export
+│
+├── services/                   # Couche service (stubs → à brancher sur API)
+│   ├── api/
+│   │   ├── client.ts           # ApiClient class (GET/POST/PATCH/DELETE + auth headers)
+│   │   └── endpoints.ts        # API_ENDPOINTS registry (toutes les routes API)
+│   ├── authService.ts          # Auth login/logout/me (stub)
+│   ├── notificationService.ts  # Notifications push/in-app (stub)
+│   └── auditService.ts         # Audit trail log/getLog (stub)
+│
+├── store/                      # State management (React Context)
+│   ├── AppProvider.tsx         # Provider racine (combine tous les contexts)
+│   ├── AuthContext.tsx         # Session utilisateur + login/logout
+│   ├── SiteContext.tsx         # Multi-sites/bâtiments/étages/départements
+│   ├── ThemeContext.tsx        # Light/Dark mode + localStorage
+│   └── NotificationsContext.tsx # Notifications in-app (liste + unread count)
+│
+├── hooks/                      # Hooks partagés
+│   ├── usePermission.ts        # can(), canAll(), canAny() → vérifie les permissions
+│   ├── useOnlineStatus.ts      # isOnline, lastSync, pendingSync
+│   ├── useSite.ts              # Re-export de useSite() depuis SiteContext
+│   ├── useTheme.ts             # Re-export de useTheme() depuis ThemeContext
+│   ├── useNotifications.ts     # Re-export de useNotifications()
+│   └── useAuditLog.ts          # log(action, resource, id) → auditService
+│
+├── utils/                      # Utilitaires purs
+│   ├── format.ts               # formatNumber, formatCurrency(DZD), formatDate,
+│   │                           # formatDateTime, formatTime, formatRelativeTime,
+│   │                           # calculateAge, getInitials, formatPercent
+│   ├── permissions.ts          # hasPermission(), hasAllPermissions(), hasAnyPermission()
+│   └── index.ts                # Barrel export
+│
+├── components/
+│   ├── ui/                     # Composants shadcn/ui (accordéon, dialog, toast…)
+│   ├── layout/                 # Layout du système
+│   │   ├── Sidebar.tsx         # Sidebar navale collapsible (220px → 64px)
+│   │   ├── Topbar.tsx          # Barre du haut (recherche, filtres, user, langue)
+│   │   ├── DashboardLayout.tsx # Wrapper Sidebar + Topbar + contenu
+│   │   ├── PageHeader.tsx      # Titre + sous-titre + fil d'Ariane + actions
+│   │   └── index.ts            # Barrel export
+│   ├── shared/                 # Composants réutilisables cross-modules
+│   │   ├── StatusBadge.tsx     # Badge coloré (success/warning/danger/info/neutral)
+│   │   ├── PatientAvatar.tsx   # Avatar initiales avec couleur déterministe
+│   │   ├── EmptyState.tsx      # État vide (icône + titre + description + action)
+│   │   ├── LoadingSkeleton.tsx # Skeletons (StatCard, TableRow, Card)
+│   │   ├── PageWrapper.tsx     # Wrapper standard de page (padding + spacing)
+│   │   └── index.ts            # Barrel export
+│   └── dashboard/              # Composants spécifiques au tableau de bord
+│       ├── StatsCard.tsx
+│       ├── ChartConsultations.tsx
+│       ├── ChartAdmissions.tsx
+│       ├── ChartServices.tsx
+│       ├── AlertsPanel.tsx
+│       ├── RecentPatients.tsx
+│       ├── UpcomingAppointments.tsx
+│       └── MiniWidgets.tsx
+│
+└── pages/
+    ├── Dashboard.tsx           # Page principale du tableau de bord
+    └── not-found.tsx           # Page 404
+```
+
+## Système de permissions
+
+Rôles définis (src/config/permissions.ts) :
+- `administrateur` — accès total
+- `directeur` — lecture + validation
+- `medecin` — patients + consultations + ordonnances
+- `infirmier` — soins + dossiers en lecture
+- `reception` — patients + rdv + facturation
+- `laboratoire` — analyses + banque de sang
+- `radiologie` — imagerie
+- `pharmacie` — stock + dispensation
+- `finance` — facturation + rapports
+- `rh` — personnel + médecins
+
+Usage : `const { can } = usePermission(); if (can('patients.create')) { ... }`
+
+## Supports futurs (stubs prêts)
+
+- **Multi-sites** : SiteContext gère Site → Bâtiment → Étage → Département
+- **Offline/Online** : useOnlineStatus() détecte navigator.onLine, stub sync prêt
+- **Notifications** : NotificationsContext + notificationService stub (push/WebSocket)
+- **Audit Trail** : auditService stub + useAuditLog hook (log toutes les actions)
+- **Dark Mode** : ThemeContext avec toggle + localStorage + classe .dark sur <html>
+- **Auth** : AuthContext + authService stub → brancher sur /api/auth quand prêt
 
 ## Architecture decisions
 
-- Toutes les données sont mock (arrays statiques) — aucun appel API pour cette v1 dashboard
-- i18n maison (useLanguage hook) supportant fr/ar/en avec RTL dynamique sur `document.documentElement.dir`
-- Sidebar collapsible (220px → 64px) avec gestion locale de l'état
-- Recharts pour tous les graphiques (LineChart, BarChart, PieChart donut)
-- Palette stricte depuis la maquette : sidebar #1B2A4A, background #F1F5F9, accents bleu/vert/orange/violet/rouge
-
-## Product
-
-Dashboard ERP hospitalier avec :
-- 12 cartes de statistiques (patients, consultations, lits, CA, etc.)
-- 3 graphiques (évolution consultations, admissions/sorties, répartition par service)
-- Alertes critiques, patients récents, rendez-vous à venir
-- 6 mini-widgets (occupation lits, réanimation, bloc, banque de sang, ambulances, stock faible)
-- Sélecteurs multi-sites (site, bâtiment, étage, service)
-- Commutateur de langue (FR / AR RTL / EN) en temps réel
+- **AppProvider** combine tous les contextes dans l'ordre correct (QueryClient → I18n → Theme → Auth → Site → Notifications → Tooltip)
+- **Mock data centralisée** dans src/mock/ — typée, exportée en barrel, prête à remplacer par des hooks API
+- **Services stubs** dans src/services/ — interface + implémentation mock, à remplacer par apiClient.get()/post() quand le backend est prêt
+- **Permissions déclaratives** dans ROLE_PERMISSIONS — matrice rôle→[permissions], aucun if/else métier
+- `src/i18n/index.tsx` reste en `.tsx` (contient du JSX) — ne pas renommer en .ts
+- Le logo est importé via `@assets/9e2f711d-...png` (alias Vite @assets → attached_assets/)
 
 ## User preferences
 
-- Reproduire la maquette fournie en screenshot avec une fidélité maximale
-- Pas de texte hardcodé — tout passe par le système i18n
-- Données mock uniquement pour cette première version
-- Pas d'emojis dans l'UI
-
-## Gotchas
-
-- `src/i18n/index.tsx` doit rester en `.tsx` (contient du JSX) — ne pas renommer en `.ts`
-- Le logo est importé via `@assets/9e2f711d-...png` (chemin résolu par vite.config.ts alias `@assets`)
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Reproduire la maquette de référence avec fidélité maximale
+- Pas de texte hardcodé — tout passe par useLanguage() / t()
+- Données mock uniquement jusqu'à la validation des modules
+- Pas d'emojis dans l'UI — lucide-react icons uniquement
+- Architecture en couches : types → mock → services → store → hooks → components → pages

@@ -142,5 +142,9 @@ export default {
   "widget.stock.view_all": "عرض الكل",
 
   // Footer
-  "footer.copyright": "© 2024 نظام إيريسام للمستشفيات – جميع الحقوق محفوظة"
+  "footer.copyright": "© 2024 نظام إيريسام للمستشفيات – جميع الحقوق محفوظة",
+
+  // Placeholder
+  "page.coming_soon": "قريباً",
+  "page.coming_soon_desc": "هذه الصفحة قيد التطوير."
 };

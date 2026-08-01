@@ -142,5 +142,9 @@ export default {
   "widget.stock.view_all": "View all",
 
   // Footer
-  "footer.copyright": "© 2024 IRISSAM HOSPITAL ERP – All rights reserved"
+  "footer.copyright": "© 2024 IRISSAM HOSPITAL ERP – All rights reserved",
+
+  // Placeholder
+  "page.coming_soon": "Coming Soon",
+  "page.coming_soon_desc": "This page is under development."
 };
