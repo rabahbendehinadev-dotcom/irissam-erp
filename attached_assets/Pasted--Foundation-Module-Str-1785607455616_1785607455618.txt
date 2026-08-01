@@ -1,0 +1,483 @@
+ممتاز، هكذا نقدر نقول بلي **الـFoundation راهي مهيأة مليح** ونقدرو نبدأو أول Module حقيقي.
+
+الـStructure اللي دارها Replit مليحة بزاف، خاصة:
+
+* فصل `types` و`services` و`hooks`.
+* نظام اللغات الثلاث.
+* الصلاحيات.
+* Multi-sites.
+* Online/Offline foundation.
+* Audit.
+* API client.
+* Shared components.
+
+ما نزيدوش نطلبو Architecture أخرى الآن باش ما نضيعوش الوقت.
+
+المرحلة الجاية تكون:
+
+# Module 1: Gestion des Patients — MPI
+
+وهذا أهم Module، لأنه كل النظام راح يرتبط بالمريض.
+
+انسخ له هذا البرومبت:
+
+```text
+الآن ابدأ أول Module حقيقي في نظام IRISSAM HOSPITAL ERP:
+
+MODULE: GESTION DES PATIENTS — MASTER PATIENT INDEX (MPI)
+
+مهم جدًا:
+
+- لا تبدأ أي Module آخر.
+- استعمل الـFoundation الموجودة حاليًا.
+- لا تغيّر تصميم الـDashboard أو الـLayout.
+- لا تهدم أو تعيد تنظيم الـArchitecture الحالية إلا إذا كان هناك خطأ تقني حقيقي، وفي هذه الحالة اشرح المشكلة قبل التعديل.
+- يجب أن يدعم Module اللغات الثلاث:
+  - Français افتراضيًا
+  - العربية مع RTL
+  - English
+- استعمل حاليًا Mock Data منظمة وقابلة للاستبدال لاحقًا بـ API وقاعدة بيانات حقيقية.
+- كل النصوص يجب أن تمر عبر نظام الترجمة الحالي.
+- كل العمليات الحساسة يجب أن تمر عبر نظام الصلاحيات والـAudit الموجودين.
+
+==================================================
+1. الهدف من Module
+==================================================
+
+إنشاء Master Patient Index مركزي يسمح بإنشاء ملف موحد ودائم لكل مريض داخل المستشفى.
+
+يجب أن يستعمل نفس Patient ID في:
+
+- المواعيد
+- الاستقبال
+- الاستشارات
+- الطوارئ
+- الاستشفاء
+- العمليات
+- الإنعاش
+- المختبر
+- الأشعة
+- الصيدلية
+- بنك الدم
+- الفوترة
+- الأرشيف
+
+ممنوع إنشاء نفس المريض مرتين بدون تنبيه واضح.
+
+==================================================
+2. صفحة قائمة المرضى
+==================================================
+
+أنشئ صفحة احترافية باسم:
+
+Patients
+
+وتحتوي على:
+
+- عنوان الصفحة.
+- وصف مختصر.
+- زر Ajouter un patient.
+- زر Export.
+- زر Import لاحقًا، يكون Disabled أو Placeholder.
+- عدد المرضى الإجمالي.
+- عدد المرضى النشطين.
+- عدد الملفات غير المكتملة.
+- عدد حالات التكرار المحتملة.
+
+==================================================
+3. جدول المرضى
+==================================================
+
+أنشئ Data Table احترافية تحتوي على:
+
+- Photo / Avatar
+- Numéro patient MPI
+- Numéro de dossier
+- Nom
+- Prénom
+- Nom complet
+- Sexe
+- Date de naissance
+- Âge محسوب تلقائيًا
+- Téléphone
+- Groupe sanguin
+- Site
+- Service الحالي إن وجد
+- Statut
+- Date de création
+- Dernière mise à jour
+
+Actions:
+
+- Voir
+- Modifier
+- Historique
+- Imprimer la fiche
+- Archiver
+
+لا تسمح بالحذف النهائي للمريض من الواجهة.
+
+استعمل Archive / Soft Delete فقط.
+
+==================================================
+4. البحث والفلاتر
+==================================================
+
+أضف بحثًا سريعًا ومتقدمًا حسب:
+
+- Nom
+- Prénom
+- Nom complet
+- Numéro MPI
+- Numéro de dossier
+- Téléphone
+- Date de naissance
+- Numéro d’identité
+- Numéro de sécurité sociale
+- Groupe sanguin
+- Sexe
+- Site
+- Statut
+- Date de création
+
+أضف:
+
+- Reset filters
+- عدد النتائج
+- Pagination
+- اختيار عدد النتائج في الصفحة
+- Sorting
+- حفظ الفلاتر لاحقًا كـ Placeholder
+
+==================================================
+5. إنشاء مريض جديد
+==================================================
+
+أنشئ Form احترافية مقسمة إلى Tabs أو Steps:
+
+Step 1 — Identité
+- Nom
+- Prénom
+- Nom de jeune fille إن وجد
+- Sexe
+- Date de naissance
+- Lieu de naissance
+- Nationalité
+- Situation familiale
+- Photo
+
+Step 2 — Identifiants
+- Numéro de pièce d’identité
+- Type de pièce
+- Numéro de sécurité sociale
+- Numéro de dossier administratif
+- MPI ID يولد تلقائيًا
+- Numéro interne يولد تلقائيًا
+
+Step 3 — Coordonnées
+- Téléphone principal
+- Téléphone secondaire
+- Email
+- Adresse
+- Commune
+- Wilaya
+- Code postal
+- Pays
+
+Step 4 — Informations médicales de base
+- Groupe sanguin
+- Rhésus
+- Allergies connues
+- Antécédents majeurs
+- Maladies chroniques
+- Handicap
+- Notes médicales critiques
+
+Step 5 — Contact d’urgence
+- Nom complet
+- Relation
+- Téléphone
+- Adresse
+- Personne à prévenir
+
+Step 6 — Ayants droit et assurance
+- Type de prise en charge
+- Assurance
+- Organisme payeur
+- Numéro d’adhérent
+- Ayants droit
+- Date de validité
+- Pièces justificatives
+
+Step 7 — Documents
+- CNI
+- Carte de sécurité sociale
+- Assurance
+- Ordonnances
+- Documents administratifs
+- Photos ou scans
+- Préparer la structure d’upload, mais utiliser Mock Data maintenant.
+
+==================================================
+6. Détection des doublons
+==================================================
+
+قبل إنشاء المريض، نفذ فحصًا تجريبيًا للتكرار حسب:
+
+- Nom + Prénom + Date de naissance
+- Téléphone
+- Numéro d’identité
+- Numéro de sécurité sociale
+
+إذا وجد احتمال تكرار:
+
+- لا تمنع المستخدم مباشرة.
+- اعرض Modal واضحة.
+- اعرض الملفات المحتملة.
+- اعرض نسبة التشابه.
+- أزرار:
+  - Ouvrir le patient existant
+  - Continuer quand même
+  - Annuler
+
+عملية “Continuer quand même” يجب أن تطلب Permission خاصة وتسجل في Audit Log.
+
+==================================================
+7. صفحة تفاصيل المريض
+==================================================
+
+أنشئ Patient Profile احترافية تحتوي على Header فيه:
+
+- Photo
+- Nom complet
+- MPI ID
+- Numéro de dossier
+- Âge
+- Sexe
+- Groupe sanguin
+- Téléphone
+- Statut
+- Site الحالي
+
+Tabs:
+
+- Vue générale
+- Identité
+- Contacts
+- Assurance
+- Documents
+- Antécédents
+- Allergies
+- Rendez-vous
+- Admissions
+- Consultations
+- Urgences
+- Hospitalisations
+- Laboratoire
+- Imagerie
+- Prescriptions
+- Factures
+- Historique
+- Audit
+
+في هذه المرحلة:
+- فعّل فقط Tabs الخاصة بالمعلومات الأساسية.
+- باقي Tabs تكون جاهزة كـ Placeholders مرتبطة بالـPatient ID.
+- لا تبنِ Modules المواعيد أو المختبر أو الأشعة الآن.
+
+==================================================
+8. Timeline
+==================================================
+
+أضف Timeline للمريض تعرض Mock Events:
+
+- Création du dossier
+- Mise à jour des coordonnées
+- Ajout d’un document
+- Rendez-vous créé
+- Admission enregistrée
+- Résultat ajouté
+
+كل عنصر يحتوي على:
+- النوع
+- التاريخ والوقت
+- المستخدم
+- الموقع
+- الوصف
+
+==================================================
+9. الصلاحيات
+==================================================
+
+استعمل usePermission() الحالي.
+
+حضّر Permissions مثل:
+
+- patients.view
+- patients.create
+- patients.update
+- patients.archive
+- patients.export
+- patients.view_sensitive
+- patients.override_duplicate
+- patients.view_audit
+
+السلوك:
+
+- إذا ما عندوش view ما يفتحش الصفحة.
+- إذا ما عندوش create ما يظهرش زر الإضافة.
+- إذا ما عندوش update تكون الحقول Read-only.
+- البيانات الحساسة تختفي بدون patients.view_sensitive.
+- تجاوز التكرار يحتاج patients.override_duplicate.
+
+==================================================
+10. Audit Trail
+==================================================
+
+استعمل useAuditLog() الحالي لتسجيل:
+
+- فتح ملف مريض
+- إنشاء مريض
+- تعديل مريض
+- أرشفة مريض
+- تصدير بيانات
+- عرض بيانات حساسة
+- تجاوز تنبيه التكرار
+- تحميل أو إضافة وثيقة
+
+يجب أن يظهر:
+- المستخدم
+- الوقت
+- الإجراء
+- Patient ID
+- الحقول المعدلة
+- القيمة القديمة والجديدة لاحقًا
+
+==================================================
+11. Multi-sites
+==================================================
+
+اربط الصفحة مع SiteContext الحالي.
+
+يجب أن تتغير قائمة المرضى حسب:
+
+- Site
+- Building
+- Floor
+- Department
+
+لكن MPI يبقى موحدًا على مستوى كامل المؤسسة.
+
+لا تنشئ Patient ID مختلف لكل Site.
+
+==================================================
+12. Online / Offline
+==================================================
+
+حضّر الواجهة لتدعم:
+
+- عرض القائمة Offline.
+- إنشاء مريض Offline لاحقًا.
+- Badge “En attente de synchronisation”.
+- حالة Sync لكل سجل.
+- Pending
+- Synced
+- Conflict
+- Error
+
+في هذه المرحلة استعمل Mock Sync Status فقط.
+
+لا تنفذ قاعدة بيانات Offline كاملة الآن.
+
+==================================================
+13. Components المطلوبة
+==================================================
+
+أنشئ Components قابلة لإعادة الاستخدام مثل:
+
+- PatientTable
+- PatientFilters
+- PatientForm
+- PatientFormStep
+- PatientProfileHeader
+- PatientSummaryCard
+- PatientStatusBadge
+- DuplicatePatientModal
+- PatientTimeline
+- PatientDocuments
+- PatientQuickActions
+- SensitiveField
+- SyncStatusBadge
+
+لا تضع كل الكود في ملف واحد.
+
+==================================================
+14. UX
+==================================================
+
+- استعمل نفس Design System الحالي.
+- لا تغيّر الـSidebar ولا الـTopbar.
+- النصوص تكون واضحة وغير صغيرة.
+- Form يكون منظمًا ومريحًا.
+- Validation messages واضحة.
+- Confirmations قبل الأرشفة.
+- Loading Skeletons.
+- Empty State.
+- Error State.
+- Responsive على Desktop وTablet وMobile.
+- لا يوجد Horizontal Scroll غير ضروري.
+
+==================================================
+15. البيانات التجريبية
+==================================================
+
+استعمل بيانات جزائرية واقعية، بدون استعمال بيانات حقيقية:
+
+- أسماء جزائرية.
+- أرقام هاتف جزائرية تجريبية.
+- Wilayas وCommunes.
+- عملة DZD عند الحاجة.
+- تواريخ بصيغة فرنسية.
+- مجموعات دم مختلفة.
+- حالات ملفات مختلفة.
+
+ضع شارة صغيرة:
+
+Données de démonstration
+
+==================================================
+16. معايير القبول
+==================================================
+
+لا تعتبر Module مكتملًا إلا إذا:
+
+- صفحة القائمة تعمل.
+- البحث والفلاتر تعمل على Mock Data.
+- Pagination تعمل.
+- Form الإضافة يعمل.
+- Validation تعمل.
+- كشف التكرار يعمل.
+- صفحة التفاصيل تعمل.
+- Tabs تعمل.
+- Timeline تعمل.
+- Permissions تتحكم في الواجهة.
+- Audit hooks يتم استدعاؤها.
+- Multi-site filters تعمل.
+- اللغة الفرنسية والعربية والإنجليزية تعمل.
+- RTL صحيح.
+- الواجهة Responsive.
+- لا توجد أخطاء Console.
+- لا يتم كسر Dashboard الحالية.
+- لا يتم بناء أي Module آخر.
+
+بعد الانتهاء:
+
+1. اعرض Structure الملفات التي أنشأتها.
+2. اشرح Components الجديدة.
+3. اشرح Permissions المستعملة.
+4. اشرح Mock Data.
+5. اشرح ما تم تأجيله للـBackend.
+6. اعرض قائمة اختبارات يدوية يمكنني القيام بها.
+```
+
+هذه المرحلة ما زالت Frontend وMock Data فقط. كي يكملها Replit ونراجعها، بعدها نقرر هل نربط مباشرة الـPatients بقاعدة البيانات والـAPI، أو نبني أولًا نظام Authentication والصلاحيات الحقيقي.
