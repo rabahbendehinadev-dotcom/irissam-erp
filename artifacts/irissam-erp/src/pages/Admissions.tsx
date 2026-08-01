@@ -12,12 +12,13 @@ import { AdmissionStatusBadge } from '@/components/admissions/AdmissionStatusBad
 import { AdmissionTypeBadge } from '@/components/admissions/AdmissionTypeBadge';
 import { PriorityBadge } from '@/components/admissions/PriorityBadge';
 import {
-  MOCK_ADMISSIONS, MOCK_ADMISSION_TIMELINES,
+  MOCK_ADMISSION_TIMELINES,
 } from '@/mock';
 import type { Admission } from '@/types/admission';
 import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { useAdmissions } from '@/store/AdmissionsContext';
 import { formatDate } from '@/utils/format';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
 
@@ -196,6 +197,7 @@ export default function AdmissionsPage() {
   const { t } = useLanguage();
   const { can } = usePermission();
   const { log } = useAuditLog();
+  const { admissions, discharge, transfer, cancel } = useAdmissions();
 
   const [filters, setFilters] = useState<AdmissionFiltersState>(DEFAULT_ADM_FILTERS);
   const [page, setPage]       = useState(1);
@@ -218,7 +220,7 @@ export default function AdmissionsPage() {
 
   const filtered = useMemo(() => {
     const q = filters.search.toLowerCase();
-    return MOCK_ADMISSIONS
+    return admissions
       .filter(a => {
         if (q && ![ a.admissionNumber, a.patientMpiId, a.patientName, a.serviceName ].some(v => v.toLowerCase().includes(q))) return false;
         if (filters.type     !== 'all' && a.type     !== filters.type)     return false;
@@ -292,7 +294,7 @@ export default function AdmissionsPage() {
           filters={filters}
           onChange={f => { setFilters(f); setPage(1); }}
           resultCount={filtered.length}
-          total={MOCK_ADMISSIONS.length}
+          total={admissions.length}
         />
 
         {/* Table */}
@@ -363,6 +365,7 @@ export default function AdmissionsPage() {
         <DischargeModal
           admission={discharging}
           onConfirm={(type, date, time, notes) => {
+            discharge(discharging.id, type, date, time, notes);
             log('archive', 'admission', discharging.id, `Sortie ${type}`);
             setDischarging(null);
           }}
@@ -374,6 +377,7 @@ export default function AdmissionsPage() {
         <TransferModal
           admission={transferring}
           onConfirm={(to, date, notes) => {
+            transfer(transferring.id, to, date, notes);
             log('update', 'admission', transferring.id, `Transfert → ${to}`);
             setTransferring(null);
           }}
@@ -396,7 +400,11 @@ export default function AdmissionsPage() {
               <button onClick={() => setCancelling(null)} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
                 {t('adm.confirm.cancel.no')}
               </button>
-              <button onClick={() => { log('archive', 'admission', cancelling.id); setCancelling(null); }}
+              <button onClick={() => {
+                cancel(cancelling.id);
+                log('archive', 'admission', cancelling.id);
+                setCancelling(null);
+              }}
                 className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">
                 {t('adm.confirm.cancel.yes')}
               </button>

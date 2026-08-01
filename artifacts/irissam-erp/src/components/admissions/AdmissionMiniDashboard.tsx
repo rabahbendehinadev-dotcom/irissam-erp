@@ -1,10 +1,6 @@
 import { BedDouble, LogIn, LogOut, Users, TrendingUp, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/i18n';
-import {
-  MOCK_ADMISSIONS, MOCK_BEDS,
-  countFreeBeds, getOccupancyRate, getTodayAdmissions, getTodayDischarges,
-  getHospitalizedCount, getUrgentCount,
-} from '@/mock';
+import { useAdmissions } from '@/store/AdmissionsContext';
 
 function StatCard({ icon, label, value, sub, color }: {
   icon: React.ReactNode; label: string; value: string | number; sub?: string; color: string;
@@ -25,26 +21,41 @@ function StatCard({ icon, label, value, sub, color }: {
 
 export function AdmissionMiniDashboard() {
   const { t } = useLanguage();
-  const todayAdm = getTodayAdmissions();
-  const todayDis = getTodayDischarges();
-  const hospitalized = getHospitalizedCount();
-  const freeBeds = countFreeBeds();
-  const totalBeds = MOCK_BEDS.length;
-  const occupancy = getOccupancyRate();
-  const urgent = getUrgentCount();
+  const { admissions, beds } = useAdmissions();
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const todayAdmCount = admissions.filter(
+    a => a.admissionDate === today && a.status !== 'cancelled',
+  ).length;
+
+  const todayDisCount = admissions.filter(
+    a => a.actualDischargeDate === today,
+  ).length;
+
+  const hospitalized = admissions.filter(a => a.status === 'active').length;
+
+  const freeBeds = beds.filter(b => b.status === 'libre').length;
+  const totalBeds = beds.length;
+  const occupied = beds.filter(b => b.status === 'occupe').length;
+  const occupancy = Math.round((occupied / totalBeds) * 100);
+
+  const urgent = admissions.filter(
+    a => a.status === 'active' && ['urgent', 'tres_urgent', 'vital'].includes(a.priority),
+  ).length;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
       <StatCard
         icon={<LogIn size={20} className="text-blue-600" />}
         label={t('adm.stats.today_admissions')}
-        value={todayAdm.length}
+        value={todayAdmCount}
         color="bg-blue-50"
       />
       <StatCard
         icon={<LogOut size={20} className="text-green-600" />}
         label={t('adm.stats.today_discharges')}
-        value={todayDis.length}
+        value={todayDisCount}
         color="bg-green-50"
       />
       <StatCard

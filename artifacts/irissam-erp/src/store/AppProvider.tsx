@@ -6,6 +6,7 @@ import { AuthProvider } from './AuthContext';
 import { SiteProvider } from './SiteContext';
 import { ThemeProvider } from './ThemeContext';
 import { NotificationsProvider } from './NotificationsContext';
+import { AdmissionsProvider } from './AdmissionsContext';
 import { QUERY_STALE_TIME, QUERY_CACHE_TIME } from '@/config/constants';
 
 const queryClient = new QueryClient({
@@ -27,10 +28,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           <AuthProvider>
             <SiteProvider>
               <NotificationsProvider>
-                <TooltipProvider>
-                  {children}
-                  <Toaster />
-                </TooltipProvider>
+                <AdmissionsProvider>
+                  <TooltipProvider>
+                    {children}
+                    <Toaster />
+                  </TooltipProvider>
+                </AdmissionsProvider>
               </NotificationsProvider>
             </SiteProvider>
           </AuthProvider>
