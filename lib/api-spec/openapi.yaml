@@ -26,6 +26,8 @@ tags:
     description: Blood bank stock
   - name: vehicles
     description: Vehicle / ambulance fleet
+  - name: medications
+    description: Pharmacy / medication stock
 paths:
   /healthz:
     get:
@@ -183,6 +185,68 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BloodBankSummary"
+
+  /medications:
+    get:
+      operationId: getMedications
+      tags: [medications]
+      summary: Get paginated medication list with stock status
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [all, ok, low, critical, expired]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated medication list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicationPage"
+
+  /medications/{id}:
+    patch:
+      operationId: updateMedicationStock
+      tags: [medications]
+      summary: Update medication stock quantity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMedicationStockBody"
+      responses:
+        "200":
+          description: Updated medication id and quantity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicationStockUpdate"
+        "400":
+          description: Invalid input
+        "404":
+          description: Medication not found
 
   /vehicles/status:
     get:
@@ -406,6 +470,79 @@ components:
         - available
         - urgentRequests
         - expiringSoon
+
+    MedicationItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        quantity:
+          type: integer
+        unit:
+          type: string
+        lowStockThreshold:
+          type: integer
+        expiryDate:
+          type: string
+          nullable: true
+        expiringSoon:
+          type: boolean
+        status:
+          type: string
+          enum: [ok, low, critical, expired]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - quantity
+        - unit
+        - lowStockThreshold
+        - expiryDate
+        - expiringSoon
+        - status
+        - createdAt
+
+    MedicationPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MedicationItem"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+      required:
+        - data
+        - total
+        - page
+        - pageSize
+
+    UpdateMedicationStockBody:
+      type: object
+      properties:
+        quantity:
+          type: integer
+          minimum: 0
+      required:
+        - quantity
+
+    MedicationStockUpdate:
+      type: object
+      properties:
+        id:
+          type: integer
+        quantity:
+          type: integer
+      required:
+        - id
+        - quantity
 
     VehiclesStatus:
       type: object

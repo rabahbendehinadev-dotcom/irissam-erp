@@ -89,10 +89,67 @@ export interface BloodBankSummary {
   expiringSoon: number;
 }
 
+export type MedicationItemStatus = typeof MedicationItemStatus[keyof typeof MedicationItemStatus];
+
+
+export const MedicationItemStatus = {
+  ok: 'ok',
+  low: 'low',
+  critical: 'critical',
+  expired: 'expired',
+} as const;
+
+export interface MedicationItem {
+  id: number;
+  name: string;
+  quantity: number;
+  unit: string;
+  lowStockThreshold: number;
+  expiryDate: string | null;
+  expiringSoon: boolean;
+  status: MedicationItemStatus;
+  createdAt: string;
+}
+
+export interface MedicationPage {
+  data: MedicationItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface UpdateMedicationStockBody {
+  /** @minimum 0 */
+  quantity: number;
+}
+
+export interface MedicationStockUpdate {
+  id: number;
+  quantity: number;
+}
+
 export interface VehiclesStatus {
   total: number;
   inService: number;
   available: number;
   maintenance: number;
 }
+
+export type GetMedicationsParams = {
+status?: GetMedicationsStatus;
+search?: string;
+page?: number;
+pageSize?: number;
+};
+
+export type GetMedicationsStatus = typeof GetMedicationsStatus[keyof typeof GetMedicationsStatus];
+
+
+export const GetMedicationsStatus = {
+  all: 'all',
+  ok: 'ok',
+  low: 'low',
+  critical: 'critical',
+  expired: 'expired',
+} as const;
 

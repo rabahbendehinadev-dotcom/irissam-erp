@@ -9,6 +9,7 @@ import bedsRouter from "./beds";
 import orRouter from "./or";
 import bloodBankRouter from "./blood-bank";
 import vehiclesRouter from "./vehicles";
+import medicationsRouter from "./medications";
 import { requireAuth } from "../middleware/requireAuth";
 
 const router: IRouter = Router();
@@ -26,5 +27,6 @@ router.use("/beds", requireAuth, bedsRouter);
 router.use("/or", requireAuth, orRouter);
 router.use("/blood-bank", requireAuth, bloodBankRouter);
 router.use("/vehicles", requireAuth, vehiclesRouter);
+router.use("/medications", requireAuth, medicationsRouter);
 
 export default router;

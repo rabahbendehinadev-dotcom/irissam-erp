@@ -12,6 +12,7 @@ import AlertsPage from '@/pages/Alerts';
 import Consultations from '@/pages/Consultations';
 import ConsultationWorkspacePage from '@/pages/ConsultationWorkspacePage';
 import LoginPage from '@/pages/Login';
+import PharmacyPage from '@/pages/Pharmacy';
 import { useAuth } from '@/store/AuthContext';
 
 function PlaceholderPage() {
@@ -80,7 +81,7 @@ function Router() {
       <Route path="/maternity" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/laboratory" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/imaging" component={() => <ProtectedRoute component={PlaceholderPage} />} />
-      <Route path="/pharmacy" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/pharmacy" component={() => <ProtectedRoute component={PharmacyPage} />} />
       <Route path="/blood-bank" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/medical-stock" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/biomedical" component={() => <ProtectedRoute component={PlaceholderPage} />} />

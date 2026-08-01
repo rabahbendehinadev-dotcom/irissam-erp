@@ -145,6 +145,58 @@ export const GetBloodBankSummaryResponse = zod.object({
 
 
 /**
+ * @summary Get paginated medication list with stock status
+ */
+export const getMedicationsQueryPageDefault = 1;
+export const getMedicationsQueryPageSizeDefault = 20;
+
+export const GetMedicationsQueryParams = zod.object({
+  "status": zod.enum(['all', 'ok', 'low', 'critical', 'expired']).optional(),
+  "search": zod.coerce.string().optional(),
+  "page": zod.coerce.number().int().default(getMedicationsQueryPageDefault),
+  "pageSize": zod.coerce.number().int().default(getMedicationsQueryPageSizeDefault)
+})
+
+export const GetMedicationsResponse = zod.object({
+  "data": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "quantity": zod.number().int(),
+  "unit": zod.string(),
+  "lowStockThreshold": zod.number().int(),
+  "expiryDate": zod.string().nullable(),
+  "expiringSoon": zod.boolean(),
+  "status": zod.enum(['ok', 'low', 'critical', 'expired']),
+  "createdAt": zod.string()
+})),
+  "total": zod.number().int(),
+  "page": zod.number().int(),
+  "pageSize": zod.number().int()
+})
+
+
+/**
+ * @summary Update medication stock quantity
+ */
+export const UpdateMedicationStockParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const updateMedicationStockBodyQuantityMin = 0;
+
+
+
+export const UpdateMedicationStockBody = zod.object({
+  "quantity": zod.number().int().min(updateMedicationStockBodyQuantityMin)
+})
+
+export const UpdateMedicationStockResponse = zod.object({
+  "id": zod.number().int(),
+  "quantity": zod.number().int()
+})
+
+
+/**
  * @summary Get vehicle fleet status
  */
 export const GetVehiclesStatusResponse = zod.object({

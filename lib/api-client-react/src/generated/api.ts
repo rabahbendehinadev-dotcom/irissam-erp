@@ -6,11 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
@@ -22,16 +26,20 @@ import type {
   BloodBankSummary,
   ConsultationChartPoint,
   DashboardStats,
+  GetMedicationsParams,
   HealthStatus,
+  MedicationPage,
+  MedicationStockUpdate,
   OrStatus,
   RecentPatient,
   ServiceChartPoint,
   UpcomingAppointment,
+  UpdateMedicationStockBody,
   VehiclesStatus
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -905,6 +913,162 @@ export function useGetBloodBankSummary<TData = Awaited<ReturnType<typeof getBloo
 
 
 
+
+export const getGetMedicationsUrl = (params?: GetMedicationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/medications?${stringifiedParams}` : `/api/medications`
+}
+
+/**
+ * @summary Get paginated medication list with stock status
+ */
+export const getMedications = async (params?: GetMedicationsParams, options?: Parameters<typeof customFetch>[1]): Promise<MedicationPage> => {
+
+  return customFetch<MedicationPage>(getGetMedicationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMedicationsQueryKey = (params?: GetMedicationsParams,) => {
+    return [
+    `/api/medications`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMedicationsQueryOptions = <TData = Awaited<ReturnType<typeof getMedications>>, TError = ErrorType<unknown>>(params?: GetMedicationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMedications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMedicationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMedications>>> = ({ signal }) => getMedications(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMedications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMedicationsQueryResult = NonNullable<Awaited<ReturnType<typeof getMedications>>>
+export type GetMedicationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get paginated medication list with stock status
+ */
+
+export function useGetMedications<TData = Awaited<ReturnType<typeof getMedications>>, TError = ErrorType<unknown>>(
+ params?: GetMedicationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMedications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMedicationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateMedicationStockUrl = (id: number,) => {
+
+
+
+
+  return `/api/medications/${id}`
+}
+
+/**
+ * @summary Update medication stock quantity
+ */
+export const updateMedicationStock = async (id: number,
+    updateMedicationStockBody: UpdateMedicationStockBody, options?: Parameters<typeof customFetch>[1]): Promise<MedicationStockUpdate> => {
+
+  return customFetch<MedicationStockUpdate>(getUpdateMedicationStockUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateMedicationStockBody)
+  }
+);}
+
+
+
+
+
+export const getUpdateMedicationStockMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMedicationStock>>, TError,{id: number;data: BodyType<UpdateMedicationStockBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMedicationStock>>, TError,{id: number;data: BodyType<UpdateMedicationStockBody>}, TContext> => {
+
+const mutationKey = ['updateMedicationStock'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMedicationStock>>, {id: number;data: BodyType<UpdateMedicationStockBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateMedicationStock(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMedicationStockMutationResult = NonNullable<Awaited<ReturnType<typeof updateMedicationStock>>>
+    export type UpdateMedicationStockMutationBody = BodyType<UpdateMedicationStockBody>
+    export type UpdateMedicationStockMutationError = ErrorType<void>
+
+    /**
+ * @summary Update medication stock quantity
+ */
+export const useUpdateMedicationStock = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMedicationStock>>, TError,{id: number;data: BodyType<UpdateMedicationStockBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMedicationStock>>,
+        TError,
+        {id: number;data: BodyType<UpdateMedicationStockBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateMedicationStockMutationOptions(options));
+    }
 
 export const getGetVehiclesStatusUrl = () => {
 
