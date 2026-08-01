@@ -10,6 +10,7 @@ const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const PatientsPage = lazy(() => import('@/pages/Patients'));
 const PatientDetailPage = lazy(() => import('@/pages/PatientDetail'));
 const AdmissionsPage = lazy(() => import('@/pages/Admissions'));
+const AdmissionDetailPage = lazy(() => import('@/pages/AdmissionDetail'));
 const NotFound = lazy(() => import('@/pages/not-found'));
 const Appointments = lazy(() => import('@/pages/Appointments'));
 const AlertsPage = lazy(() => import('@/pages/Alerts'));
@@ -109,6 +110,7 @@ function Router() {
       <Route path="/patients/:id" component={() => <ProtectedRoute component={PatientDetailPage} />} />
       <Route path="/patients" component={() => <ProtectedRoute component={PatientsPage} />} />
       <Route path="/appointments" component={() => <ProtectedRoute component={Appointments} />} />
+      <Route path="/admissions/:id" component={() => <ProtectedRoute component={AdmissionDetailPage} />} />
       <Route path="/admissions" component={() => <ProtectedRoute component={AdmissionsPage} />} />
       <Route path="/consultations/:id" component={() => <ProtectedRoute component={ConsultationWorkspacePage} />} />
       <Route path="/consultations" component={() => <ProtectedRoute component={Consultations} />} />

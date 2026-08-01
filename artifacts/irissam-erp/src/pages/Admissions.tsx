@@ -197,6 +197,7 @@ export default function AdmissionsPage() {
   const { t } = useLanguage();
   const { can } = usePermission();
   const { log } = useAuditLog();
+  const [, navigate] = useLocation();
   const { admissions, discharge, transfer, cancel } = useAdmissions();
 
   const [filters, setFilters] = useState<AdmissionFiltersState>(DEFAULT_ADM_FILTERS);
@@ -302,7 +303,7 @@ export default function AdmissionsPage() {
           admissions={filtered}
           page={page}
           perPage={perPage}
-          onView={a => { log('view', 'admission', a.id); setDetailing(a); }}
+          onView={a => { log('view', 'admission', a.id); navigate(`/admissions/${a.id}`); }}
           onEdit={a => { setEditing(a); setShowForm(true); }}
           onDischarge={a => setDischarging(a)}
           onTransfer={a => setTransferring(a)}
