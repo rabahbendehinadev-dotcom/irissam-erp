@@ -5,6 +5,7 @@ import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import {
   useGetBedsSummary,
+  useGetBedsByService,
   useGetOrStatus,
   useGetBloodBankSummary,
   useGetVehiclesStatus,
@@ -46,9 +47,12 @@ export function MiniWidgets() {
   const { t } = useLanguage();
 
   const { data: beds } = useGetBedsSummary({ query: { refetchInterval: 60_000 } });
+  const { data: bedsByService } = useGetBedsByService({ query: { refetchInterval: 60_000 } });
   const { data: or } = useGetOrStatus({ query: { refetchInterval: 60_000 } });
   const { data: blood } = useGetBloodBankSummary({ query: { refetchInterval: 60_000 } });
   const { data: vehicles } = useGetVehiclesStatus({ query: { refetchInterval: 60_000 } });
+
+  const reaSvc = bedsByService?.services.find((s) => s.service === "Réanimation");
 
   const bedsData = [
     { name: 'Occupés',     value: beds?.occupied    ?? 312, color: '#3b82f6' },
@@ -94,31 +98,20 @@ export function MiniWidgets() {
         </div>
       </WidgetCard>
 
-      {/* Widget 2: Resuscitation — derived from beds table "Réanimation" service */}
+      {/* Widget 2: Resuscitation — live data from /beds/by-service for "Réanimation" */}
       <WidgetCard title={t("widget.resuscitation.title")}>
         <div className="flex items-start gap-3 h-full">
           <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center shrink-0 mt-1">
             <Bed className="w-4 h-4" />
           </div>
           <div className="flex-1 flex flex-col justify-center gap-0.5">
-            {beds ? (
-              (() => {
-                // Réanimation is seeded as 24 total, 24 occupied → we approximate from overall data
-                // For a richer breakdown, the API would expose per-service data.
-                // For now we show the Réanimation row from the total summary as a proportional estimate.
-                const reaTotal = 24;
-                const reaOccupied = 24;
-                const reaFree = reaTotal - reaOccupied;
-                const reaRate = Math.round((reaOccupied / reaTotal) * 100);
-                return (
-                  <>
-                    <StatRow label={t("widget.resuscitation.total_beds")}     value={reaTotal} />
-                    <StatRow label={t("widget.beds.occupied")}                value={reaOccupied} />
-                    <StatRow label={t("widget.beds.free")}                    value={reaFree} />
-                    <StatRow label={t("widget.resuscitation.occupancy_rate")} value={`${reaRate}%`} />
-                  </>
-                );
-              })()
+            {reaSvc ? (
+              <>
+                <StatRow label={t("widget.resuscitation.total_beds")}     value={reaSvc.totalBeds} />
+                <StatRow label={t("widget.beds.occupied")}                value={reaSvc.occupiedBeds} />
+                <StatRow label={t("widget.beds.free")}                    value={reaSvc.freeBeds} />
+                <StatRow label={t("widget.resuscitation.occupancy_rate")} value={`${reaSvc.occupancyPercent}%`} />
+              </>
             ) : (
               <><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
             )}

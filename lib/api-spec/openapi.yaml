@@ -396,6 +396,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/BedsSummary"
 
+  /beds/by-service:
+    get:
+      operationId: getBedsByService
+      tags: [beds]
+      summary: Get bed occupancy broken down by service
+      responses:
+        "200":
+          description: Per-service bed occupancy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BedsByService"
+
   /or/status:
     get:
       operationId: getOrStatus
@@ -1002,6 +1015,42 @@ components:
         - outOfService
         - total
         - occupancyPercent
+
+    BedsByServiceItem:
+      type: object
+      properties:
+        service:
+          type: string
+        totalBeds:
+          type: number
+        occupiedBeds:
+          type: number
+        freeBeds:
+          type: number
+        cleaningBeds:
+          type: number
+        outOfServiceBeds:
+          type: number
+        occupancyPercent:
+          type: number
+      required:
+        - service
+        - totalBeds
+        - occupiedBeds
+        - freeBeds
+        - cleaningBeds
+        - outOfServiceBeds
+        - occupancyPercent
+
+    BedsByService:
+      type: object
+      properties:
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/BedsByServiceItem"
+      required:
+        - services
 
     OrStatus:
       type: object

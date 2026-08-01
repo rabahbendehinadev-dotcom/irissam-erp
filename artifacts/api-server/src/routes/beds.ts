@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { bedsTable } from "@workspace/db/schema";
-import { sum, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -18,6 +17,32 @@ router.get("/summary", async (_req, res, next) => {
     const occupancyPercent = total > 0 ? Math.round((occupied / total) * 100) : 0;
 
     res.json({ occupied, free, cleaning, outOfService, total, occupancyPercent });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /beds/by-service */
+router.get("/by-service", async (_req, res, next) => {
+  try {
+    const rows = await db.select().from(bedsTable);
+
+    const services = rows.map((r) => {
+      const free = r.totalBeds - r.occupiedBeds - r.cleaningBeds - r.outOfServiceBeds;
+      const occupancyPercent =
+        r.totalBeds > 0 ? Math.round((r.occupiedBeds / r.totalBeds) * 100) : 0;
+      return {
+        service: r.service,
+        totalBeds: r.totalBeds,
+        occupiedBeds: r.occupiedBeds,
+        freeBeds: free,
+        cleaningBeds: r.cleaningBeds,
+        outOfServiceBeds: r.outOfServiceBeds,
+        occupancyPercent,
+      };
+    });
+
+    res.json({ services });
   } catch (err) {
     next(err);
   }

@@ -23,6 +23,7 @@ import type {
   AdmissionChartPoint,
   AlertItem,
   AppointmentListItem,
+  BedsByService,
   BedsSummary,
   BloodBankSummary,
   ConsultationChartPoint,
@@ -60,11 +61,12 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
+
+
 /** UseQueryOptions with queryKey made optional — orval provides it internally. */
 type UseQueryOptionsCompat<TData, TError, TSelectData = TData> =
   Omit<UseQueryOptions<TData, TError, TSelectData>, 'queryKey'> &
   { queryKey?: ReadonlyArray<unknown> };
-
 
 
 
@@ -1446,6 +1448,83 @@ export function useGetBedsSummary<TData = Awaited<ReturnType<typeof getBedsSumma
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetBedsSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetBedsByServiceUrl = () => {
+
+
+
+
+  return `/api/beds/by-service`
+}
+
+/**
+ * @summary Get bed occupancy broken down by service
+ */
+export const getBedsByService = async ( options?: Parameters<typeof customFetch>[1]): Promise<BedsByService> => {
+
+  return customFetch<BedsByService>(getGetBedsByServiceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBedsByServiceQueryKey = () => {
+    return [
+    `/api/beds/by-service`
+    ] as const;
+    }
+
+
+export const getGetBedsByServiceQueryOptions = <TData = Awaited<ReturnType<typeof getBedsByService>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptionsCompat<Awaited<ReturnType<typeof getBedsByService>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBedsByServiceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBedsByService>>> = ({ signal }) => getBedsByService({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBedsByService>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBedsByServiceQueryResult = NonNullable<Awaited<ReturnType<typeof getBedsByService>>>
+export type GetBedsByServiceQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get bed occupancy broken down by service
+ */
+
+export function useGetBedsByService<TData = Awaited<ReturnType<typeof getBedsByService>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptionsCompat<Awaited<ReturnType<typeof getBedsByService>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBedsByServiceQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

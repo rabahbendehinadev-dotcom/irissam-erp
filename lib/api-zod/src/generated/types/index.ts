@@ -10,6 +10,8 @@ export * from './admissionChartPoint';
 export * from './alertItem';
 export * from './appointmentListItem';
 export * from './appointmentPatient';
+export * from './bedsByService';
+export * from './bedsByServiceItem';
 export * from './bedsSummary';
 export * from './bloodBankSummary';
 export * from './consultationChartPoint';

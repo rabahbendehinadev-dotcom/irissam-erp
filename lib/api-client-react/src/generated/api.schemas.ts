@@ -203,6 +203,20 @@ export interface BedsSummary {
   occupancyPercent: number;
 }
 
+export interface BedsByServiceItem {
+  service: string;
+  totalBeds: number;
+  occupiedBeds: number;
+  freeBeds: number;
+  cleaningBeds: number;
+  outOfServiceBeds: number;
+  occupancyPercent: number;
+}
+
+export interface BedsByService {
+  services: BedsByServiceItem[];
+}
+
 export interface OrStatus {
   totalRooms: number;
   available: number;

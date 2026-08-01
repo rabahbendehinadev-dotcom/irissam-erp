@@ -414,6 +414,22 @@ export const GetBedsSummaryResponse = zod.object({
 
 
 /**
+ * @summary Get bed occupancy broken down by service
+ */
+export const GetBedsByServiceResponse = zod.object({
+  "services": zod.array(zod.object({
+  "service": zod.string(),
+  "totalBeds": zod.number(),
+  "occupiedBeds": zod.number(),
+  "freeBeds": zod.number(),
+  "cleaningBeds": zod.number(),
+  "outOfServiceBeds": zod.number(),
+  "occupancyPercent": zod.number()
+}))
+})
+
+
+/**
  * @summary Get operating room status
  */
 export const GetOrStatusResponse = zod.object({
