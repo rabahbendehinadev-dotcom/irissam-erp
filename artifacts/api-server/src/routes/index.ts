@@ -5,6 +5,10 @@ import patientsRouter from "./patients";
 import appointmentsRouter from "./appointments";
 import alertsRouter from "./alerts";
 import authRouter from "./auth";
+import bedsRouter from "./beds";
+import orRouter from "./or";
+import bloodBankRouter from "./blood-bank";
+import vehiclesRouter from "./vehicles";
 import { requireAuth } from "../middleware/requireAuth";
 
 const router: IRouter = Router();
@@ -18,5 +22,9 @@ router.use("/dashboard", requireAuth, dashboardRouter);
 router.use("/patients", requireAuth, patientsRouter);
 router.use("/appointments", requireAuth, appointmentsRouter);
 router.use("/alerts", requireAuth, alertsRouter);
+router.use("/beds", requireAuth, bedsRouter);
+router.use("/or", requireAuth, orRouter);
+router.use("/blood-bank", requireAuth, bloodBankRouter);
+router.use("/vehicles", requireAuth, vehiclesRouter);
 
 export default router;

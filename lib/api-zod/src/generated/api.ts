@@ -109,3 +109,49 @@ export const GetAlertsResponseItem = zod.object({
 export const GetAlertsResponse = zod.array(GetAlertsResponseItem)
 
 
+/**
+ * @summary Get bed occupancy summary
+ */
+export const GetBedsSummaryResponse = zod.object({
+  "occupied": zod.number(),
+  "free": zod.number(),
+  "cleaning": zod.number(),
+  "outOfService": zod.number(),
+  "total": zod.number(),
+  "occupancyPercent": zod.number()
+})
+
+
+/**
+ * @summary Get operating room status
+ */
+export const GetOrStatusResponse = zod.object({
+  "totalRooms": zod.number(),
+  "available": zod.number(),
+  "occupied": zod.number(),
+  "prep": zod.number()
+})
+
+
+/**
+ * @summary Get blood bank stock summary
+ */
+export const GetBloodBankSummaryResponse = zod.object({
+  "totalBags": zod.number(),
+  "available": zod.number(),
+  "urgentRequests": zod.number(),
+  "expiringSoon": zod.number()
+})
+
+
+/**
+ * @summary Get vehicle fleet status
+ */
+export const GetVehiclesStatusResponse = zod.object({
+  "total": zod.number(),
+  "inService": zod.number(),
+  "available": zod.number(),
+  "maintenance": zod.number()
+})
+
+

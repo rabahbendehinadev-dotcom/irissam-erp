@@ -66,3 +66,33 @@ export interface AlertItem {
   createdAt: string;
 }
 
+export interface BedsSummary {
+  occupied: number;
+  free: number;
+  cleaning: number;
+  outOfService: number;
+  total: number;
+  occupancyPercent: number;
+}
+
+export interface OrStatus {
+  totalRooms: number;
+  available: number;
+  occupied: number;
+  prep: number;
+}
+
+export interface BloodBankSummary {
+  totalBags: number;
+  available: number;
+  urgentRequests: number;
+  expiringSoon: number;
+}
+
+export interface VehiclesStatus {
+  total: number;
+  inService: number;
+  available: number;
+  maintenance: number;
+}
+

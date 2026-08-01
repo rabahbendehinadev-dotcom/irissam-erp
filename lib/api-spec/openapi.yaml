@@ -18,6 +18,14 @@ tags:
     description: Appointment operations
   - name: alerts
     description: Alert operations
+  - name: beds
+    description: Bed occupancy
+  - name: or
+    description: Operating room status
+  - name: blood-bank
+    description: Blood bank stock
+  - name: vehicles
+    description: Vehicle / ambulance fleet
 paths:
   /healthz:
     get:
@@ -136,6 +144,58 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AlertItem"
+
+  /beds/summary:
+    get:
+      operationId: getBedsSummary
+      tags: [beds]
+      summary: Get bed occupancy summary
+      responses:
+        "200":
+          description: Aggregated bed occupancy across all services
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BedsSummary"
+
+  /or/status:
+    get:
+      operationId: getOrStatus
+      tags: [or]
+      summary: Get operating room status
+      responses:
+        "200":
+          description: Count of operating rooms by status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrStatus"
+
+  /blood-bank/summary:
+    get:
+      operationId: getBloodBankSummary
+      tags: [blood-bank]
+      summary: Get blood bank stock summary
+      responses:
+        "200":
+          description: Aggregated blood bank totals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BloodBankSummary"
+
+  /vehicles/status:
+    get:
+      operationId: getVehiclesStatus
+      tags: [vehicles]
+      summary: Get vehicle fleet status
+      responses:
+        "200":
+          description: Count of vehicles by status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehiclesStatus"
 
 components:
   schemas:
@@ -289,3 +349,77 @@ components:
         - title
         - detail
         - createdAt
+
+    BedsSummary:
+      type: object
+      properties:
+        occupied:
+          type: number
+        free:
+          type: number
+        cleaning:
+          type: number
+        outOfService:
+          type: number
+        total:
+          type: number
+        occupancyPercent:
+          type: number
+      required:
+        - occupied
+        - free
+        - cleaning
+        - outOfService
+        - total
+        - occupancyPercent
+
+    OrStatus:
+      type: object
+      properties:
+        totalRooms:
+          type: number
+        available:
+          type: number
+        occupied:
+          type: number
+        prep:
+          type: number
+      required:
+        - totalRooms
+        - available
+        - occupied
+        - prep
+
+    BloodBankSummary:
+      type: object
+      properties:
+        totalBags:
+          type: number
+        available:
+          type: number
+        urgentRequests:
+          type: number
+        expiringSoon:
+          type: number
+      required:
+        - totalBags
+        - available
+        - urgentRequests
+        - expiringSoon
+
+    VehiclesStatus:
+      type: object
+      properties:
+        total:
+          type: number
+        inService:
+          type: number
+        available:
+          type: number
+        maintenance:
+          type: number
+      required:
+        - total
+        - inService
+        - available
+        - maintenance

@@ -18,12 +18,16 @@ import type {
 import type {
   AdmissionChartPoint,
   AlertItem,
+  BedsSummary,
+  BloodBankSummary,
   ConsultationChartPoint,
   DashboardStats,
   HealthStatus,
+  OrStatus,
   RecentPatient,
   ServiceChartPoint,
-  UpcomingAppointment
+  UpcomingAppointment,
+  VehiclesStatus
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -659,6 +663,314 @@ export function useGetAlerts<TData = Awaited<ReturnType<typeof getAlerts>>, TErr
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetAlertsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetBedsSummaryUrl = () => {
+
+
+
+
+  return `/api/beds/summary`
+}
+
+/**
+ * @summary Get bed occupancy summary
+ */
+export const getBedsSummary = async ( options?: Parameters<typeof customFetch>[1]): Promise<BedsSummary> => {
+
+  return customFetch<BedsSummary>(getGetBedsSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBedsSummaryQueryKey = () => {
+    return [
+    `/api/beds/summary`
+    ] as const;
+    }
+
+
+export const getGetBedsSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getBedsSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBedsSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBedsSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBedsSummary>>> = ({ signal }) => getBedsSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBedsSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBedsSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getBedsSummary>>>
+export type GetBedsSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get bed occupancy summary
+ */
+
+export function useGetBedsSummary<TData = Awaited<ReturnType<typeof getBedsSummary>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBedsSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBedsSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetOrStatusUrl = () => {
+
+
+
+
+  return `/api/or/status`
+}
+
+/**
+ * @summary Get operating room status
+ */
+export const getOrStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<OrStatus> => {
+
+  return customFetch<OrStatus>(getGetOrStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrStatusQueryKey = () => {
+    return [
+    `/api/or/status`
+    ] as const;
+    }
+
+
+export const getGetOrStatusQueryOptions = <TData = Awaited<ReturnType<typeof getOrStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOrStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrStatus>>> = ({ signal }) => getOrStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOrStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getOrStatus>>>
+export type GetOrStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get operating room status
+ */
+
+export function useGetOrStatus<TData = Awaited<ReturnType<typeof getOrStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOrStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetBloodBankSummaryUrl = () => {
+
+
+
+
+  return `/api/blood-bank/summary`
+}
+
+/**
+ * @summary Get blood bank stock summary
+ */
+export const getBloodBankSummary = async ( options?: Parameters<typeof customFetch>[1]): Promise<BloodBankSummary> => {
+
+  return customFetch<BloodBankSummary>(getGetBloodBankSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBloodBankSummaryQueryKey = () => {
+    return [
+    `/api/blood-bank/summary`
+    ] as const;
+    }
+
+
+export const getGetBloodBankSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getBloodBankSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBloodBankSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBloodBankSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBloodBankSummary>>> = ({ signal }) => getBloodBankSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBloodBankSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBloodBankSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getBloodBankSummary>>>
+export type GetBloodBankSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get blood bank stock summary
+ */
+
+export function useGetBloodBankSummary<TData = Awaited<ReturnType<typeof getBloodBankSummary>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBloodBankSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBloodBankSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetVehiclesStatusUrl = () => {
+
+
+
+
+  return `/api/vehicles/status`
+}
+
+/**
+ * @summary Get vehicle fleet status
+ */
+export const getVehiclesStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<VehiclesStatus> => {
+
+  return customFetch<VehiclesStatus>(getGetVehiclesStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVehiclesStatusQueryKey = () => {
+    return [
+    `/api/vehicles/status`
+    ] as const;
+    }
+
+
+export const getGetVehiclesStatusQueryOptions = <TData = Awaited<ReturnType<typeof getVehiclesStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVehiclesStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVehiclesStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVehiclesStatus>>> = ({ signal }) => getVehiclesStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVehiclesStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVehiclesStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getVehiclesStatus>>>
+export type GetVehiclesStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get vehicle fleet status
+ */
+
+export function useGetVehiclesStatus<TData = Awaited<ReturnType<typeof getVehiclesStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVehiclesStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVehiclesStatusQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

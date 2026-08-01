@@ -4,3 +4,7 @@ export * from "./alerts";
 export * from "./admissions";
 export * from "./medications";
 export * from "./daily_stats";
+export * from "./beds";
+export * from "./operating_rooms";
+export * from "./blood_bank";
+export * from "./vehicles";

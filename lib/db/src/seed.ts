@@ -13,6 +13,10 @@ import {
   admissionsTable,
   medicationsTable,
   dailyStatsTable,
+  bedsTable,
+  operatingRoomsTable,
+  bloodBankTable,
+  vehiclesTable,
 } from "./schema";
 
 const { Pool } = pg;
@@ -185,6 +189,69 @@ async function seed() {
     { date: dateStr(0), consultations: 312, rendezVous: 186, admissions: 10, sorties:  9, analyses: 145, imaging: 68, invoices: 156, revenueDA: 2_145_000 },
   ]);
   console.log("✅ Daily stats seeded (7 days)");
+
+  // ── Beds (by service) ────────────────────────────────────────────────────
+  await db.delete(bedsTable);
+  await db.insert(bedsTable).values([
+    { service: "Médecine interne", totalBeds: 80, occupiedBeds: 62, cleaningBeds: 5, outOfServiceBeds: 2 },
+    { service: "Chirurgie",        totalBeds: 60, occupiedBeds: 48, cleaningBeds: 3, outOfServiceBeds: 1 },
+    { service: "Pédiatrie",        totalBeds: 50, occupiedBeds: 38, cleaningBeds: 2, outOfServiceBeds: 0 },
+    { service: "Gynécologie",      totalBeds: 40, occupiedBeds: 30, cleaningBeds: 2, outOfServiceBeds: 1 },
+    { service: "Cardiologie",      totalBeds: 35, occupiedBeds: 28, cleaningBeds: 1, outOfServiceBeds: 0 },
+    { service: "Urgences",         totalBeds: 30, occupiedBeds: 25, cleaningBeds: 1, outOfServiceBeds: 1 },
+    { service: "Neurologie",       totalBeds: 30, occupiedBeds: 22, cleaningBeds: 1, outOfServiceBeds: 0 },
+    { service: "Orthopédie",       totalBeds: 30, occupiedBeds: 24, cleaningBeds: 0, outOfServiceBeds: 0 },
+    { service: "Pneumologie",      totalBeds: 25, occupiedBeds: 19, cleaningBeds: 0, outOfServiceBeds: 0 },
+    { service: "Réanimation",      totalBeds: 24, occupiedBeds: 24, cleaningBeds: 0, outOfServiceBeds: 0 },
+    { service: "Endocrinologie",   totalBeds: 16, occupiedBeds: 12, cleaningBeds: 0, outOfServiceBeds: 0 },
+  ]);
+  console.log("✅ Beds seeded (11 services)");
+
+  // ── Operating Rooms ──────────────────────────────────────────────────────
+  await db.delete(operatingRoomsTable);
+  await db.insert(operatingRoomsTable).values([
+    { name: "Bloc 1", status: "occupied" },
+    { name: "Bloc 2", status: "prep" },
+    { name: "Bloc 3", status: "available" },
+    { name: "Bloc 4", status: "available" },
+    { name: "Bloc 5", status: "occupied" },
+    { name: "Bloc 6", status: "available" },
+    { name: "Bloc 7", status: "available" },
+    { name: "Bloc 8", status: "available" },
+  ]);
+  console.log("✅ Operating rooms seeded (8)");
+
+  // ── Blood Bank ───────────────────────────────────────────────────────────
+  await db.delete(bloodBankTable);
+  await db.insert(bloodBankTable).values([
+    { bloodType: "A+",  totalBags: 30, availableBags: 22, urgentRequests: 1, expiringSoon: 3 },
+    { bloodType: "A-",  totalBags: 10, availableBags: 7,  urgentRequests: 0, expiringSoon: 1 },
+    { bloodType: "B+",  totalBags: 25, availableBags: 18, urgentRequests: 2, expiringSoon: 2 },
+    { bloodType: "B-",  totalBags: 8,  availableBags: 5,  urgentRequests: 1, expiringSoon: 0 },
+    { bloodType: "AB+", totalBags: 15, availableBags: 10, urgentRequests: 2, expiringSoon: 3 },
+    { bloodType: "AB-", totalBags: 5,  availableBags: 3,  urgentRequests: 1, expiringSoon: 0 },
+    { bloodType: "O+",  totalBags: 40, availableBags: 28, urgentRequests: 1, expiringSoon: 2 },
+    { bloodType: "O-",  totalBags: 23, availableBags: 7,  urgentRequests: 0, expiringSoon: 1 },
+  ]);
+  console.log("✅ Blood bank seeded (8 blood types)");
+
+  // ── Vehicles ─────────────────────────────────────────────────────────────
+  await db.delete(vehiclesTable);
+  await db.insert(vehiclesTable).values([
+    { registration: "AMB-001", type: "ambulance",         status: "in_service" },
+    { registration: "AMB-002", type: "ambulance",         status: "available" },
+    { registration: "AMB-003", type: "ambulance",         status: "in_service" },
+    { registration: "AMB-004", type: "ambulance",         status: "available" },
+    { registration: "AMB-005", type: "ambulance",         status: "in_service" },
+    { registration: "AMB-006", type: "ambulance",         status: "available" },
+    { registration: "AMB-007", type: "ambulance",         status: "in_service" },
+    { registration: "AMB-008", type: "ambulance",         status: "available" },
+    { registration: "AMB-009", type: "ambulance",         status: "in_service" },
+    { registration: "AMB-010", type: "ambulance",         status: "in_service" },
+    { registration: "AMB-011", type: "ambulance",         status: "maintenance" },
+    { registration: "AMB-012", type: "ambulance",         status: "maintenance" },
+  ]);
+  console.log("✅ Vehicles seeded (12)");
 
   await pool.end();
   console.log("🎉 Seed complete!");

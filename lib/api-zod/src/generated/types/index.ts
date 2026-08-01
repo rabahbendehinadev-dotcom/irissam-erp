@@ -8,9 +8,13 @@
 
 export * from './admissionChartPoint';
 export * from './alertItem';
+export * from './bedsSummary';
+export * from './bloodBankSummary';
 export * from './consultationChartPoint';
 export * from './dashboardStats';
 export * from './healthStatus';
+export * from './orStatus';
 export * from './recentPatient';
 export * from './serviceChartPoint';
 export * from './upcomingAppointment';
+export * from './vehiclesStatus';
