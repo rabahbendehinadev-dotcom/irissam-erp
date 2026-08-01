@@ -2,62 +2,27 @@ import { AlertTriangle, Package, Clock, ArrowRight } from "lucide-react";
 import { useLanguage } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
+import { useGetAlerts } from "@workspace/api-client-react";
 
-const alerts = [
-  {
-    id: 1,
-    type: 'critical',
-    title: "Résultat d'analyse critique",
-    detail: "Patient : Fatima Zahra – Potassium élevé",
-    time: "10:15",
-    icon: AlertTriangle,
-    bg: "bg-red-100",
-    color: "text-red-500"
-  },
-  {
-    id: 2,
-    type: 'warning',
-    title: "Stock faible",
-    detail: "Paracétamol 1G – 15 unités restantes",
-    time: "09:45",
-    icon: Package,
-    bg: "bg-orange-100",
-    color: "text-orange-500"
-  },
-  {
-    id: 3,
-    type: 'warning',
-    title: "Médicament proche péremption",
-    detail: "Amoxicilline 500mg – Expire le 20/05/2024",
-    time: "09:30",
-    icon: AlertTriangle,
-    bg: "bg-orange-100",
-    color: "text-orange-500"
-  },
-  {
-    id: 4,
-    type: 'critical',
-    title: "Service de réanimation indisponible",
-    detail: "Service Réanimation – Capacité 100%",
-    time: "09:20",
-    icon: AlertTriangle,
-    bg: "bg-red-100",
-    color: "text-red-500"
-  },
-  {
-    id: 5,
-    type: 'info',
-    title: "Intervention en retard",
-    detail: "Bloc 2 – Début prévu à 09:00",
-    time: "09:10",
-    icon: Clock,
-    bg: "bg-red-50",
-    color: "text-red-400"
+function getAlertStyle(type: string) {
+  switch (type) {
+    case "critical":
+      return { Icon: AlertTriangle, bg: "bg-red-100", color: "text-red-500" };
+    case "warning":
+      return { Icon: Package, bg: "bg-orange-100", color: "text-orange-500" };
+    default:
+      return { Icon: Clock, bg: "bg-red-50", color: "text-red-400" };
   }
-];
+}
+
+function fmtTime(isoStr: string): string {
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
 
 export function AlertsPanel() {
   const { t } = useLanguage();
+  const { data: alerts, isLoading } = useGetAlerts();
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col h-full">
@@ -69,25 +34,38 @@ export function AlertsPanel() {
       </div>
       
       <div className="flex-1 p-2 flex flex-col gap-1">
-        {alerts.map(alert => (
-          <div key={alert.id} className="flex gap-3 p-2 hover:bg-gray-50 rounded-md transition-colors">
-            <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5", alert.bg, alert.color)}>
-              <alert.icon className="w-4 h-4" />
+        {isLoading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex gap-3 p-2 animate-pulse">
+              <div className="w-8 h-8 rounded-full bg-gray-100 shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 bg-gray-100 rounded w-3/4" />
+                <div className="h-2.5 bg-gray-100 rounded w-full" />
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-bold text-gray-900 truncate">{alert.title}</h4>
-              <p className="text-[11px] text-gray-500 truncate">{alert.detail}</p>
+          ))
+        ) : (alerts ?? []).map(alert => {
+          const { Icon, bg, color } = getAlertStyle(alert.type);
+          return (
+            <div key={alert.id} className="flex gap-3 p-2 hover:bg-gray-50 rounded-md transition-colors">
+              <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5", bg, color)}>
+                <Icon className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xs font-bold text-gray-900 truncate">{alert.title}</h4>
+                <p className="text-[11px] text-gray-500 truncate">{alert.detail}</p>
+              </div>
+              <div className="text-[10px] text-gray-400 whitespace-nowrap pt-0.5">
+                {fmtTime(alert.createdAt)}
+              </div>
             </div>
-            <div className="text-[10px] text-gray-400 whitespace-nowrap pt-0.5">
-              {alert.time}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="p-3 border-t border-gray-100 text-center">
         <Link href="/alerts" className="text-xs font-medium text-blue-500 hover:underline inline-flex items-center gap-1">
-          {t("alerts.view_all_arrow")}
+          {t("alerts.view_all_arrow")} <ArrowRight className="w-3 h-3" />
         </Link>
       </div>
     </div>

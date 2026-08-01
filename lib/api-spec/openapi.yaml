@@ -10,6 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Dashboard statistics and charts
+  - name: patients
+    description: Patient operations
+  - name: appointments
+    description: Appointment operations
+  - name: alerts
+    description: Alert operations
 paths:
   /healthz:
     get:
@@ -24,6 +32,111 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard statistics
+      description: Returns aggregated KPIs for the main dashboard
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/charts/consultations:
+    get:
+      operationId: getConsultationsChart
+      tags: [dashboard]
+      summary: Get 7-day consultations chart data
+      responses:
+        "200":
+          description: Consultations and appointments per day
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsultationChartPoint"
+
+  /dashboard/charts/admissions:
+    get:
+      operationId: getAdmissionsChart
+      tags: [dashboard]
+      summary: Get 7-day admissions chart data
+      responses:
+        "200":
+          description: Admissions and discharges per day
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdmissionChartPoint"
+
+  /dashboard/charts/services:
+    get:
+      operationId: getServicesChart
+      tags: [dashboard]
+      summary: Get admissions by service (pie chart)
+      responses:
+        "200":
+          description: Admissions distribution by medical service
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceChartPoint"
+
+  /patients/recent:
+    get:
+      operationId: getRecentPatients
+      tags: [patients]
+      summary: Get recently registered patients
+      responses:
+        "200":
+          description: List of recent patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecentPatient"
+
+  /appointments/upcoming:
+    get:
+      operationId: getUpcomingAppointments
+      tags: [appointments]
+      summary: Get upcoming appointments for today
+      responses:
+        "200":
+          description: List of upcoming appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UpcomingAppointment"
+
+  /alerts:
+    get:
+      operationId: getAlerts
+      tags: [alerts]
+      summary: Get active alerts
+      responses:
+        "200":
+          description: List of active alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AlertItem"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +147,145 @@ components:
       required:
         - status
 
+    DashboardStats:
+      type: object
+      properties:
+        totalPatients:
+          type: number
+        appointmentsToday:
+          type: number
+        hospitalized:
+          type: number
+        admissionsToday:
+          type: number
+        emergenciesWaiting:
+          type: number
+        consultationsToday:
+          type: number
+        analysesToday:
+          type: number
+        imagingToday:
+          type: number
+        invoicesToday:
+          type: number
+        revenueToday:
+          type: number
+        bedOccupancyPercent:
+          type: number
+      required:
+        - totalPatients
+        - appointmentsToday
+        - hospitalized
+        - admissionsToday
+        - emergenciesWaiting
+        - consultationsToday
+        - analysesToday
+        - imagingToday
+        - invoicesToday
+        - revenueToday
+        - bedOccupancyPercent
+
+    ConsultationChartPoint:
+      type: object
+      properties:
+        name:
+          type: string
+        consultations:
+          type: number
+        rendezVous:
+          type: number
+      required:
+        - name
+        - consultations
+        - rendezVous
+
+    AdmissionChartPoint:
+      type: object
+      properties:
+        name:
+          type: string
+        admissions:
+          type: number
+        sorties:
+          type: number
+      required:
+        - name
+        - admissions
+        - sorties
+
+    ServiceChartPoint:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: number
+      required:
+        - name
+        - value
+
+    RecentPatient:
+      type: object
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        age:
+          type: number
+        fileNumber:
+          type: string
+        service:
+          type: string
+        registeredAt:
+          type: string
+      required:
+        - id
+        - name
+        - age
+        - fileNumber
+        - service
+        - registeredAt
+
+    UpcomingAppointment:
+      type: object
+      properties:
+        id:
+          type: number
+        patientName:
+          type: string
+        service:
+          type: string
+        doctorName:
+          type: string
+        scheduledAt:
+          type: string
+        status:
+          type: string
+      required:
+        - id
+        - patientName
+        - service
+        - doctorName
+        - scheduledAt
+        - status
+
+    AlertItem:
+      type: object
+      properties:
+        id:
+          type: number
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - type
+        - title
+        - detail
+        - createdAt

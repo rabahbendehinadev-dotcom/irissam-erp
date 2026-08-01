@@ -6,6 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
+export interface UpcomingAppointment {
+  id: number;
+  patientName: string;
+  service: string;
+  doctorName: string;
+  scheduledAt: string;
   status: string;
 }
