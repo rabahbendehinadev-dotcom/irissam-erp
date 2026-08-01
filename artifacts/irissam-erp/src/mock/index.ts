@@ -6,3 +6,4 @@ export * from './alerts';
 export * from './dashboard';
 export * from './inventory';
 export * from './consultations';
+export * from './emergency';

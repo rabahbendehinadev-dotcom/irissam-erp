@@ -13,6 +13,7 @@ import Consultations from '@/pages/Consultations';
 import ConsultationWorkspacePage from '@/pages/ConsultationWorkspacePage';
 import LoginPage from '@/pages/Login';
 import PharmacyPage from '@/pages/Pharmacy';
+import EmergenciesPage from '@/pages/Emergencies';
 import { useAuth } from '@/store/AuthContext';
 
 function PlaceholderPage() {
@@ -74,7 +75,7 @@ function Router() {
       <Route path="/consultations/:id" component={() => <ProtectedRoute component={ConsultationWorkspacePage} />} />
       <Route path="/consultations" component={() => <ProtectedRoute component={Consultations} />} />
       <Route path="/alerts" component={() => <ProtectedRoute component={AlertsPage} />} />
-      <Route path="/emergencies" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/emergencies" component={() => <ProtectedRoute component={EmergenciesPage} />} />
       <Route path="/hospitalization" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/operating-room" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/resuscitation" component={() => <ProtectedRoute component={PlaceholderPage} />} />
