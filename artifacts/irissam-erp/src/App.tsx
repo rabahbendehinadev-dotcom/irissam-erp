@@ -1,21 +1,59 @@
+import { lazy, Suspense } from 'react';
 import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
 import { AppProvider } from '@/store/AppProvider';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import Dashboard from '@/pages/Dashboard';
-import PatientsPage from '@/pages/Patients';
-import PatientDetailPage from '@/pages/PatientDetail';
-import AdmissionsPage from '@/pages/Admissions';
-import NotFound from '@/pages/not-found';
 import { useLanguage } from '@/i18n';
-import Appointments from '@/pages/Appointments';
-import AlertsPage from '@/pages/Alerts';
-import Consultations from '@/pages/Consultations';
-import ConsultationWorkspacePage from '@/pages/ConsultationWorkspacePage';
-import LoginPage from '@/pages/Login';
-import PharmacyPage from '@/pages/Pharmacy';
-import EmergenciesPage from '@/pages/Emergencies';
-import EmergencyPatientDetail from '@/pages/EmergencyPatientDetail';
 import { useAuth } from '@/store/AuthContext';
+
+// Lazy-loaded page modules — each produces its own JS chunk
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const PatientsPage = lazy(() => import('@/pages/Patients'));
+const PatientDetailPage = lazy(() => import('@/pages/PatientDetail'));
+const AdmissionsPage = lazy(() => import('@/pages/Admissions'));
+const NotFound = lazy(() => import('@/pages/not-found'));
+const Appointments = lazy(() => import('@/pages/Appointments'));
+const AlertsPage = lazy(() => import('@/pages/Alerts'));
+const Consultations = lazy(() => import('@/pages/Consultations'));
+const ConsultationWorkspacePage = lazy(() => import('@/pages/ConsultationWorkspacePage'));
+const LoginPage = lazy(() => import('@/pages/Login'));
+const PharmacyPage = lazy(() => import('@/pages/Pharmacy'));
+const EmergenciesPage = lazy(() => import('@/pages/Emergencies'));
+const EmergencyPatientDetail = lazy(() => import('@/pages/EmergencyPatientDetail'));
+
+// ---------------------------------------------------------------------------
+// Loading skeleton shown while a lazy chunk is fetching
+// ---------------------------------------------------------------------------
+function LoadingSkeleton() {
+  return (
+    <DashboardLayout>
+      <div className="p-6 space-y-4 animate-pulse">
+        {/* Header placeholder */}
+        <div className="h-8 bg-white/10 rounded-lg w-1/3" />
+        {/* Card row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 bg-white/10 rounded-xl" />
+          ))}
+        </div>
+        {/* Content block */}
+        <div className="h-64 bg-white/10 rounded-xl" />
+        <div className="h-48 bg-white/10 rounded-xl" />
+      </div>
+    </DashboardLayout>
+  );
+}
+
+// Minimal skeleton for pages that render their own layout (Login, NotFound, etc.)
+function FullPageSpinner() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#0a2540] via-[#0e3460] to-[#1a5c8a] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+        <p className="text-white/70 text-sm font-medium">Chargement…</p>
+      </div>
+    </div>
+  );
+}
 
 function PlaceholderPage() {
   const { t } = useLanguage();
@@ -33,14 +71,7 @@ function PlaceholderPage() {
 
 /** Shows a full-screen spinner while the session is being restored */
 function AuthLoadingScreen() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a2540] via-[#0e3460] to-[#1a5c8a] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
-        <p className="text-white/70 text-sm font-medium">Chargement…</p>
-      </div>
-    </div>
-  );
+  return <FullPageSpinner />;
 }
 
 /** Wrapper that redirects unauthenticated users to /login */
@@ -48,7 +79,11 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return <AuthLoadingScreen />;
   if (!isAuthenticated) return <Redirect to="/login" />;
-  return <Component />;
+  return (
+    <Suspense fallback={<LoadingSkeleton />}>
+      <Component />
+    </Suspense>
+  );
 }
 
 function Router() {
@@ -63,7 +98,9 @@ function Router() {
         ) : isAuthenticated ? (
           <Redirect to="/" />
         ) : (
-          <LoginPage />
+          <Suspense fallback={<FullPageSpinner />}>
+            <LoginPage />
+          </Suspense>
         )}
       </Route>
 
@@ -95,7 +132,11 @@ function Router() {
       <Route path="/archives" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/reports" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={PlaceholderPage} />} />
-      <Route component={NotFound} />
+      <Route component={() => (
+        <Suspense fallback={<FullPageSpinner />}>
+          <NotFound />
+        </Suspense>
+      )} />
     </Switch>
   );
 }

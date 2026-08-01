@@ -63,6 +63,9 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    // Dynamic imports already split pages into separate chunks;
+    // raise the limit so React's vendor bundle doesn't trigger noise.
+    chunkSizeWarningLimit: 600,
   },
   server: {
     port,
