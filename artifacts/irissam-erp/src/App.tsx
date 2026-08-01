@@ -7,6 +7,9 @@ import PatientDetailPage from '@/pages/PatientDetail';
 import AdmissionsPage from '@/pages/Admissions';
 import NotFound from '@/pages/not-found';
 import { useLanguage } from '@/i18n';
+import Appointments from '@/pages/Appointments';
+import AlertsPage from '@/pages/Alerts';
+import Consultations from '@/pages/Consultations';
 
 function PlaceholderPage() {
   const { t } = useLanguage();
@@ -28,10 +31,11 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/patients/:id" component={PatientDetailPage} />
       <Route path="/patients" component={PatientsPage} />
-      <Route path="/appointments" component={PlaceholderPage} />
+      <Route path="/appointments" component={Appointments} />
       <Route path="/admissions" component={AdmissionsPage} />
       <Route path="/emergencies" component={PlaceholderPage} />
-      <Route path="/consultations" component={PlaceholderPage} />
+      <Route path="/consultations" component={Consultations} />
+      <Route path="/alerts" component={AlertsPage} />
       <Route path="/hospitalization" component={PlaceholderPage} />
       <Route path="/operating-room" component={PlaceholderPage} />
       <Route path="/resuscitation" component={PlaceholderPage} />

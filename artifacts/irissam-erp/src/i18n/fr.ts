@@ -23,6 +23,7 @@ export default {
   "nav.archives": "GED & Archives",
   "nav.reports": "Rapports & BI",
   "nav.settings": "Paramètres",
+  "nav.alerts": "Alertes",
   "nav.collapse": "Réduire",
   "nav.expand": "Agrandir",
   "nav.group.patient": "PARCOURS PATIENT",
@@ -82,7 +83,7 @@ export default {
   "chart.filter.7days": "7 derniers jours",
   "chart.filter.this_month": "Ce mois",
 
-  // Alerts
+  // Alerts (dashboard)
   "alerts.title": "Alertes critiques",
   "alerts.view_all": "Voir tout",
   "alerts.view_all_arrow": "Voir toutes les alertes →",
@@ -136,30 +137,20 @@ export default {
   "page.coming_soon": "Bientôt disponible",
   "page.coming_soon_desc": "Cette page est en cours de développement.",
 
-  // ============================================================
   // MODULE PATIENTS — MPI
-  // ============================================================
-
-  // Page header
   "pat.page.title": "Gestion des Patients — MPI",
   "pat.page.subtitle": "Master Patient Index — Registre central et permanent des patients",
   "pat.page.demo": "Données de démonstration",
   "pat.page.no_permission": "Vous n'avez pas la permission d'accéder à cette page.",
-
-  // Stats header
   "pat.stats.total": "Total patients",
   "pat.stats.active": "Patients actifs",
   "pat.stats.incomplete": "Dossiers incomplets",
   "pat.stats.duplicates": "Doublons potentiels",
-
-  // Actions
   "pat.add": "Ajouter un patient",
   "pat.export": "Exporter",
   "pat.import": "Importer",
   "pat.import.soon": "Disponible prochainement",
   "pat.back_to_list": "Retour à la liste",
-
-  // Table columns
   "pat.col.patient": "Patient",
   "pat.col.mpi": "N° MPI",
   "pat.col.file": "N° Dossier",
@@ -175,39 +166,27 @@ export default {
   "pat.col.created": "Créé le",
   "pat.col.updated": "Modifié le",
   "pat.col.actions": "Actions",
-
-  // Row actions
   "pat.action.view": "Voir le dossier",
   "pat.action.edit": "Modifier",
   "pat.action.history": "Historique",
   "pat.action.print": "Imprimer la fiche",
   "pat.action.archive": "Archiver",
-
-  // Patient statuses
   "pat.status.active": "Actif",
   "pat.status.inactive": "Inactif",
   "pat.status.archived": "Archivé",
   "pat.status.deceased": "Décédé",
-
-  // Sync statuses
   "pat.sync.synced": "Synchronisé",
   "pat.sync.pending": "En attente",
   "pat.sync.conflict": "Conflit",
   "pat.sync.error": "Erreur",
-
-  // Gender
   "pat.gender.m": "Masculin",
   "pat.gender.f": "Féminin",
   "pat.gender.short.m": "M",
   "pat.gender.short.f": "F",
-
-  // Age
   "pat.age.years": "ans",
   "pat.age.months": "mois",
   "pat.age.days": "j",
   "pat.age.newborn": "Nouveau-né",
-
-  // Filters
   "pat.filter.search": "Rechercher par nom, prénom, N° MPI, téléphone...",
   "pat.filter.status": "Statut",
   "pat.filter.gender": "Sexe",
@@ -217,23 +196,15 @@ export default {
   "pat.filter.reset": "Réinitialiser",
   "pat.filter.results": "résultat(s)",
   "pat.filter.advanced": "Filtres avancés",
-
-  // Sorting
   "pat.sort.asc": "Croissant",
   "pat.sort.desc": "Décroissant",
-
-  // Pagination
   "pat.pagination.per_page": "par page",
   "pat.pagination.of": "sur",
   "pat.pagination.prev": "Précédent",
   "pat.pagination.next": "Suivant",
-
-  // Empty / loading states
   "pat.empty.title": "Aucun patient trouvé",
   "pat.empty.desc": "Modifiez vos critères de recherche ou ajoutez un nouveau patient.",
   "pat.loading": "Chargement des patients...",
-
-  // Form — global
   "pat.form.create.title": "Nouveau patient",
   "pat.form.edit.title": "Modifier le patient",
   "pat.form.next": "Suivant",
@@ -245,8 +216,6 @@ export default {
   "pat.form.auto_generated": "Généré automatiquement",
   "pat.form.step_of": "Étape",
   "pat.form.of": "sur",
-
-  // Form — step titles
   "pat.form.step1": "Identité",
   "pat.form.step2": "Identifiants",
   "pat.form.step3": "Coordonnées",
@@ -254,8 +223,6 @@ export default {
   "pat.form.step5": "Contact d'urgence",
   "pat.form.step6": "Assurance",
   "pat.form.step7": "Documents",
-
-  // Form — step 1: identity
   "pat.form.lastName": "Nom de famille",
   "pat.form.firstName": "Prénom",
   "pat.form.maidenName": "Nom de jeune fille",
@@ -266,16 +233,12 @@ export default {
   "pat.form.maritalStatus": "Situation familiale",
   "pat.form.photo": "Photo du patient",
   "pat.form.photo.hint": "JPG, PNG — max 2 Mo",
-
-  // Form — step 2: identifiers
   "pat.form.idType": "Type de pièce d'identité",
   "pat.form.idNumber": "Numéro de pièce d'identité",
   "pat.form.socialSecurity": "Numéro de sécurité sociale",
   "pat.form.fileNumber": "Numéro de dossier administratif",
   "pat.form.mpiId": "MPI ID",
   "pat.form.internalNumber": "Numéro interne",
-
-  // Form — step 3: contacts
   "pat.form.phone": "Téléphone principal",
   "pat.form.phoneSecondary": "Téléphone secondaire",
   "pat.form.email": "Adresse e-mail",
@@ -284,8 +247,6 @@ export default {
   "pat.form.wilaya": "Wilaya",
   "pat.form.postalCode": "Code postal",
   "pat.form.country": "Pays",
-
-  // Form — step 4: medical
   "pat.form.bloodType": "Groupe sanguin",
   "pat.form.rhesus": "Rhésus",
   "pat.form.allergies": "Allergies connues",
@@ -295,20 +256,14 @@ export default {
   "pat.form.disability": "Handicap / situation de handicap",
   "pat.form.criticalNotes": "Notes médicales critiques",
   "pat.form.criticalNotes.hint": "Ces informations seront affichées en rouge sur la fiche patient",
-
-  // Form — step 5: emergency contact
   "pat.form.emergency.name": "Nom complet",
   "pat.form.emergency.relation": "Relation",
   "pat.form.emergency.phone": "Téléphone",
   "pat.form.emergency.address": "Adresse",
-
-  // Form — step 6: insurance
   "pat.form.insurance.type": "Type de prise en charge",
   "pat.form.insurance.org": "Assurance / Organisme payeur",
   "pat.form.insurance.memberNumber": "Numéro d'adhérent",
   "pat.form.insurance.validUntil": "Date de validité",
-
-  // Form — step 7: documents
   "pat.form.docs.cni": "Carte nationale d'identité",
   "pat.form.docs.ss": "Carte de sécurité sociale",
   "pat.form.docs.insurance": "Attestation d'assurance",
@@ -316,28 +271,20 @@ export default {
   "pat.form.docs.admin": "Documents administratifs",
   "pat.form.docs.other": "Autres documents / Photos",
   "pat.form.docs.hint": "Fonctionnalité disponible prochainement — les pièces seront chargées via le backend.",
-
-  // ID document types
   "pat.id_type.cni": "Carte Nationale d'Identité",
   "pat.id_type.passeport": "Passeport",
   "pat.id_type.permis": "Permis de conduire",
   "pat.id_type.autre": "Autre document",
-
-  // Marital status
   "pat.marital.celibataire": "Célibataire",
   "pat.marital.marie": "Marié(e)",
   "pat.marital.divorce": "Divorcé(e)",
   "pat.marital.veuf": "Veuf / Veuve",
-
-  // Insurance types
   "pat.insurance.cnas": "CNAS",
   "pat.insurance.casnos": "CASNOS",
   "pat.insurance.mutuelle": "Mutuelle",
   "pat.insurance.militaire": "Militaire / CNMS",
   "pat.insurance.gratuite": "Gratuité des soins",
   "pat.insurance.payant": "Payant",
-
-  // Duplicate detection
   "pat.dup.title": "Doublon potentiel détecté",
   "pat.dup.desc": "Un ou plusieurs dossiers similaires ont été trouvés. Vérifiez avant de continuer.",
   "pat.dup.similarity": "Similarité",
@@ -348,8 +295,6 @@ export default {
   "pat.dup.reason.label": "Raison de la création malgré le doublon",
   "pat.dup.reason.hint": "Cette information sera enregistrée dans l'audit",
   "pat.dup.confirm": "Confirmer et créer",
-
-  // Profile page tabs
   "pat.tab.overview": "Vue générale",
   "pat.tab.identity": "Identité",
   "pat.tab.contacts": "Contacts",
@@ -368,21 +313,15 @@ export default {
   "pat.tab.invoices": "Factures",
   "pat.tab.timeline": "Historique",
   "pat.tab.audit": "Audit",
-
-  // Profile header actions
   "pat.profile.edit": "Modifier",
   "pat.profile.print": "Imprimer",
   "pat.profile.archive": "Archiver",
   "pat.profile.mpi": "N° MPI",
   "pat.profile.file": "N° Dossier",
-
-  // Confirm archive
   "pat.confirm.archive.title": "Archiver ce patient ?",
   "pat.confirm.archive.desc": "Le dossier sera archivé et ne sera plus visible dans la liste active. Cette action est réversible par un administrateur.",
   "pat.confirm.archive.yes": "Oui, archiver",
   "pat.confirm.archive.no": "Annuler",
-
-  // Timeline events
   "pat.timeline.title": "Historique du dossier",
   "pat.timeline.empty": "Aucun événement enregistré",
   "pat.timeline.creation": "Création du dossier",
@@ -395,27 +334,19 @@ export default {
   "pat.timeline.consultation": "Consultation",
   "pat.timeline.by": "par",
   "pat.timeline.at": "à",
-
-  // Documents tab
   "pat.docs.title": "Documents du patient",
   "pat.docs.add": "Ajouter un document",
   "pat.docs.empty": "Aucun document enregistré",
   "pat.docs.empty.desc": "Les documents seront disponibles une fois le backend connecté.",
   "pat.docs.soon": "Fonctionnalité disponible prochainement",
-
-  // Sensitive field
   "pat.sensitive.hidden": "●●●●●●●●●●",
   "pat.sensitive.show": "Afficher",
   "pat.sensitive.hide": "Masquer",
   "pat.sensitive.no_permission": "Permission insuffisante",
-
-  // Sync badge
   "pat.sync.badge.synced": "Synchronisé",
   "pat.sync.badge.pending": "En attente de sync",
   "pat.sync.badge.conflict": "Conflit",
   "pat.sync.badge.error": "Erreur de sync",
-
-  // Overview tab sections
   "pat.overview.identity": "Identité",
   "pat.overview.contact": "Contact",
   "pat.overview.medical": "Informations médicales",
@@ -426,15 +357,11 @@ export default {
   "pat.overview.no_history": "Aucun antécédent majeur",
   "pat.overview.no_insurance": "Non renseigné",
   "pat.overview.incomplete_banner": "Dossier incomplet — certaines informations obligatoires sont manquantes.",
-
-  // Success messages
   "pat.success.created": "Patient créé avec succès",
   "pat.success.updated": "Dossier mis à jour",
   "pat.success.archived": "Patient archivé",
 
-  // ── MODULE 2 : ADMISSIONS ─────────────────────────────────────────────────
-
-  // Page
+  // MODULE ADMISSIONS
   "adm.page.title": "Admissions & Préadmissions",
   "adm.page.subtitle": "Gestion des entrées, hospitalisations et sorties",
   "adm.page.demo": "Données de démonstration",
@@ -442,38 +369,28 @@ export default {
   "adm.add": "Nouvelle admission",
   "adm.export": "Exporter",
   "adm.back_to_list": "Retour à la liste",
-
-  // Mini-dashboard stats
   "adm.stats.today_admissions": "Admissions aujourd'hui",
   "adm.stats.today_discharges": "Sorties aujourd'hui",
   "adm.stats.hospitalized": "Patients hospitalisés",
   "adm.stats.free_beds": "Lits disponibles",
   "adm.stats.occupancy": "Taux d'occupation",
   "adm.stats.urgent": "Urgences actives",
-
-  // Types d'admission
   "adm.type.hospitalisation": "Hospitalisation",
   "adm.type.ambulatoire": "Ambulatoire",
   "adm.type.preadmission": "Préadmission",
   "adm.type.urgence": "Urgence",
   "adm.type.maternite": "Maternité",
   "adm.type.chirurgie": "Chirurgie",
-
-  // Statuts
   "adm.status.active": "Hospitalisé",
   "adm.status.preadmission": "Préadmis",
   "adm.status.ambulatoire": "Ambulatoire",
   "adm.status.transferred": "Transféré",
   "adm.status.discharged": "Sorti",
   "adm.status.cancelled": "Annulé",
-
-  // Priorités
   "adm.priority.normal": "Normal",
   "adm.priority.urgent": "Urgent",
   "adm.priority.tres_urgent": "Très urgent",
   "adm.priority.vital": "Vital — SMUR",
-
-  // Colonnes du tableau
   "adm.col.number": "N° Admission",
   "adm.col.mpi": "MPI",
   "adm.col.patient": "Patient",
@@ -485,8 +402,6 @@ export default {
   "adm.col.priority": "Priorité",
   "adm.col.status": "Statut",
   "adm.col.actions": "Actions",
-
-  // Filtres
   "adm.filter.search": "Rechercher par N° admission, MPI, patient…",
   "adm.filter.type": "Type — Tous",
   "adm.filter.status": "Statut — Tous",
@@ -496,8 +411,6 @@ export default {
   "adm.filter.date_to": "Au",
   "adm.filter.reset": "Réinitialiser",
   "adm.filter.results": "résultat(s)",
-
-  // Formulaire — étapes
   "adm.form.title.create": "Nouvelle admission",
   "adm.form.title.edit": "Modifier l'admission",
   "adm.form.step1": "Recherche patient",
@@ -511,8 +424,6 @@ export default {
   "adm.form.saving": "Enregistrement…",
   "adm.form.cancel": "Annuler",
   "adm.form.required": "Champ obligatoire",
-
-  // Step 1 — Recherche patient
   "adm.form.search.label": "Rechercher un patient existant",
   "adm.form.search.placeholder": "Entrez le N° MPI, nom ou téléphone…",
   "adm.form.search.button": "Rechercher",
@@ -522,8 +433,6 @@ export default {
   "adm.form.search.selected": "Patient sélectionné",
   "adm.form.search.change": "Changer de patient",
   "adm.form.search.required": "Veuillez sélectionner un patient avant de continuer.",
-
-  // Step 2 — Infos admission
   "adm.form.type": "Type d'admission",
   "adm.form.service": "Service",
   "adm.form.doctor": "Médecin responsable",
@@ -536,8 +445,6 @@ export default {
   "adm.form.preadmission_date": "Date d'admission prévue",
   "adm.form.notes": "Notes complémentaires",
   "adm.form.notes.placeholder": "Informations supplémentaires…",
-
-  // Step 3 — Lit
   "adm.form.bed.title": "Attribution d'un lit (optionnel)",
   "adm.form.bed.hint": "Sélectionnez un bâtiment, un étage, puis un lit disponible.",
   "adm.form.bed.building": "Bâtiment",
@@ -546,15 +453,11 @@ export default {
   "adm.form.bed.skip": "Continuer sans lit (attribuer plus tard)",
   "adm.form.bed.selected": "Lit sélectionné",
   "adm.form.bed.none": "Aucun lit sélectionné",
-
-  // Statuts de lits
   "adm.bed.libre": "Libre",
   "adm.bed.occupe": "Occupé",
   "adm.bed.nettoyage": "Nettoyage",
   "adm.bed.maintenance": "Maintenance",
   "adm.bed.occupied_by": "Occupé par",
-
-  // Actions rapides
   "adm.action.view": "Voir détail",
   "adm.action.edit": "Modifier",
   "adm.action.discharge": "Sortie patient",
@@ -562,8 +465,6 @@ export default {
   "adm.action.cancel": "Annuler",
   "adm.action.print": "Imprimer fiche",
   "adm.action.timeline": "Historique",
-
-  // Sortie
   "adm.discharge.title": "Sortie du patient",
   "adm.discharge.type": "Type de sortie",
   "adm.discharge.type.domicile": "Retour à domicile",
@@ -576,15 +477,11 @@ export default {
   "adm.discharge.time": "Heure de sortie",
   "adm.discharge.notes": "Résumé / notes de sortie",
   "adm.discharge.confirm": "Confirmer la sortie",
-
-  // Transfert
   "adm.transfer.title": "Transfert du patient",
   "adm.transfer.to": "Destination (service ou établissement)",
   "adm.transfer.date": "Date de transfert",
   "adm.transfer.notes": "Motif du transfert",
   "adm.transfer.confirm": "Confirmer le transfert",
-
-  // Timeline
   "adm.timeline.title": "Historique des événements",
   "adm.timeline.empty": "Aucun événement enregistré",
   "adm.timeline.admission": "Admission",
@@ -595,23 +492,144 @@ export default {
   "adm.timeline.note": "Note clinique",
   "adm.timeline.exam_ordered": "Examen prescrit",
   "adm.timeline.exam_result": "Résultat d'examen",
-
-  // Messages
   "adm.empty.title": "Aucune admission",
   "adm.empty.desc": "Aucune admission ne correspond aux critères de recherche.",
   "adm.success.created": "Admission créée avec succès",
   "adm.success.discharged": "Sortie enregistrée",
   "adm.success.transferred": "Transfert enregistré",
   "adm.success.cancelled": "Admission annulée",
-
-  // Pagination
   "adm.pagination.of": "sur",
   "adm.pagination.prev": "Précédent",
   "adm.pagination.next": "Suivant",
-
-  // Confirm dialogs
   "adm.confirm.cancel.title": "Annuler l'admission",
   "adm.confirm.cancel.desc": "Êtes-vous sûr de vouloir annuler cette admission ?",
   "adm.confirm.cancel.yes": "Oui, annuler",
   "adm.confirm.cancel.no": "Non, garder",
+
+  // PAGE PATIENTS (liste simple)
+  "patients.title": "Patients",
+  "patients.subtitle": "Gestion des dossiers patients",
+  "patients.new": "Nouveau patient",
+  "patients.search": "Rechercher par nom, prénom, n° dossier...",
+  "patients.filter.all_depts": "Tous les services",
+  "patients.filter.all_genders": "Tous",
+  "patients.filter.male": "Hommes",
+  "patients.filter.female": "Femmes",
+  "patients.table.file": "N° Dossier",
+  "patients.table.name": "Nom complet",
+  "patients.table.age": "Âge",
+  "patients.table.gender": "Sexe",
+  "patients.table.blood": "Groupe",
+  "patients.table.phone": "Téléphone",
+  "patients.table.department": "Service",
+  "patients.table.actions": "Actions",
+  "patients.male": "Homme",
+  "patients.female": "Femme",
+  "patients.total": "patient(s) trouvé(s)",
+  "patients.detail.title": "Dossier patient",
+  "patients.detail.info": "Informations personnelles",
+  "patients.detail.dob": "Date de naissance",
+  "patients.detail.address": "Adresse",
+  "patients.detail.phone": "Téléphone",
+  "patients.detail.blood": "Groupe sanguin",
+  "patients.detail.department": "Service",
+  "patients.detail.file": "N° Dossier",
+  "patients.detail.gender": "Sexe",
+  "patients.no_phone": "Non renseigné",
+  "patients.no_address": "Non renseignée",
+
+  // PAGE RENDEZ-VOUS
+  "appointments.title": "Rendez-vous",
+  "appointments.subtitle": "Calendrier et gestion des rendez-vous",
+  "appointments.new": "Nouveau rendez-vous",
+  "appointments.view.list": "Liste",
+  "appointments.view.calendar": "Calendrier",
+  "appointments.search": "Rechercher un patient, médecin...",
+  "appointments.filter.all_status": "Tous les statuts",
+  "appointments.filter.all_depts": "Tous les services",
+  "appointments.table.date": "Date & Heure",
+  "appointments.table.patient": "Patient",
+  "appointments.table.doctor": "Médecin",
+  "appointments.table.department": "Service",
+  "appointments.table.duration": "Durée",
+  "appointments.table.status": "Statut",
+  "appointments.table.notes": "Notes",
+  "appointments.total": "rendez-vous",
+  "appointments.min": "min",
+  "appointments.status.confirmed": "Confirmé",
+  "appointments.status.pending": "En attente",
+  "appointments.status.cancelled": "Annulé",
+  "appointments.status.completed": "Terminé",
+  "appointments.status.no_show": "Absent",
+  "appointments.form.title.new": "Nouveau rendez-vous",
+  "appointments.form.title.edit": "Modifier le rendez-vous",
+  "appointments.form.patient": "Patient",
+  "appointments.form.doctor": "Médecin",
+  "appointments.form.department": "Service",
+  "appointments.form.date": "Date",
+  "appointments.form.time": "Heure",
+  "appointments.form.duration": "Durée (min)",
+  "appointments.form.notes": "Notes",
+  "appointments.form.save": "Enregistrer",
+  "appointments.form.cancel": "Annuler",
+  "appointments.calendar.prev": "Précédent",
+  "appointments.calendar.next": "Suivant",
+  "appointments.calendar.today": "Aujourd'hui",
+
+  // PAGE ALERTES
+  "alerts.page.title": "Alertes",
+  "alerts.page.subtitle": "Suivi des alertes critiques et notifications",
+  "alerts.filter.all_severity": "Toutes les sévérités",
+  "alerts.filter.all_category": "Toutes les catégories",
+  "alerts.filter.unread": "Non lues",
+  "alerts.filter.all": "Toutes",
+  "alerts.mark_read": "Marquer comme lu",
+  "alerts.mark_all_read": "Tout marquer comme lu",
+  "alerts.severity.critical": "Critique",
+  "alerts.severity.high": "Élevée",
+  "alerts.severity.medium": "Moyenne",
+  "alerts.severity.low": "Faible",
+  "alerts.category.lab": "Laboratoire",
+  "alerts.category.stock": "Stock",
+  "alerts.category.medication": "Médicament",
+  "alerts.category.capacity": "Capacité",
+  "alerts.category.equipment": "Équipement",
+  "alerts.category.schedule": "Planning",
+  "alerts.table.severity": "Sévérité",
+  "alerts.table.category": "Catégorie",
+  "alerts.table.title": "Titre",
+  "alerts.table.description": "Description",
+  "alerts.table.time": "Heure",
+  "alerts.table.status": "Statut",
+  "alerts.table.actions": "Actions",
+  "alerts.unread_badge": "Non lue",
+  "alerts.read_badge": "Lue",
+  "alerts.total": "alerte(s)",
+  "alerts.unread_count": "non lue(s)",
+
+  // PAGE CONSULTATIONS
+  "consultations.title": "Consultations du jour",
+  "consultations.subtitle": "Suivi des consultations médicales",
+  "consultations.search": "Rechercher un patient, médecin...",
+  "consultations.filter.all_depts": "Tous les services",
+  "consultations.filter.all_status": "Tous les statuts",
+  "consultations.table.time": "Heure",
+  "consultations.table.patient": "Patient",
+  "consultations.table.doctor": "Médecin",
+  "consultations.table.department": "Service",
+  "consultations.table.type": "Type",
+  "consultations.table.status": "Statut",
+  "consultations.table.duration": "Durée",
+  "consultations.status.waiting": "En attente",
+  "consultations.status.in_progress": "En cours",
+  "consultations.status.completed": "Terminée",
+  "consultations.status.cancelled": "Annulée",
+  "consultations.type.consultation": "Consultation",
+  "consultations.type.followup": "Suivi",
+  "consultations.type.emergency": "Urgence",
+  "consultations.total": "consultation(s)",
+  "consultations.stats.waiting": "En attente",
+  "consultations.stats.in_progress": "En cours",
+  "consultations.stats.completed": "Terminées",
+  "consultations.min": "min"
 };

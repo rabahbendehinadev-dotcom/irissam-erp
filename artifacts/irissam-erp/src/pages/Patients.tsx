@@ -102,7 +102,7 @@ export default function PatientsPage() {
     setArchivingPatient(null);
   };
 
-  const handleSave = (data: Partial<Patient>) => {
+  const handleSave = (_data: Partial<Patient>) => {
     // Mock save — in production this would call API
     setShowForm(false);
     setEditingPatient(null);
@@ -173,10 +173,10 @@ export default function PatientsPage() {
 
         {/* Stats cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={<Users size={20} className="text-blue-600" />}       label={t('pat.stats.total')}      value={stats.total}      color="bg-blue-50" />
-          <StatCard icon={<UserCheck size={20} className="text-green-600" />}  label={t('pat.stats.active')}     value={stats.active}     color="bg-green-50" />
+          <StatCard icon={<Users size={20} className="text-blue-600" />}          label={t('pat.stats.total')}      value={stats.total}      color="bg-blue-50" />
+          <StatCard icon={<UserCheck size={20} className="text-green-600" />}     label={t('pat.stats.active')}     value={stats.active}     color="bg-green-50" />
           <StatCard icon={<AlertTriangle size={20} className="text-amber-600" />} label={t('pat.stats.incomplete')} value={stats.incomplete}  color="bg-amber-50" />
-          <StatCard icon={<Copy size={20} className="text-red-600" />}         label={t('pat.stats.duplicates')} value={stats.duplicates} color="bg-red-50" />
+          <StatCard icon={<Copy size={20} className="text-red-600" />}            label={t('pat.stats.duplicates')} value={stats.duplicates} color="bg-red-50" />
         </div>
 
         {/* Filters */}

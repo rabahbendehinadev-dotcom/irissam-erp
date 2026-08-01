@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, Calendar, ClipboardList, AlertTriangle, 
   Stethoscope, Bed, Scissors, HeartPulse, Baby, FlaskConical, Scan, 
   Pill, Droplets, Package, Microscope, UserCheck, Users2, DollarSign, 
-  Truck, FolderOpen, BarChart3, Settings, ChevronLeft
+  Truck, FolderOpen, BarChart3, Settings, ChevronLeft, Bell
 } from "lucide-react";
 
 export function Sidebar({ collapsed, setCollapsed }: { collapsed: boolean, setCollapsed: (val: boolean) => void }) {
@@ -22,6 +22,7 @@ export function Sidebar({ collapsed, setCollapsed }: { collapsed: boolean, setCo
         { path: "/appointments", icon: Calendar, label: "nav.appointments" },
         { path: "/admissions", icon: ClipboardList, label: "nav.admissions" },
         { path: "/emergencies", icon: AlertTriangle, label: "nav.emergencies" },
+        { path: "/alerts", icon: Bell, label: "nav.alerts" },
         { path: "/consultations", icon: Stethoscope, label: "nav.consultations" },
         { path: "/hospitalization", icon: Bed, label: "nav.hospitalization" },
       ]
