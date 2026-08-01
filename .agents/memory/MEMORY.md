@@ -1,3 +1,4 @@
+- [Production Logic Layer](production-logic.md) — 8-phase architecture (encounters, workflow, validation, notifications, occupancy, audit); MockRepositoryContextType is the PostgreSQL swap contract
 - [Emergency Dossier Architecture](emergency-dossier.md) — multi-component EMR dossier; context-driven state, 8 lazy tabs, mock data in src/mock/emergencyDossier.ts
 - [User type shape](user-type.md) — User has firstName/lastName (not name); no siteId guarantee; role from UserRole
 - [Mock Repository](mock-repository.md) — unified cross-module store in src/store/MockRepository.tsx; swap point for PostgreSQL

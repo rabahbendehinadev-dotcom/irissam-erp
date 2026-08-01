@@ -1,0 +1,180 @@
+الآن أوقف إنشاء أي Components أو صفحات جديدة.
+
+أريد الدخول في مرحلة Production Logic.
+
+ركز فقط على جعل النظام يعمل مثل مستشفى حقيقي.
+
+=====================
+المرحلة الأولى
+=====================
+
+كل Patient له Encounter واحد أو أكثر.
+
+كل Encounter يحتوي:
+
+- Consultations
+- Urgence
+- Admission
+- Prescriptions
+- Analyses
+- Imagerie
+- Documents
+- Facturation
+
+ولا يتم إنشاء أي سجل خارج Encounter.
+
+=====================
+المرحلة الثانية
+=====================
+
+كل Module يقرأ نفس البيانات من Repository.
+
+أي تعديل داخل:
+
+Urgence
+
+يظهر مباشرة في:
+
+Patient
+
+Admissions
+
+Laboratoire
+
+Imagerie
+
+Facturation
+
+Audit
+
+بدون أي Refresh.
+
+=====================
+المرحلة الثالثة
+=====================
+
+أضف Validation كامل.
+
+مثلاً:
+
+لا يمكن إرسال Analyse إذا لم يوجد Médecin.
+
+لا يمكن Hospitaliser إذا لا توجد Salle.
+
+لا يمكن Bloc إذا لا يوجد Chirurgien.
+
+لا يمكن Réanimation إذا لا يوجد Lit.
+
+لا يمكن Clôturer إذا توجد Demandes غير منجزة.
+
+=====================
+المرحلة الرابعة
+=====================
+
+أضف Workflow Engine.
+
+كل Statut يسمح فقط بالانتقالات الصحيحة.
+
+Exemple :
+
+En attente
+↓
+
+Triage
+↓
+
+Consultation
+↓
+
+Décision
+
+↓
+
+Hospitalisation
+ou
+Bloc
+ou
+Réanimation
+ou
+Sortie
+
+ولا يسمح بالقفز بين الحالات.
+
+=====================
+المرحلة الخامسة
+=====================
+
+أضف Notifications internes.
+
+مثلاً:
+
+Analyse créée
+→ laboratoire reçoit notification.
+
+Prescription créée
+→ pharmacie reçoit notification.
+
+Hospitalisation créée
+→ admissions reçoit notification.
+
+Bloc créé
+→ bloc reçoit notification.
+
+Réanimation créée
+→ ICU reçoit notification.
+
+=====================
+المرحلة السادسة
+=====================
+
+أضف Occupation en temps réel.
+
+كل Salle.
+
+كل Lit.
+
+كل Ambulance.
+
+كل Médecin.
+
+كل Infirmier.
+
+يجب أن تتحدث مباشرة عند أي عملية.
+
+=====================
+المرحلة السابعة
+=====================
+
+كل عملية تحفظ داخل Audit.
+
+Date
+
+Heure
+
+Utilisateur
+
+Action
+
+Module
+
+Patient
+
+Encounter
+
+Ancienne valeur
+
+Nouvelle valeur
+
+=====================
+المرحلة الثامنة
+=====================
+
+أريد أن يصبح Repository مطابقاً تقريباً لقاعدة PostgreSQL.
+
+بحيث لاحقاً أغير MockRepository إلى API فقط دون إعادة كتابة الـ UI أو الـ Business Logic.
+
+لا تنشئ صفحات جديدة.
+
+لا تغير التصميم.
+
+ركز فقط على منطق النظام الداخلي.

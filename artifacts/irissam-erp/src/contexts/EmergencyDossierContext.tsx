@@ -4,7 +4,13 @@ import {
 import { useAuth } from '@/store/AuthContext';
 import { useMockRepository } from '@/store/MockRepository';
 import { useAdmissions } from '@/store/AdmissionsContext';
+import { useToast } from '@/hooks/use-toast';
 import { getMockDossier } from '@/mock/emergencyDossier';
+import {
+  validateLabOrder, validateImagingOrder,
+  validateHospitalization, validateBloc, validateICU,
+  validateTransfer, validateCloseFile,
+} from '@/engine/validationEngine';
 import type {
   EmergencyDossier, EmergencyWorkflowStatus, WorkflowTransition,
   VitalReading, GlasgowBreakdown, ABCDEAssessment, LabRequest, ImagingRequest,
@@ -76,6 +82,7 @@ export function EmergencyDossierProvider({
   const { user } = useAuth();
   const repo = useMockRepository();
   const { addAdmission: admissionsAddAdmission } = useAdmissions();
+  const { toast } = useToast();
   const [dossier, setDossier] = useState<EmergencyDossier>(() => getMockDossier(patientId));
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -149,9 +156,17 @@ export function EmergencyDossierProvider({
   }, [transitionStatus]);
 
   const closeFile = useCallback(() => {
+    // Phase 3: validate no pending lab or imaging requests
+    const pendingLab     = dossier.labRequests.filter(r => ['demandee', 'prelevee', 'en_cours'].includes(r.status)).length;
+    const pendingImaging = dossier.imagingRequests.filter(r => ['demandee', 'planifiee'].includes(r.status)).length;
+    const v = validateCloseFile({ pendingLabCount: pendingLab, pendingImagingCount: pendingImaging });
+    if (!v.valid) {
+      toast({ title: 'Clôture impossible', description: v.error, variant: 'destructive' });
+      return;
+    }
     transitionStatus('cloture', 'Dossier clôturé');
     pushAudit({ action: 'Clôture du dossier', category: 'admin', details: '' });
-  }, [transitionStatus, pushAudit]);
+  }, [dossier, transitionStatus, pushAudit, toast]);
 
   // ── Clinical Text ─────────────────────────────────────────────────────────
   const updateClinicalText = useCallback((
@@ -202,17 +217,23 @@ export function EmergencyDossierProvider({
     };
     setDossier(d => ({ ...d, labRequests: [...d.labRequests, r] }));
     pushAudit({ action: 'Analyse demandée', category: 'lab', details: r.test });
+    // Phase 3: validate doctor is present
+    const vLab = validateLabOrder({ requestedById: whoId });
+    if (!vLab.valid) {
+      toast({ title: 'Analyse refusée', description: vLab.error, variant: 'destructive' });
+      return;
+    }
     // Cross-module: register in global repository so Lab module can see it
     const pt = repo.getPatient(patientId);
     repo.createLabOrder({
-      visitId: `visit-${patientId}`, patientId,
+      visitId: `visit-${patientId}`, encounterId: `enc-${patientId}`, patientId,
       patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
       test: r.test, category: r.category, urgency: r.urgency,
       requestedBy: who, requestedById: whoId,
       status: r.status, sourceModule: 'urgences',
       laboratory: r.laboratory,
     });
-  }, [who, whoId, pushAudit, repo, patientId]);
+  }, [who, whoId, pushAudit, repo, patientId, toast]);
 
   const updateLabStatus = useCallback((id: string, status: LabRequest['status'], result?: string, isCritical?: boolean) => {
     setDossier(d => ({
@@ -234,17 +255,23 @@ export function EmergencyDossierProvider({
     };
     setDossier(d => ({ ...d, imagingRequests: [...d.imagingRequests, r] }));
     pushAudit({ action: 'Imagerie demandée', category: 'imaging', details: `${r.exam} — ${r.region}` });
+    // Phase 3: validate doctor is present
+    const vImg = validateImagingOrder({ requestedById: whoId });
+    if (!vImg.valid) {
+      toast({ title: 'Imagerie refusée', description: vImg.error, variant: 'destructive' });
+      return;
+    }
     // Cross-module: register in global repository so Radiology module can see it
     const pt = repo.getPatient(patientId);
     repo.createImagingOrder({
-      visitId: `visit-${patientId}`, patientId,
+      visitId: `visit-${patientId}`, encounterId: `enc-${patientId}`, patientId,
       patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
       exam: r.exam, region: r.region, side: r.side,
       urgency: r.urgency, withContrast: r.withContrast,
       requestedBy: who, requestedById: whoId,
       status: r.status, sourceModule: 'urgences',
     });
-  }, [who, whoId, pushAudit, repo, patientId]);
+  }, [who, whoId, pushAudit, repo, patientId, toast]);
 
   const updateImagingStatus = useCallback((id: string, status: ImagingRequest['status'], result?: string) => {
     setDossier(d => ({
@@ -269,7 +296,7 @@ export function EmergencyDossierProvider({
     // Cross-module: register in global repository so patient history can see it
     const pt = repo.getPatient(patientId);
     repo.createPrescription({
-      visitId: `visit-${patientId}`, patientId,
+      visitId: `visit-${patientId}`, encounterId: `enc-${patientId}`, patientId,
       patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
       drug: p.drug, dosage: p.dosage, route: p.route,
       frequency: p.frequency, duration: p.duration,
@@ -376,6 +403,21 @@ export function EmergencyDossierProvider({
     const d = dossier;
     const decision = d.finalDecision.decision;
     if (!decision) return;
+
+    // Phase 3: validate decision-specific requirements before executing
+    if (decision === 'hospitalisation') {
+      const v = validateHospitalization({ ward: d.finalDecision.ward });
+      if (!v.valid) { toast({ title: 'Hospitalisation refusée', description: v.error, variant: 'destructive' }); return; }
+    } else if (decision === 'bloc') {
+      const v = validateBloc({ surgeon: d.finalDecision.surgeon, intervention: d.finalDecision.intervention });
+      if (!v.valid) { toast({ title: 'Demande bloc refusée', description: v.error, variant: 'destructive' }); return; }
+    } else if (decision === 'reanimation') {
+      const v = validateICU({ icuBed: d.finalDecision.icuBed, icuMotif: d.finalDecision.icuMotif });
+      if (!v.valid) { toast({ title: 'Admission réa refusée', description: v.error, variant: 'destructive' }); return; }
+    } else if (decision === 'transfert') {
+      const v = validateTransfer({ destEtablissement: d.finalDecision.destEtablissement });
+      if (!v.valid) { toast({ title: 'Transfert refusé', description: v.error, variant: 'destructive' }); return; }
+    }
 
     const now = new Date().toISOString();
     const auditCtx = { userId: whoId, userName: who, userRole: whoRole };

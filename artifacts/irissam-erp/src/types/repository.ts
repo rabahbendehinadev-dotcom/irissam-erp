@@ -22,6 +22,7 @@ export interface RepoAuditEntry {
   userName: string;
   userRole: string;
   patientId?: string;
+  encounterId?: string;  // Phase 1: every record belongs to an encounter
   visitId?: string;
   resourceId?: string;
   resourceType?: string;
@@ -62,6 +63,7 @@ export interface EmergencyVisit {
 
 export interface RepoLabOrder {
   id: string;
+  encounterId?: string;  // Phase 1: belongs to encounter
   visitId: string;
   patientId: string;
   patientName: string;
@@ -83,6 +85,7 @@ export interface RepoLabOrder {
 
 export interface RepoImagingOrder {
   id: string;
+  encounterId?: string;
   visitId: string;
   patientId: string;
   patientName: string;
@@ -104,6 +107,7 @@ export interface RepoImagingOrder {
 
 export interface RepoPrescription {
   id: string;
+  encounterId?: string;
   visitId: string;
   patientId: string;
   patientName: string;
