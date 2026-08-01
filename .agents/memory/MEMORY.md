@@ -1,0 +1,2 @@
+- [Emergency Dossier Architecture](emergency-dossier.md) — multi-component EMR dossier; context-driven state, 8 lazy tabs, mock data in src/mock/emergencyDossier.ts
+- [User type shape](user-type.md) — User has firstName/lastName (not name); no siteId guarantee; role from UserRole

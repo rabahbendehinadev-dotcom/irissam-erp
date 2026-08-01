@@ -1,0 +1,551 @@
+نريد الآن إنهاء Module Urgences بطريقة صحيحة ومترابطة.
+
+مهم جدًا:
+- لا تغيّر Dashboard الحالية.
+- لا تغيّر الألوان أو الـLayout أو الـSidebar أو الـTopbar.
+- لا تضف Widgets جديدة إلى Dashboard.
+- ركّز فقط على صفحة ملف مريض الاستعجالات:
+  /emergencies/:id
+- استعمل نفس Design System الحالي.
+- استعمل Mock Data حاليًا، لكن جهّز كل شيء للربط لاحقًا مع Backend وPostgreSQL.
+- دعم كامل للفرنسية والعربية RTL والإنجليزية.
+- تطبيق Permissions وAudit على جميع العمليات.
+
+==================================================
+1. فتح ملف مريض الاستعجالات
+==================================================
+
+عند الضغط على:
+- Ouvrir
+- Prendre en charge
+
+يجب فتح الصفحة:
+ /emergencies/:id
+
+بدون Refresh كامل للصفحة.
+
+يجب تمرير نفس:
+- Patient ID
+- MPI
+- Emergency ID
+- Triage level
+- Arrival time
+- Assigned doctor
+- Assigned nurse
+- Room
+- Current status
+
+ممنوع إعادة إدخال بيانات المريض.
+
+==================================================
+2. Header ثابت واحترافي
+==================================================
+
+أنشئ Header Sticky يحتوي على:
+
+- اسم المريض
+- MPI
+- رقم الملف
+- العمر
+- الجنس
+- فصيلة الدم
+- Minor / Adulte
+- مستوى الفرز P1 / P2 / P3 / P4 / P5
+- سبب الحضور
+- وقت الوصول
+- وقت بداية الفرز
+- وقت بدء التكفل
+- مدة الانتظار الحية
+- الطبيب المكلف
+- الممرض المكلف
+- الغرفة
+- الحالة الحالية
+- حالة المزامنة
+- آخر حفظ
+
+أزرار:
+
+- Commencer la prise en charge
+- Suspendre
+- Reprendre
+- Sauvegarder
+- Imprimer
+- Exporter PDF
+- Clôturer le dossier
+
+==================================================
+3. التنبيهات الطبية
+==================================================
+
+أضف Banner ثابتة قابلة للطي تعرض:
+
+- Allergies
+- Maladies chroniques
+- Anticoagulants
+- Grossesse
+- Risque infectieux
+- Groupe sanguin rare
+- Handicap
+- Traitement chronique
+
+التنبيه الحرج يبقى ظاهرًا حتى أثناء النزول في الصفحة.
+
+==================================================
+4. Workflow والحالات
+==================================================
+
+الحالات:
+
+- Arrivé
+- En triage
+- En attente médecin
+- En prise en charge
+- En soins
+- En observation
+- En attente résultats
+- Décision en attente
+- Hospitalisé
+- Transféré
+- Sorti
+- Décédé
+- Dossier clôturé
+
+كل تغيير حالة يجب أن:
+- يسجل الوقت.
+- يسجل المستخدم.
+- يظهر داخل Timeline.
+- يسجل في Audit Trail.
+- يحدث Dashboard Urgences.
+
+==================================================
+5. Timeline المريض
+==================================================
+
+أنشئ Timeline تفاعلية تعرض:
+
+- Arrivée
+- Triage
+- Affectation médecin
+- Affectation infirmier
+- Affectation salle
+- Constantes
+- Prélèvement
+- Analyse demandée
+- Résultat reçu
+- Imagerie demandée
+- Imagerie réalisée
+- Prescription
+- Médicament administré
+- Procédure réalisée
+- Décision finale
+- Sortie / Transfert / Hospitalisation
+
+عند الضغط على حدث:
+- افتح Drawer جانبية بالتفاصيل.
+- لا تغادر الصفحة.
+- أضف زر طباعة الحدث.
+
+==================================================
+6. Tab Évaluation
+==================================================
+
+أضف:
+
+A. Motif principal
+- plainte principale
+- heure de début
+- contexte
+- mécanisme traumatique إن وجد
+
+B. Histoire de la maladie
+- symptômes
+- durée
+- intensité
+- facteurs aggravants
+- facteurs soulageants
+- évolution
+
+C. Signes vitaux
+- Poids
+- Taille
+- IMC
+- Température
+- Tension systolique
+- Tension diastolique
+- Fréquence cardiaque
+- Fréquence respiratoire
+- Saturation O2
+- Glycémie
+- Douleur 0–10
+- État de conscience
+- Glasgow
+- Oxygène administré
+- Débit O2
+
+D. Scores automatiques
+- NEWS2
+- qSOFA
+- Shock Index
+- Glasgow Score
+
+اعرض تنبيهًا واضحًا إذا كانت النتيجة خطيرة.
+
+E. ABCDE
+- Airway
+- Breathing
+- Circulation
+- Disability
+- Exposure
+
+كل قسم:
+- Normal
+- Anormal
+- Non évalué
+- Notes
+- Action immédiate
+
+==================================================
+7. Tab Examen clinique
+==================================================
+
+الأقسام:
+
+- État général
+- Cardiovasculaire
+- Respiratoire
+- Neurologique
+- Abdominal
+- Traumatique
+- Cutané
+- ORL
+- Musculosquelettique
+- Autres constatations
+
+أضف:
+- Diagnostic provisoire
+- Diagnostics différentiels
+- Gravité
+- CIM-10 Placeholder قابل للبحث
+
+==================================================
+8. Tab Ordres
+==================================================
+
+قسم Analyses:
+
+- Type d’analyse
+- Priorité
+- Laboratoire
+- Heure de demande
+- Statut:
+  - Demandée
+  - Prélevée
+  - En cours
+  - Validée
+  - Annulée
+- Résultat
+- Résultat critique
+
+قسم Imagerie:
+
+- Type d’examen
+- Zone anatomique
+- Priorité
+- Contraste
+- Contre-indications
+- Heure de demande
+- Statut:
+  - Demandée
+  - Planifiée
+  - Réalisée
+  - Interprétée
+  - Annulée
+- Compte rendu
+
+كل طلب يجب أن يرتبط بـ:
+- Emergency ID
+- Patient ID
+- Doctor ID
+
+لا تبنِ LIS أو RIS كاملًا الآن.
+
+==================================================
+9. Tab Traitement
+==================================================
+
+Prescriptions:
+
+- Médicament
+- Dose
+- Voie
+- Fréquence
+- Heure prescrite
+- Heure prévue
+- Heure administrée
+- Infirmier
+- Statut:
+  - Prescrit
+  - Préparé
+  - Administré
+  - Refusé
+  - Retard
+  - Annulé
+- Commentaire
+
+Procédures:
+
+- Oxygène
+- Perfusion
+- Injection
+- Pansement
+- Suture
+- Immobilisation
+- Cathéter
+- Réanimation
+- Autre procédure
+
+كل إجراء يحتوي على:
+- المستخدم
+- الوقت
+- النتيجة
+- الملاحظات
+
+==================================================
+10. Tab Notes
+==================================================
+
+أضف Timeline للملاحظات:
+
+- Notes médicales
+- Notes infirmières
+- Notes administratives
+- Transmission d’équipe
+
+كل Note:
+- المستخدم
+- الدور
+- التاريخ والوقت
+- النص
+- Pin
+- Modifier مع Versioning
+- Recherche
+- Filtre
+
+لا تحذف النسخ القديمة.
+
+==================================================
+11. Tab Observation
+==================================================
+
+للمرضى تحت المراقبة:
+
+- Début observation
+- Motif
+- Fréquence surveillance
+- Constantes répétées
+- Traitements administrés
+- Évolution
+- Alertes
+- Durée totale
+- Médecin responsable
+- Infirmier responsable
+
+اعرض Chart بسيط لتطور:
+- FC
+- TA
+- SpO2
+- Température
+- Douleur
+
+==================================================
+12. القرار النهائي
+==================================================
+
+أنشئ قسم Décision finale مع الخيارات:
+
+- Retour à domicile
+- Hospitalisation
+- Réanimation
+- Bloc opératoire
+- Transfert externe
+- Observation prolongée
+- Décès
+
+لكل قرار افتح Wizard صغير.
+
+Retour à domicile:
+- Diagnostic final
+- Traitement
+- Conseils
+- Ordonnance
+- Contrôle
+- Signes d’alerte
+- Accompagnant
+- Heure de sortie
+
+Hospitalisation:
+- Service
+- Médecin
+- Motif
+- Priorité
+- Chambre/Lit Placeholder
+- Résumé médical
+- Documents à transmettre
+
+Réanimation:
+- Motif
+- Priorité
+- Lit requis
+- Équipe prévenue
+- Heure de transfert
+
+Bloc opératoire:
+- Intervention prévue
+- Chirurgien
+- Anesthésiste
+- Degré d’urgence
+- Préparation préopératoire
+- Consentement
+
+Transfert externe:
+- Établissement
+- Motif
+- Médecin contacté
+- Ambulance
+- Documents
+- Heure départ
+
+Décès:
+- Heure
+- Médecin constatant
+- Cause provisoire
+- Personne informée
+- Morgue
+- Documents
+
+==================================================
+13. الربط مع بقية Modules
+==================================================
+
+عند اختيار Hospitalisation:
+- أنشئ Admission Mock جديدة تلقائيًا.
+- اربطها بنفس Patient ID وEmergency ID.
+- حدّث Dashboard Admissions.
+- لا تطلب إعادة إدخال بيانات المريض.
+
+عند اختيار Bloc opératoire:
+- أنشئ Surgical Request Mock.
+- اربطها بالطوارئ والمريض.
+
+عند اختيار Réanimation:
+- أنشئ ICU Request Mock.
+
+عند اختيار Transfert:
+- أنشئ Transfer Record Mock.
+
+عند اختيار Retour domicile:
+- أغلق الزيارة وحدث حالة المريض في Dashboard.
+
+==================================================
+14. Audit وVersioning
+==================================================
+
+سجل:
+
+- فتح الملف
+- بدء التكفل
+- تعديل العلامات الحيوية
+- تغيير مستوى الفرز
+- إضافة تشخيص
+- طلب تحليل
+- طلب أشعة
+- وصف دواء
+- إعطاء دواء
+- إضافة ملاحظة
+- اتخاذ القرار
+- إغلاق الملف
+- طباعة
+- تصدير
+
+أي تعديل بعد Clôture يحتاج Permission خاصة وينشئ Version جديدة.
+
+==================================================
+15. الصلاحيات
+==================================================
+
+حضّر Permissions:
+
+- emergencies.view
+- emergencies.create
+- emergencies.triage
+- emergencies.start_care
+- emergencies.update
+- emergencies.assign_staff
+- emergencies.assign_room
+- emergencies.order_lab
+- emergencies.order_imaging
+- emergencies.prescribe
+- emergencies.administer_medication
+- emergencies.add_note
+- emergencies.decide
+- emergencies.transfer
+- emergencies.hospitalize
+- emergencies.send_to_or
+- emergencies.send_to_icu
+- emergencies.close
+- emergencies.reopen
+- emergencies.print
+- emergencies.export
+- emergencies.view_audit
+
+==================================================
+16. الأداء والـUX
+==================================================
+
+- لا Reload عند التنقل بين Tabs.
+- Auto-save كل ثانيتين بصريًا.
+- Lazy Loading للـTabs.
+- Cache للبيانات داخل Workspace.
+- Loading Skeleton.
+- Error State.
+- Empty State.
+- Responsive.
+- Keyboard Navigation.
+- لا يوجد Scroll أفقي غير ضروري.
+- الحفاظ على Dark Mode.
+- صفر أخطاء TypeScript.
+
+==================================================
+17. معايير القبول
+==================================================
+
+لا تعتبر المهمة مكتملة إلا إذا:
+
+- زر Ouvrir وPrendre en charge يفتحان نفس الملف.
+- جميع بيانات المريض تنتقل بدون إعادة إدخال.
+- الحالة تتغير وتحدث Dashboard.
+- Timer يعمل.
+- Timeline تعمل.
+- العلامات الحيوية تعمل.
+- Scores تتحسب.
+- ABCDE يعمل.
+- التحاليل والأشعة تعمل بـMock Data.
+- الأدوية والإجراءات تعمل.
+- الملاحظات تعمل.
+- Observation تعمل.
+- القرار النهائي يعمل.
+- Hospitalisation / Bloc / Réanimation / Transfert تنشئ سجلات مرتبطة.
+- Audit يعمل.
+- Permissions مطبقة.
+- اللغات الثلاث تعمل.
+- RTL صحيح.
+- لا يتم كسر أي Module موجود.
+
+بعد الانتهاء اعرض:
+
+1. Structure الملفات الجديدة.
+2. Components التي أنشأتها.
+3. Permissions المستعملة.
+4. العلاقات بين Urgences وPatients وAdmissions وHospitalisation وBloc.
+5. ما تم تأجيله للـBackend.
+6. قائمة اختبارات يدوية كاملة.

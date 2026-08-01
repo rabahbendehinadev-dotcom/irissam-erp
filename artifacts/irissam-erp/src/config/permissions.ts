@@ -17,8 +17,17 @@ export type Permission =
   | 'admissions.view' | 'admissions.create' | 'admissions.edit'
   | 'admissions.discharge' | 'admissions.transfer' | 'admissions.cancel'
   | 'admissions.export' | 'admissions.view_audit'
-  // Emergencies
-  | 'emergencies.view' | 'emergencies.triage'
+  // Emergencies — full module
+  | 'emergencies.view' | 'emergencies.create' | 'emergencies.triage'
+  | 'emergencies.start_care' | 'emergencies.update'
+  | 'emergencies.assign_staff' | 'emergencies.assign_room'
+  | 'emergencies.order_lab' | 'emergencies.order_imaging'
+  | 'emergencies.prescribe' | 'emergencies.administer_medication'
+  | 'emergencies.add_note' | 'emergencies.decide'
+  | 'emergencies.transfer' | 'emergencies.hospitalize'
+  | 'emergencies.send_to_or' | 'emergencies.send_to_icu'
+  | 'emergencies.close' | 'emergencies.reopen'
+  | 'emergencies.print' | 'emergencies.export' | 'emergencies.view_audit'
   // Consultations
   | 'consultations.view' | 'consultations.create' | 'consultations.edit'
   | 'consultations.start' | 'consultations.complete' | 'consultations.cancel'
@@ -64,7 +73,16 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'admissions.view', 'admissions.create', 'admissions.edit',
     'admissions.discharge', 'admissions.transfer', 'admissions.cancel',
     'admissions.export', 'admissions.view_audit',
-    'emergencies.view', 'emergencies.triage',
+    'emergencies.view', 'emergencies.create', 'emergencies.triage',
+    'emergencies.start_care', 'emergencies.update',
+    'emergencies.assign_staff', 'emergencies.assign_room',
+    'emergencies.order_lab', 'emergencies.order_imaging',
+    'emergencies.prescribe', 'emergencies.administer_medication',
+    'emergencies.add_note', 'emergencies.decide',
+    'emergencies.transfer', 'emergencies.hospitalize',
+    'emergencies.send_to_or', 'emergencies.send_to_icu',
+    'emergencies.close', 'emergencies.reopen',
+    'emergencies.print', 'emergencies.export', 'emergencies.view_audit',
     'consultations.view', 'consultations.create', 'consultations.edit',
     'consultations.start', 'consultations.complete', 'consultations.cancel',
     'consultations.print', 'consultations.export', 'consultations.view_sensitive',
