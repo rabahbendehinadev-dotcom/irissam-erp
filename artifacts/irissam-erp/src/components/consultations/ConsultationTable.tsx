@@ -77,11 +77,12 @@ function ActionsMenu({ consultation: c, onAction }: ActionsMenuProps) {
 interface Props {
   consultations: Consultation[];
   onStatusChange?: (id: string, status: ConsultationStatus) => void;
+  onPatientClick?: (patientId: string) => void;
 }
 
 const PAGE_SIZE = 10;
 
-export function ConsultationTable({ consultations, onStatusChange }: Props) {
+export function ConsultationTable({ consultations, onStatusChange, onPatientClick }: Props) {
   const [, setLocation] = useLocation();
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -169,14 +170,14 @@ export function ConsultationTable({ consultations, onStatusChange }: Props) {
                     <p className="text-xs font-medium text-gray-800">{formatDate(c.scheduledAt)}</p>
                     <p className="text-xs text-gray-400">{formatTime(c.scheduledAt)}</p>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                  <td className="px-4 py-3" onClick={e => { if (onPatientClick && c.patientId) { e.stopPropagation(); onPatientClick(c.patientId); } }}>
+                    <div className={cn("flex items-center gap-2", onPatientClick && c.patientId ? "cursor-pointer group" : "")}>
                       <PatientAvatar
                         firstName={nameParts[nameParts.length - 1] ?? ''}
                         lastName={nameParts[0] ?? ''}
                         size="xs"
                       />
-                      <span className="font-medium text-gray-900 whitespace-nowrap">{c.patientName}</span>
+                      <span className={cn("font-medium whitespace-nowrap", onPatientClick && c.patientId ? "text-blue-700 group-hover:underline" : "text-gray-900")}>{c.patientName}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">{c.patientMpi}</td>

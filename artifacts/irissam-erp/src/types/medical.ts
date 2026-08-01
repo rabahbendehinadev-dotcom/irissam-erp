@@ -11,6 +11,8 @@ export interface MedicalAlert {
   isRead: boolean;
   siteId?: string;
   departmentId?: string;
+  /** Patient ID when the alert is linked to a specific patient */
+  patientId?: string;
 }
 
 export interface Medication {

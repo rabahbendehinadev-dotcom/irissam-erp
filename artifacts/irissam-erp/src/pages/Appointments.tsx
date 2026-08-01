@@ -3,6 +3,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageWrapper } from "@/components/shared/PageWrapper";
 import { PatientAvatar } from "@/components/shared/PatientAvatar";
+import { PatientDrawer } from "@/components/shared/PatientDrawer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useLanguage } from "@/i18n";
 import { MOCK_APPOINTMENTS } from "@/mock";
@@ -55,6 +56,7 @@ export default function Appointments() {
   const [calendarDate, setCalendarDate] = useState(new Date("2026-08-01"));
   const [editApt, setEditApt] = useState<Appointment | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
 
   const departments = useMemo(() => {
     const map = new Map<string, string>();
@@ -203,10 +205,13 @@ export default function Appointments() {
                         </p>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setDrawerPatientId(apt.patientId)}
+                          className="flex items-center gap-2 group text-left"
+                        >
                           <PatientAvatar firstName={apt.patient.firstName} lastName={apt.patient.lastName} size="xs" />
-                          <span className="font-medium text-gray-900">{apt.patient.firstName} {apt.patient.lastName}</span>
-                        </div>
+                          <span className="font-medium text-blue-700 group-hover:underline">{apt.patient.firstName} {apt.patient.lastName}</span>
+                        </button>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5 text-gray-700">
@@ -303,10 +308,11 @@ export default function Appointments() {
                     {/* Appointments */}
                     <div className="p-1.5 space-y-1">
                       {dayApts.slice(0, 4).map((a) => (
-                        <div
+                        <button
                           key={a.id}
+                          onClick={() => setDrawerPatientId(a.patientId)}
                           className={cn(
-                            "text-xs px-1.5 py-1 rounded-md border truncate",
+                            "text-xs px-1.5 py-1 rounded-md border truncate w-full text-left hover:opacity-80 transition-opacity",
                             a.status === "confirmed" ? "bg-green-50 border-green-200 text-green-800" :
                             a.status === "pending" ? "bg-yellow-50 border-yellow-200 text-yellow-800" :
                             a.status === "cancelled" ? "bg-red-50 border-red-200 text-red-700 line-through" :
@@ -316,7 +322,7 @@ export default function Appointments() {
                         >
                           <span className="font-medium">{formatTime(a.scheduledAt)}</span>{" "}
                           {a.patient.firstName} {a.patient.lastName}
-                        </div>
+                        </button>
                       ))}
                       {dayApts.length > 4 && (
                         <p className="text-[10px] text-gray-400 text-center">+{dayApts.length - 4} autres</p>
@@ -378,6 +384,12 @@ export default function Appointments() {
           </div>
         </div>
       )}
+
+      {/* Patient drawer */}
+      <PatientDrawer
+        patientId={drawerPatientId}
+        onClose={() => setDrawerPatientId(null)}
+      />
     </DashboardLayout>
   );
 }

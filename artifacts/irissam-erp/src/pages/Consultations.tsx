@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Plus, RefreshCw, Download, Stethoscope } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageWrapper } from '@/components/shared/PageWrapper';
+import { PatientDrawer } from '@/components/shared/PatientDrawer';
 import { ConsultationStats } from '@/components/consultations/ConsultationStats';
 import { ConsultationFilters, DEFAULT_FILTERS, type ConsultationFiltersState } from '@/components/consultations/ConsultationFilters';
 import { ConsultationTable } from '@/components/consultations/ConsultationTable';
@@ -14,6 +15,7 @@ export default function ConsultationsPage() {
   const [filters, setFilters] = useState<ConsultationFiltersState>(DEFAULT_FILTERS);
   const [showForm, setShowForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
 
   // ── Filter logic ────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -131,6 +133,7 @@ export default function ConsultationsPage() {
         <ConsultationTable
           consultations={filtered}
           onStatusChange={handleStatusChange}
+          onPatientClick={setDrawerPatientId}
         />
       </PageWrapper>
 
@@ -141,6 +144,12 @@ export default function ConsultationsPage() {
           onCreated={handleCreated}
         />
       )}
+
+      {/* ── Patient drawer ──────────────────────────────────────────────────── */}
+      <PatientDrawer
+        patientId={drawerPatientId}
+        onClose={() => setDrawerPatientId(null)}
+      />
     </DashboardLayout>
   );
 }

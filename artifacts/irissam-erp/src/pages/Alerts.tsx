@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageWrapper } from "@/components/shared/PageWrapper";
+import { PatientDrawer } from "@/components/shared/PatientDrawer";
 import { useLanguage } from "@/i18n";
 import { MOCK_ALERTS } from "@/mock";
 import { formatRelativeTime } from "@/utils/format";
@@ -36,6 +37,7 @@ export default function Alerts() {
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState<AlertCategory | "all">("all");
   const [readFilter, setReadFilter] = useState<"all" | "unread">("all");
+  const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return alerts
@@ -199,7 +201,17 @@ export default function Alerts() {
                           {t(cat.key as any)}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">{alert.description}</p>
+                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1 flex-wrap">
+                        <span>{alert.description}</span>
+                        {alert.patientId && (
+                          <button
+                            onClick={() => setDrawerPatientId(alert.patientId!)}
+                            className="inline-flex items-center gap-1 text-blue-600 hover:underline font-medium"
+                          >
+                            Voir dossier
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs text-gray-400 whitespace-nowrap">
@@ -235,6 +247,12 @@ export default function Alerts() {
           )}
         </div>
       </PageWrapper>
+
+      {/* Patient drawer */}
+      <PatientDrawer
+        patientId={drawerPatientId}
+        onClose={() => setDrawerPatientId(null)}
+      />
     </DashboardLayout>
   );
 }
