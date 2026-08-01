@@ -10,6 +10,7 @@ import { useLanguage } from '@/i18n';
 import Appointments from '@/pages/Appointments';
 import AlertsPage from '@/pages/Alerts';
 import Consultations from '@/pages/Consultations';
+import ConsultationWorkspacePage from '@/pages/ConsultationWorkspacePage';
 import LoginPage from '@/pages/Login';
 import { useAuth } from '@/store/AuthContext';
 
@@ -69,6 +70,7 @@ function Router() {
       <Route path="/patients" component={() => <ProtectedRoute component={PatientsPage} />} />
       <Route path="/appointments" component={() => <ProtectedRoute component={Appointments} />} />
       <Route path="/admissions" component={() => <ProtectedRoute component={AdmissionsPage} />} />
+      <Route path="/consultations/:id" component={() => <ProtectedRoute component={ConsultationWorkspacePage} />} />
       <Route path="/consultations" component={() => <ProtectedRoute component={Consultations} />} />
       <Route path="/alerts" component={() => <ProtectedRoute component={AlertsPage} />} />
       <Route path="/emergencies" component={() => <ProtectedRoute component={PlaceholderPage} />} />

@@ -1,0 +1,704 @@
+تمام، نروحو الآن لـ **Module Consultations**، بصح نخدموه وحدو وبنفس الـUI الحالي، وما نخليوش Replit يبني المختبر ولا الأشعة ولا الصيدلية كاملين؛ غير يجهز الربط معهم كطلبات.
+
+انسخ له هذا البرومبت:
+
+```text
+الآن ابدأ تطوير Module جديد فقط داخل نظام IRISSAM HOSPITAL ERP:
+
+MODULE: CONSULTATIONS MÉDICALES
+
+مهم جدًا:
+
+- لا تغيّر الـDashboard.
+- لا تغيّر الـSidebar أو الـTopbar أو الهوية البصرية.
+- استعمل نفس الـFoundation ونفس الـDesign System الحالي.
+- اربط Module الاستشارات مع المرضى والمواعيد والقبول الموجودة حاليًا.
+- لا تبنِ الآن Module المختبر أو الأشعة أو الصيدلية بالكامل.
+- حضّر فقط طلبات التحاليل والأشعة والوصفات كبيانات Mock قابلة للربط لاحقًا.
+- استعمل Mock Data فقط حاليًا.
+- دعم كامل للغات:
+  - Français افتراضيًا
+  - العربية مع RTL
+  - English
+- لا تكتب نصوصًا ثابتة خارج نظام الترجمة.
+- طبّق الصلاحيات والـAudit Trail في جميع العمليات الحساسة.
+
+==================================================
+1. هدف Module
+==================================================
+
+إنشاء Module احترافي يسمح للطبيب بإدارة الاستشارة الطبية كاملة من بداية استقبال المريض إلى إنهاء الاستشارة.
+
+يجب أن تكون الاستشارة مرتبطة دائمًا بـ:
+
+- Patient MPI
+- Médecin
+- Service
+- Site
+- Rendez-vous اختياري
+- Admission اختياري
+- Date et heure
+- Type de consultation
+
+أنواع الاستشارة:
+
+- Consultation programmée
+- Consultation sans rendez-vous
+- Consultation de contrôle
+- Consultation spécialisée
+- Consultation ambulatoire
+- Téléconsultation كـPlaceholder فقط
+- Consultation issue des urgences
+- Consultation liée à une hospitalisation
+
+==================================================
+2. صفحة قائمة الاستشارات
+==================================================
+
+أنشئ صفحة باسم:
+
+Consultations
+
+تحتوي على:
+
+- عنوان ووصف الصفحة.
+- زر Nouvelle consultation.
+- زر Exporter.
+- شارة Données de démonstration.
+- بطاقات إحصائية:
+
+  - Consultations aujourd’hui
+  - En attente
+  - En cours
+  - Terminées
+  - Annulées
+  - Consultations sans rendez-vous
+  - Durée moyenne
+  - Patients à revoir
+
+==================================================
+3. جدول الاستشارات
+==================================================
+
+أنشئ Data Table تحتوي على:
+
+- N° Consultation
+- Date
+- Heure
+- Patient
+- MPI
+- Médecin
+- Spécialité
+- Service
+- Type
+- Motif
+- Statut
+- Durée
+- Origine:
+  - Rendez-vous
+  - Urgence
+  - Admission
+  - Sans rendez-vous
+- Sync Status
+- Actions
+
+الحالات:
+
+- Planifiée
+- En attente
+- En cours
+- Suspendue
+- Terminée
+- Annulée
+- Patient absent
+
+Actions:
+
+- Ouvrir
+- Commencer
+- Modifier
+- Terminer
+- Imprimer
+- Voir historique
+- Annuler
+
+لا تسمح بالحذف النهائي.
+
+==================================================
+4. البحث والفلاتر
+==================================================
+
+أضف البحث حسب:
+
+- Patient
+- MPI
+- N° Consultation
+- Médecin
+- Motif
+
+الفلاتر:
+
+- Date
+- Période
+- Statut
+- Médecin
+- Spécialité
+- Service
+- Type de consultation
+- Origine
+- Site
+- Building
+- Floor
+- Department
+
+أضف:
+
+- Reset filters
+- Pagination
+- Sorting
+- Nombre de résultats
+
+==================================================
+5. إنشاء استشارة جديدة
+==================================================
+
+أنشئ Form أو Wizard منظم:
+
+الخطوة 1 — Sélection du patient
+
+- البحث عن مريض موجود بالاسم أو MPI أو الهاتف.
+- عرض بطاقة مختصرة للمريض.
+- ممنوع إنشاء Patient جديد داخل Module Consultations.
+- أضف زر يوجّه إلى Patients فقط إذا لم يوجد المريض.
+
+الخطوة 2 — Contexte de consultation
+
+- Médecin
+- Spécialité
+- Service
+- Date
+- Heure
+- Type de consultation
+- Origine
+- Rendez-vous مرتبط إن وجد
+- Admission مرتبطة إن وجدت
+- Motif de consultation
+- Accompagnant اختياري
+
+الخطوة 3 — Informations initiales
+
+- Poids
+- Taille
+- Température
+- Tension artérielle
+- Fréquence cardiaque
+- Fréquence respiratoire
+- Saturation en oxygène
+- Glycémie
+- Niveau de douleur من 0 إلى 10
+- Allergies connues
+- Grossesse إن كانت مناسبة
+- Notes infirmières
+
+احسب تلقائيًا:
+
+- IMC
+- حالة المؤشرات الحيوية
+- تنبيهات القيم غير الطبيعية
+
+==================================================
+6. صفحة الاستشارة الطبية
+==================================================
+
+أنشئ Workspace احترافي للطبيب يحتوي على Header فيه:
+
+- Patient
+- MPI
+- Âge
+- Sexe
+- Groupe sanguin
+- Allergies
+- Maladies chroniques
+- Alertes critiques
+- Médecin
+- Service
+- Statut consultation
+- Chronomètre مدة الاستشارة
+- زر Terminer la consultation
+
+قسّم الصفحة إلى Tabs أو Sections:
+
+- Résumé patient
+- Motif et histoire de la maladie
+- Examen clinique
+- Diagnostic
+- Prescriptions
+- Analyses
+- Imagerie
+- Documents
+- Certificats
+- Suivi
+- Historique
+- Audit
+
+==================================================
+7. Motif et histoire de la maladie
+==================================================
+
+الحقول:
+
+- Motif principal
+- Symptômes
+- Date de début
+- Durée
+- Intensité
+- Facteurs aggravants
+- Facteurs soulageants
+- Historique de la maladie actuelle
+- Contexte familial
+- Contexte professionnel
+- Notes libres
+
+==================================================
+8. Examen clinique
+==================================================
+
+أنشئ نموذجًا مرنًا حسب التخصص.
+
+القسم العام:
+
+- État général
+- Conscience
+- Hydratation
+- Examen cardiovasculaire
+- Examen respiratoire
+- Examen abdominal
+- Examen neurologique
+- Examen cutané
+- Autres constatations
+
+أضف Templates قابلة للتوسعة حسب:
+
+- Médecine générale
+- Cardiologie
+- Gynécologie
+- Pédiatrie
+- Orthopédie
+- Médecine interne
+- Oncologie
+- Autres
+
+في هذه المرحلة استعمل Mock Templates.
+
+==================================================
+9. Diagnostic
+==================================================
+
+أضف:
+
+- Diagnostic principal
+- Diagnostics secondaires
+- Diagnostic provisoire أو confirmé
+- Code CIM-10 كـPlaceholder قابل للبحث
+- Niveau de gravité
+- Commentaires
+- Date de confirmation
+
+اسمح بإضافة أكثر من Diagnostic.
+
+==================================================
+10. Ordonnance / Prescriptions
+==================================================
+
+داخل الاستشارة أنشئ Prescription Builder مؤقتًا ببيانات Mock:
+
+لكل دواء:
+
+- Médicament
+- Forme
+- Dosage
+- Voie d’administration
+- Fréquence
+- Durée
+- Quantité
+- Instructions
+- Moment de prise
+- Renouvelable
+- Notes
+
+أضف:
+
+- كشف تعارض تجريبي مع Allergies.
+- تنبيه Mock للتداخلات الدوائية.
+- زر Imprimer ordonnance.
+- توليد Ordonnance مرتبطة بالـConsultation ID وPatient ID.
+
+لا تبنِ Module Pharmacie الآن.
+
+==================================================
+11. Demandes d’analyses
+==================================================
+
+أنشئ طلب تحليل داخل الاستشارة:
+
+- Type d’analyse
+- Priorité:
+  - Normale
+  - Urgente
+  - Très urgente
+- Laboratoire
+- Instructions
+- Jeûne requis
+- Date souhaitée
+- Motif clinique
+
+الحالات:
+
+- Brouillon
+- Demandée
+- Prélevée
+- En cours
+- Validée
+- Annulée
+
+في هذه المرحلة استعمل Mock Data فقط.
+
+لا تبنِ LIS كاملًا.
+
+==================================================
+12. Demandes d’imagerie
+==================================================
+
+أنشئ طلب أشعة:
+
+- Type d’examen
+- Zone anatomique
+- Priorité
+- Service d’imagerie
+- Motif clinique
+- Question clinique
+- Avec ou sans contraste
+- Contre-indications
+- Date souhaitée
+
+الحالات:
+
+- Brouillon
+- Demandée
+- Planifiée
+- Réalisée
+- Interprétée
+- Annulée
+
+لا تبنِ RIS/PACS الآن.
+
+==================================================
+13. Certificats et documents
+==================================================
+
+أضف إمكانية إنشاء Mock Documents:
+
+- Certificat médical
+- Arrêt de travail
+- Lettre d’orientation
+- Lettre de référence
+- Compte rendu de consultation
+- Certificat d’aptitude
+- Autre document
+
+كل وثيقة تحتوي على:
+
+- Date
+- Médecin
+- Contenu
+- Durée إن وجدت
+- Signature électronique Placeholder
+- Imprimer PDF
+
+==================================================
+14. Plan de suivi
+==================================================
+
+أضف:
+
+- Traitement conseillé
+- Conseils médicaux
+- Régime
+- Repos
+- Surveillance
+- Date de contrôle
+- Nouveau rendez-vous
+- Orientation vers spécialiste
+- Admission recommandée
+- Hospitalisation recommandée
+- Retour aux urgences si aggravation
+
+==================================================
+15. Terminer la consultation
+==================================================
+
+عند الضغط على Terminer:
+
+نفذ Validation نهائية:
+
+- Motif موجود.
+- Diagnostic موجود أو سبب عدم التشخيص.
+- Compte rendu موجود.
+- الطبيب محدد.
+- لا توجد Prescription ناقصة.
+- الطلبات محفوظة.
+
+اعرض Modal Résumé فيها:
+
+- Patient
+- Diagnostic
+- Prescriptions
+- Analyses demandées
+- Imagerie demandée
+- Documents
+- Prochain rendez-vous
+- Orientation
+
+أزرار:
+
+- Retour et modifier
+- Terminer et imprimer
+- Terminer sans impression
+
+بعد الإنهاء:
+
+- يصبح Status = Terminée.
+- تصبح البيانات الطبية Read-only.
+- التعديل بعد الإنهاء يحتاج Permission خاصة.
+- أي تعديل لاحق ينشئ Version جديدة ولا يمسح النسخة القديمة.
+- سجّل العملية في Audit Trail.
+
+==================================================
+16. صفحة تفاصيل الاستشارة
+==================================================
+
+بعد الحفظ، افتح Consultation Detail مباشرة.
+
+اعرض:
+
+- Résumé
+- Signes vitaux
+- Examen clinique
+- Diagnostic
+- Ordonnance
+- Analyses
+- Imagerie
+- Certificats
+- Suivi
+- Timeline
+- Versions
+- Audit
+
+أضف Quick Actions:
+
+- Imprimer compte rendu
+- Imprimer ordonnance
+- Créer rendez-vous de contrôle
+- Demander admission
+- Envoyer au laboratoire
+- Envoyer à l’imagerie
+
+==================================================
+17. ربط Patient Profile
+==================================================
+
+اربط الاستشارة بـPatient Profile:
+
+- Tab Consultations يعرض استشارات المريض.
+- Quick Action Nouvelle consultation تفتح Form مع المريض محدد مسبقًا.
+- تاريخ الاستشارة يظهر في Timeline المريض.
+- الإحصائيات داخل ملف المريض تتحدث من Mock Data.
+
+==================================================
+18. ربط Rendez-vous
+==================================================
+
+إذا بدأت الاستشارة من موعد:
+
+- استعمل نفس المريض والطبيب والخدمة.
+- غيّر حالة الموعد إلى:
+  - Patient arrivé
+  - En consultation
+  - Terminé
+
+لا تنشئ موعدًا ثانيًا.
+
+==================================================
+19. ربط Admissions
+==================================================
+
+إذا كانت الاستشارة مرتبطة بـAdmission:
+
+- اعرض رقم Admission.
+- اسمح بإنشاء توصية Admission أو Hospitalisation.
+- لا تنفذ Hospitalisation كاملة الآن.
+
+==================================================
+20. الصلاحيات
+==================================================
+
+استعمل usePermission() الحالي.
+
+Permissions:
+
+- consultations.view
+- consultations.create
+- consultations.start
+- consultations.update
+- consultations.complete
+- consultations.cancel
+- consultations.print
+- consultations.export
+- consultations.view_sensitive
+- consultations.edit_completed
+- consultations.create_prescription
+- consultations.request_lab
+- consultations.request_imaging
+- consultations.create_certificate
+- consultations.view_audit
+
+اخفِ الأزرار أو اجعل الصفحة Read-only حسب الصلاحيات.
+
+==================================================
+21. Audit Trail وVersioning
+==================================================
+
+استعمل Audit Service الحالي لتسجيل:
+
+- فتح الاستشارة
+- إنشاء
+- بدء
+- تعديل
+- إنهاء
+- إلغاء
+- طباعة
+- إضافة تشخيص
+- إضافة وصفة
+- طلب تحليل
+- طلب أشعة
+- إنشاء شهادة
+- تعديل استشارة منتهية
+
+حضّر Versioning للاستشارة:
+
+- Version number
+- Modified by
+- Modified at
+- Reason for modification
+- Previous values
+- New values
+
+استعمل Mock Versions الآن.
+
+==================================================
+22. Online / Offline
+==================================================
+
+حضّر واجهة الاستشارة لدعم Offline لاحقًا:
+
+- SyncStatusBadge
+- Pending
+- Synced
+- Conflict
+- Error
+- Last saved locally
+- Pending changes counter
+
+لا تنفذ Offline Database كاملة الآن.
+
+==================================================
+23. Components المقترحة
+==================================================
+
+أنشئ Components منفصلة وقابلة لإعادة الاستخدام:
+
+- ConsultationTable
+- ConsultationFilters
+- ConsultationStats
+- ConsultationForm
+- PatientSelector
+- ConsultationContextForm
+- VitalSignsForm
+- VitalSignsAlert
+- ConsultationWorkspace
+- ConsultationHeader
+- MedicalAlertBanner
+- ClinicalExamForm
+- DiagnosisBuilder
+- PrescriptionBuilder
+- LabOrderBuilder
+- ImagingOrderBuilder
+- MedicalDocumentBuilder
+- FollowUpPlan
+- ConsultationSummaryModal
+- ConsultationTimeline
+- ConsultationVersions
+- ConsultationAudit
+- ConsultationStatusBadge
+
+لا تضع كل شيء في ملف واحد.
+
+==================================================
+24. UX
+==================================================
+
+- نفس Design System الحالي.
+- واجهة الطبيب تكون سريعة وواضحة.
+- Auto-save بصري Mock كل عدة ثوانٍ.
+- مؤشر “Enregistré” أو “Modifications non enregistrées”.
+- Tabs واضحة.
+- النصوص ليست صغيرة.
+- دعم Keyboard Navigation.
+- Validation مباشرة وواضحة.
+- Loading Skeleton.
+- Empty State.
+- Error State.
+- Responsive على Desktop وTablet وMobile.
+- لا يوجد Scroll أفقي غير ضروري.
+
+==================================================
+25. معايير القبول
+==================================================
+
+لا تعتبر Module مكتملًا إلا إذا:
+
+- قائمة الاستشارات تعمل.
+- الفلاتر والبحث يعملان.
+- إنشاء استشارة يعمل.
+- اختيار المريض يعمل.
+- العلامات الحيوية تعمل.
+- التشخيص يعمل.
+- Prescription Builder يعمل ببيانات Mock.
+- طلب التحاليل يعمل.
+- طلب الأشعة يعمل.
+- الشهادات تعمل.
+- إنهاء الاستشارة يعمل.
+- صفحة التفاصيل تعمل.
+- الطباعة تعمل بصريًا.
+- Patient Profile يتحدث.
+- الموعد يتغير Status بصريًا.
+- Permissions مطبقة.
+- Audit hooks مستدعاة.
+- Versioning ظاهر.
+- اللغات الثلاث تعمل.
+- RTL صحيح.
+- لا توجد أخطاء Console.
+- لا يتم كسر Modules الحالية.
+- لا يتم بناء أي Module آخر.
+
+بعد الانتهاء اعرض:
+
+1. Structure الملفات الجديدة.
+2. Components التي تم إنشاؤها.
+3. Permissions المستعملة.
+4. العلاقات مع Patients وRendez-vous وAdmissions.
+5. ما تم تأجيله للـBackend.
+6. قائمة اختبارات يدوية كاملة.
+```
+
+كي يكمل، ما ننتقلوش مباشرة لـUrgences؛ نراجع أولًا هل الاستشارة تقدر تبدأ من المريض ومن الموعد، وهل الإنهاء والوصفة وطلبات التحليل يخدموا بلا أخطاء.

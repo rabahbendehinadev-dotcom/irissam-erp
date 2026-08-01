@@ -1,0 +1,4 @@
+- [Consultations module architecture](consultations-module.md) — full clinical workspace at /consultations/:id; workspace bypasses PageWrapper, needs DashboardLayout noPadding or equivalent.
+- [i18n file extension quirk](i18n-quirk.md) — src/i18n/index.tsx must stay .tsx (contains JSX); never rename to .ts.
+- [Mock data naming convention](mock-naming.md) — admissions mock uses MOCK_ADM_BUILDINGS/MOCK_ADM_FLOORS to avoid clash with sites.ts MOCK_BUILDINGS/MOCK_FLOORS.
+- [Auth HMR transient errors](auth-hmr.md) — "useAuth must be used within AuthProvider" on hot reload is a Vite HMR artifact, not a real bug; tree nesting is correct.

@@ -4,7 +4,7 @@ import { Topbar } from "./Topbar";
 import { useLanguage } from "@/i18n";
 import { cn } from "@/lib/utils";
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+export function DashboardLayout({ children, noPadding = false }: { children: React.ReactNode; noPadding?: boolean }) {
   const [collapsed, setCollapsed] = useState(false);
   const { isRTL } = useLanguage();
 
@@ -19,7 +19,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           isRTL ? (collapsed ? "mr-16" : "mr-[220px]") : (collapsed ? "ml-16" : "ml-[220px]")
         )}
       >
-        <div className="p-6 h-full">
+        <div className={noPadding ? 'h-full' : 'p-6 h-full'}>
           {children}
         </div>
       </main>

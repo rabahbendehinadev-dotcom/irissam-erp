@@ -21,6 +21,11 @@ export type Permission =
   | 'emergencies.view' | 'emergencies.triage'
   // Consultations
   | 'consultations.view' | 'consultations.create' | 'consultations.edit'
+  | 'consultations.start' | 'consultations.complete' | 'consultations.cancel'
+  | 'consultations.print' | 'consultations.export' | 'consultations.view_sensitive'
+  | 'consultations.edit_completed' | 'consultations.create_prescription'
+  | 'consultations.request_lab' | 'consultations.request_imaging'
+  | 'consultations.create_certificate' | 'consultations.view_audit'
   // Operating room
   | 'operating_room.view' | 'operating_room.schedule'
   // Laboratory
@@ -61,6 +66,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'admissions.export', 'admissions.view_audit',
     'emergencies.view', 'emergencies.triage',
     'consultations.view', 'consultations.create', 'consultations.edit',
+    'consultations.start', 'consultations.complete', 'consultations.cancel',
+    'consultations.print', 'consultations.export', 'consultations.view_sensitive',
+    'consultations.edit_completed', 'consultations.create_prescription',
+    'consultations.request_lab', 'consultations.request_imaging',
+    'consultations.create_certificate', 'consultations.view_audit',
     'operating_room.view', 'operating_room.schedule',
     'laboratory.view', 'laboratory.create', 'laboratory.validate',
     'imaging.view', 'imaging.request',
@@ -101,6 +111,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'admissions.discharge', 'admissions.transfer', 'admissions.cancel',
     'emergencies.view', 'emergencies.triage',
     'consultations.view', 'consultations.create', 'consultations.edit',
+    'consultations.start', 'consultations.complete', 'consultations.cancel',
+    'consultations.print', 'consultations.view_sensitive',
+    'consultations.create_prescription', 'consultations.request_lab',
+    'consultations.request_imaging', 'consultations.create_certificate',
     'operating_room.view',
     'laboratory.view', 'laboratory.create',
     'imaging.view', 'imaging.request',
