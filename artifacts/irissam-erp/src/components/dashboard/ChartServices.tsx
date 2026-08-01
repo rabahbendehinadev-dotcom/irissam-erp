@@ -19,7 +19,7 @@ const FALLBACK_COLORS = ["#3b82f6", "#06b6d4", "#10b981", "#8b5cf6", "#f97316", 
 
 export function ChartServices() {
   const { t } = useLanguage();
-  const { data: rawData, isLoading } = useGetServicesChart();
+  const { data: rawData, isLoading } = useGetServicesChart({ query: { refetchInterval: 60_000 } });
 
   const total = rawData?.reduce((sum, d) => sum + d.value, 0) ?? 1;
   const data = (rawData ?? []).map((d, i) => ({

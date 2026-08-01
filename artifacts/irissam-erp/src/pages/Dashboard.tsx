@@ -21,7 +21,7 @@ function fmtN(n: number | undefined): string {
 
 export default function Dashboard() {
   const { t } = useLanguage();
-  const { data: stats } = useGetDashboardStats();
+  const { data: stats } = useGetDashboardStats({ query: { refetchInterval: 30_000 } });
 
   return (
     <DashboardLayout>

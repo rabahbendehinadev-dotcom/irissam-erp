@@ -3,12 +3,14 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { useLanguage } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { DashboardRefreshProvider } from "@/store/DashboardRefreshContext";
 
 export function DashboardLayout({ children, noPadding = false }: { children: React.ReactNode; noPadding?: boolean }) {
   const [collapsed, setCollapsed] = useState(false);
   const { isRTL } = useLanguage();
 
   return (
+    <DashboardRefreshProvider>
     <div className="min-h-screen bg-[#F1F5F9] flex flex-col font-sans">
       <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
       <Topbar collapsed={collapsed} setCollapsed={setCollapsed} />
@@ -24,5 +26,6 @@ export function DashboardLayout({ children, noPadding = false }: { children: Rea
         </div>
       </main>
     </div>
+    </DashboardRefreshProvider>
   );
 }

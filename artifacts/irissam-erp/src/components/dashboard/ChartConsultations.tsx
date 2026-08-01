@@ -9,7 +9,7 @@ const FALLBACK_DATA = [
 
 export function ChartConsultations() {
   const { t } = useLanguage();
-  const { data, isLoading } = useGetConsultationsChart();
+  const { data, isLoading } = useGetConsultationsChart({ query: { refetchInterval: 60_000 } });
 
   const chartData = (!isLoading && data && data.length > 0) ? data : FALLBACK_DATA;
 

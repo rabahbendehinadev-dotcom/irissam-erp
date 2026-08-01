@@ -11,7 +11,7 @@ function fmtTime(isoStr: string): string {
 
 export function UpcomingAppointments() {
   const { t } = useLanguage();
-  const { data: appointments, isLoading } = useGetUpcomingAppointments();
+  const { data: appointments, isLoading } = useGetUpcomingAppointments({ query: { refetchInterval: 30_000 } });
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden">

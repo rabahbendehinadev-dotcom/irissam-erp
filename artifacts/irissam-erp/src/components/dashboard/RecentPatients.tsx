@@ -18,7 +18,7 @@ function fmtTime(isoStr: string): string {
 
 export function RecentPatients() {
   const { t } = useLanguage();
-  const { data: patients, isLoading } = useGetRecentPatients();
+  const { data: patients, isLoading } = useGetRecentPatients({ query: { refetchInterval: 30_000 } });
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden">

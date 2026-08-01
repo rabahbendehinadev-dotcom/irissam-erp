@@ -1,6 +1,7 @@
 import { Search, Building, Building2, Layers, LayoutGrid, Wifi, RefreshCcw, Bell, Mail, ChevronDown, Menu, Globe, LogOut, User } from "lucide-react";
 import { useLanguage } from "@/i18n";
 import { useAuth } from "@/store/AuthContext";
+import { useDashboardRefresh } from "@/store/DashboardRefreshContext";
 import { cn } from "@/lib/utils";
 import { useState, useRef, useEffect } from "react";
 import type { UserRole } from "@/types";
@@ -44,9 +45,15 @@ const AVATAR_BG: Record<UserRole, string> = {
   rh: "bg-gray-600",
 };
 
+function fmtSyncTime(date: Date | null): string {
+  if (!date) return "—";
+  return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
 export function Topbar({ collapsed, setCollapsed }: { collapsed: boolean, setCollapsed: (val: boolean) => void }) {
   const { t, isRTL, lang, setLang } = useLanguage();
   const { user, logout } = useAuth();
+  const { lastSyncAt, isRefreshing, refreshAll } = useDashboardRefresh();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -130,13 +137,23 @@ export function Topbar({ collapsed, setCollapsed }: { collapsed: boolean, setCol
 
         {/* Right side items */}
         <div className="flex items-center gap-4">
+          {/* Online + last sync + manual refresh */}
           <div className="hidden md:flex items-center gap-2 text-xs">
             <Wifi className="w-3.5 h-3.5 text-green-500" />
             <span className="text-green-500 font-medium">{t("topbar.online")}</span>
             <span className="text-gray-400 mx-1">|</span>
             <span className="text-gray-400">{t("topbar.last_sync")}</span>
-            <button className="text-gray-400 hover:text-gray-600 ml-1">
-              <RefreshCcw className="w-3.5 h-3.5" />
+            <span className="text-gray-500 font-medium tabular-nums">{fmtSyncTime(lastSyncAt)}</span>
+            <button
+              onClick={refreshAll}
+              disabled={isRefreshing}
+              title="Actualiser maintenant"
+              className={cn(
+                "text-gray-400 hover:text-blue-500 ml-1 transition-colors",
+                isRefreshing && "text-blue-400 cursor-not-allowed"
+              )}
+            >
+              <RefreshCcw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
             </button>
           </div>
 

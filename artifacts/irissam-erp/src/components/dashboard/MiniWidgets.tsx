@@ -45,10 +45,10 @@ function SkeletonRow() {
 export function MiniWidgets() {
   const { t } = useLanguage();
 
-  const { data: beds } = useGetBedsSummary();
-  const { data: or } = useGetOrStatus();
-  const { data: blood } = useGetBloodBankSummary();
-  const { data: vehicles } = useGetVehiclesStatus();
+  const { data: beds } = useGetBedsSummary({ query: { refetchInterval: 60_000 } });
+  const { data: or } = useGetOrStatus({ query: { refetchInterval: 60_000 } });
+  const { data: blood } = useGetBloodBankSummary({ query: { refetchInterval: 60_000 } });
+  const { data: vehicles } = useGetVehiclesStatus({ query: { refetchInterval: 60_000 } });
 
   const bedsData = [
     { name: 'Occupés',     value: beds?.occupied    ?? 312, color: '#3b82f6' },

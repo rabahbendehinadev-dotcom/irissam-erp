@@ -22,7 +22,7 @@ function fmtTime(isoStr: string): string {
 
 export function AlertsPanel() {
   const { t } = useLanguage();
-  const { data: alerts, isLoading } = useGetAlerts();
+  const { data: alerts, isLoading } = useGetAlerts({ query: { refetchInterval: 30_000 } });
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col h-full">

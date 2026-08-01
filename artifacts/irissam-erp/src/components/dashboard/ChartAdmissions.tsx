@@ -9,7 +9,7 @@ const FALLBACK_DATA = [
 
 export function ChartAdmissions() {
   const { t } = useLanguage();
-  const { data, isLoading } = useGetAdmissionsChart();
+  const { data, isLoading } = useGetAdmissionsChart({ query: { refetchInterval: 60_000 } });
 
   const chartData = (!isLoading && data && data.length > 0) ? data : FALLBACK_DATA;
 
