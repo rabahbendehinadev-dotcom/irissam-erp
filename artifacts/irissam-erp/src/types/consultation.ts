@@ -6,7 +6,8 @@ export type ConsultationStatus =
   | 'planifiee' | 'en_attente' | 'en_cours' | 'suspendue'
   | 'terminee' | 'annulee' | 'patient_absent';
 
-export type ConsultationOrigin = 'rdv' | 'urgence' | 'admission' | 'sans_rdv';
+export type ConsultationOrigin = 'rdv' | 'urgence' | 'admission' | 'sans_rdv' | 'hospitalisation' | 'controle';
+export type ConsultationPriority = 'normale' | 'urgente' | 'tres_urgente';
 
 export type LabOrderStatus = 'brouillon' | 'demandee' | 'prelevee' | 'en_cours' | 'validee' | 'annulee';
 export type ImagingOrderStatus = 'brouillon' | 'demandee' | 'planifiee' | 'realisee' | 'interpretee' | 'annulee';
@@ -18,17 +19,23 @@ export type DocumentType =
   | 'lettre_reference' | 'compte_rendu' | 'certificat_aptitude' | 'autre';
 
 export interface VitalSigns {
-  weight?: number;          // kg
-  height?: number;          // cm
-  temperature?: number;     // °C
-  systolicBP?: number;      // mmHg
-  diastolicBP?: number;     // mmHg
-  heartRate?: number;       // bpm
-  respiratoryRate?: number; // /min
-  oxygenSaturation?: number; // %
-  bloodGlucose?: number;    // mmol/L
-  painLevel?: number;       // 0-10
-  bmi?: number;             // computed
+  weight?: number;             // kg
+  height?: number;             // cm
+  temperature?: number;        // °C
+  systolicBP?: number;         // mmHg
+  diastolicBP?: number;        // mmHg
+  heartRate?: number;          // bpm
+  respiratoryRate?: number;    // /min
+  oxygenSaturation?: number;   // %
+  bloodGlucose?: number;       // mmol/L
+  painLevel?: number;          // 0-10
+  bmi?: number;                // computed
+  waistCircumference?: number; // cm
+  glasgowScore?: number;       // 3-15
+  consciousnessState?: string; // alerte | voix | douleur | inconscient
+  oxygenAdministered?: boolean;
+  oxygenFlowRate?: number;     // L/min
+  clinicalComment?: string;
   pregnancy?: boolean;
   nursingNotes?: string;
 }
@@ -156,6 +163,7 @@ export interface Consultation {
   reason: string;           // motif principal
   status: ConsultationStatus;
   syncStatus: 'synced' | 'pending' | 'conflict' | 'error';
+  priority?: ConsultationPriority;
   companion?: string;
 
   // Clinical sections (filled during workspace)

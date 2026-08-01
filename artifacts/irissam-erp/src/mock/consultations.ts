@@ -199,6 +199,18 @@ export const MOCK_CONSULTATIONS: Consultation[] = [
   },
 ];
 
+// ─── Session Registry (for consultations created during this browser session) ─
+
+export const SESSION_CONSULTATIONS: Consultation[] = [];
+
+export function addSessionConsultation(c: Consultation): void {
+  SESSION_CONSULTATIONS.unshift(c);
+}
+
+export function getAllConsultations(): Consultation[] {
+  return [...SESSION_CONSULTATIONS, ...MOCK_CONSULTATIONS];
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function getTodayConsultations(): Consultation[] {

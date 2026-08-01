@@ -1,0 +1,219 @@
+أريد الآن تحسين وتثبيت Workflow إنشاء الاستشارة الطبية الحالية فقط.
+
+مهم جدًا:
+- لا تغيّر التصميم الحالي.
+- لا تغيّر الألوان أو الـLayout أو الـSidebar أو الـTopbar.
+- لا تنشئ Module جديد.
+- لا تحذف أي خاصية موجودة.
+- أصلح فقط منطق الـWizard والربط بين الحقول، ثم تأكد أن إنشاء الاستشارة يفتح Workspace الطبيب مباشرة.
+
+==================================================
+1. ربط Service → Spécialité → Médecin
+==================================================
+
+يجب أن يكون التسلسل إجباريًا بهذا الشكل:
+
+Service
+↓
+Spécialité
+↓
+Médecin
+
+السلوك المطلوب:
+
+- لا يمكن اختيار Spécialité قبل اختيار Service.
+- لا يمكن اختيار Médecin قبل اختيار Spécialité.
+- بعد اختيار Service، اعرض فقط التخصصات التابعة لهذا القسم.
+- بعد اختيار Spécialité، اعرض فقط الأطباء المرتبطين بهذا التخصص والقسم.
+- إذا غيّر المستخدم Service، أعد تعيين Spécialité وMédecin.
+- إذا غيّر Spécialité، أعد تعيين Médecin.
+- استعمل Mock Data منظمة وقابلة للربط لاحقًا مع Backend.
+
+مثال:
+Service Cardiologie
+→ Spécialité Cardiologie
+→ أطباء القلب فقط
+
+==================================================
+2. ربط Origine مع Type de consultation
+==================================================
+
+اجعل Type de consultation يتغير تلقائيًا حسب Origine:
+
+- Rendez-vous → Consultation programmée
+- Sans rendez-vous → Consultation sans rendez-vous
+- Urgence → Consultation d'urgence
+- Hospitalisation → Consultation interne
+- Admission → Consultation liée à une admission
+- Contrôle → Consultation de contrôle
+
+يمكن للمستخدم التعديل فقط إذا عنده Permission مناسبة.
+
+==================================================
+3. التاريخ والوقت
+==================================================
+
+عند فتح Wizard:
+
+- Date = تاريخ اليوم تلقائيًا.
+- Heure = الوقت الحالي تلقائيًا.
+- استعمل تنسيق 24 ساعة.
+- لا تستعمل AM/PM في الواجهة الفرنسية.
+- اسمح بالتعديل إذا عند المستخدم Permission.
+
+==================================================
+4. Motif de consultation
+==================================================
+
+طور حقل Motif de consultation:
+
+- أضف Autocomplete بمقترحات Mock مثل:
+  - Fièvre
+  - Douleur thoracique
+  - Contrôle diabète
+  - Suivi grossesse
+  - Hypertension
+  - Traumatisme
+  - Douleur abdominale
+  - Céphalées
+  - Toux
+  - Contrôle post-opératoire
+
+- اسمح أيضًا بالكتابة الحرة.
+- أضف حقلًا صغيرًا اختياريًا:
+  Description complémentaire
+
+==================================================
+5. Medical Alert Banner
+==================================================
+
+بعد اختيار المريض، اعرض Banner واضحة داخل كل خطوات الـWizard إذا كان عنده:
+
+- Allergie
+- Diabète
+- Hypertension
+- Maladie chronique
+- Grossesse
+- Anticoagulant
+- Groupe sanguin rare
+- Risque infectieux
+
+يجب أن تبقى ظاهرة في Step Contexte وStep Signes vitaux.
+
+==================================================
+6. Signes vitaux
+==================================================
+
+احتفظ بالحقول الحالية وأضف:
+
+- IMC محسوب تلقائيًا من poids وtaille
+- Tour de taille
+- État de conscience:
+  - Alerte
+  - Répond à la voix
+  - Répond à la douleur
+  - Inconscient
+- Score de Glasgow كحقل اختياري
+- Oxygène administré نعم/لا
+- Débit O2
+- Commentaire clinique سريع
+
+Validation:
+- منع القيم غير المنطقية.
+- إظهار تنبيه للقيم غير الطبيعية.
+- لا تمنع إنشاء الاستشارة إذا كانت بعض القياسات غير متوفرة، لكن اطلب سببًا مختصرًا.
+
+==================================================
+7. الأولوية
+==================================================
+
+أضف حقل Priorité في Step Contexte:
+
+- Normale
+- Urgente
+- Très urgente
+
+اعرض Badge واضحة حسب الأولوية.
+
+==================================================
+8. عند إنشاء الاستشارة
+==================================================
+
+عند الضغط على "Créer la consultation":
+
+- تحقق من جميع الحقول الإلزامية.
+- أنشئ Consultation Mock جديدة.
+- أنشئ رقم Consultation تلقائيًا.
+- اربطها بـPatient ID وMPI.
+- اربطها بالطبيب والتخصص والقسم.
+- سجّل العملية في Audit.
+- حدّث قائمة Consultations.
+- حدّث Patient Timeline.
+- لا ترجع إلى القائمة.
+- افتح مباشرة:
+  /consultations/:id
+
+==================================================
+9. Consultation Workspace
+==================================================
+
+بعد الإنشاء يجب فتح Workspace الطبيب مباشرة، وتحتوي على:
+
+- Header فيه:
+  - Patient
+  - MPI
+  - Âge
+  - Sexe
+  - Groupe sanguin
+  - Allergies
+  - Médecin
+  - Service
+  - Spécialité
+  - Priorité
+  - Statut
+  - Heure de début
+  - Chronomètre
+
+- أزرار:
+  - Commencer
+  - Suspendre
+  - Reprendre
+  - Terminer
+  - Imprimer
+
+- Tabs:
+  - Contexte
+  - Signes vitaux
+  - Examen clinique
+  - Diagnostic
+  - Ordonnance
+  - Analyses
+  - Imagerie
+  - Documents
+  - Suivi
+  - Historique
+  - Audit
+
+إذا الـWorkspace موجودة أصلًا، لا تعاود بناءها. فقط اربطها بالاستشارة الجديدة وتأكد أن البيانات تنتقل إليها بشكل صحيح.
+
+==================================================
+10. معايير النجاح
+==================================================
+
+اعتبر المهمة ناجحة فقط إذا:
+
+- Service يفلتر Spécialité.
+- Spécialité تفرز Médecin.
+- Origine تضبط Type تلقائيًا.
+- التاريخ والوقت يتعباو تلقائيًا.
+- الوقت يظهر بصيغة 24 ساعة.
+- Motif يدعم Autocomplete والكتابة الحرة.
+- Medical Banner تبقى ظاهرة.
+- IMC يتحسب تلقائيًا.
+- القيم غير الطبيعية تظهر بتنبيه.
+- زر إنشاء الاستشارة يعمل.
+- بعد الإنشاء يفتح Workspace مباشرة.
+- البيانات المختارة تظهر داخل Workspace.
+- Patient Timeline تتحدث.
+- لا توجد أخطاء Console.
+- لا يتكسر أي Module موجود.

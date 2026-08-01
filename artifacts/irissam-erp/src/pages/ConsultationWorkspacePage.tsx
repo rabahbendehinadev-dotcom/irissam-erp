@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRoute } from 'wouter';
-import { MOCK_CONSULTATIONS } from '@/mock/consultations';
+import { getAllConsultations } from '@/mock/consultations';
 import { ConsultationWorkspace } from '@/components/consultations/ConsultationWorkspace';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import type { Consultation, ConsultationStatus } from '@/types/consultation';
@@ -12,7 +12,7 @@ export default function ConsultationWorkspacePage() {
   const [, params] = useRoute('/consultations/:id');
   const id = params?.id;
 
-  const initial = MOCK_CONSULTATIONS.find(c => c.id === id);
+  const initial = getAllConsultations().find(c => c.id === id);
   const [consultation, setConsultation] = useState<Consultation | undefined>(
     initial as Consultation | undefined
   );
