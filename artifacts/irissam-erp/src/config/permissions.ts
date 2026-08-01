@@ -8,8 +8,9 @@ import type { UserRole } from '@/types';
 export type Permission =
   // Dashboard
   | 'dashboard.view'
-  // Patients
-  | 'patients.view' | 'patients.create' | 'patients.edit' | 'patients.delete'
+  // Patients — MPI
+  | 'patients.view' | 'patients.create' | 'patients.edit' | 'patients.archive'
+  | 'patients.export' | 'patients.view_sensitive' | 'patients.override_duplicate' | 'patients.view_audit'
   // Appointments
   | 'appointments.view' | 'appointments.create' | 'appointments.edit' | 'appointments.cancel'
   // Admissions
@@ -50,7 +51,8 @@ export type Permission =
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   administrateur: [
     'dashboard.view',
-    'patients.view', 'patients.create', 'patients.edit', 'patients.delete',
+    'patients.view', 'patients.create', 'patients.edit', 'patients.archive',
+    'patients.export', 'patients.view_sensitive', 'patients.override_duplicate', 'patients.view_audit',
     'appointments.view', 'appointments.create', 'appointments.edit', 'appointments.cancel',
     'admissions.view', 'admissions.create', 'admissions.discharge',
     'emergencies.view', 'emergencies.triage',
@@ -70,7 +72,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   directeur: [
     'dashboard.view',
-    'patients.view',
+    'patients.view', 'patients.view_sensitive', 'patients.view_audit', 'patients.export',
     'appointments.view',
     'admissions.view',
     'emergencies.view',
@@ -82,39 +84,40 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'blood_bank.view',
     'medical_stock.view',
     'finance.view', 'finance.validate',
-    'hr.view', 'hr.manage',
-    'doctors.view', 'doctors.manage',
+    'hr.view',
+    'doctors.view',
     'reports.view', 'reports.export',
     'settings.view',
-    'admin.audit',
   ],
   medecin: [
     'dashboard.view',
-    'patients.view', 'patients.create', 'patients.edit',
-    'appointments.view', 'appointments.create', 'appointments.edit',
+    'patients.view', 'patients.create', 'patients.edit', 'patients.view_sensitive',
+    'appointments.view', 'appointments.create', 'appointments.edit', 'appointments.cancel',
     'admissions.view', 'admissions.create', 'admissions.discharge',
+    'emergencies.view', 'emergencies.triage',
     'consultations.view', 'consultations.create', 'consultations.edit',
-    'operating_room.view', 'operating_room.schedule',
+    'operating_room.view',
     'laboratory.view', 'laboratory.create',
     'imaging.view', 'imaging.request',
     'pharmacy.view',
     'blood_bank.view',
-    'reports.view',
   ],
   infirmier: [
     'dashboard.view',
     'patients.view', 'patients.edit',
     'appointments.view',
     'admissions.view',
+    'emergencies.view',
     'consultations.view',
     'operating_room.view',
     'laboratory.view',
+    'imaging.view',
     'pharmacy.view',
     'blood_bank.view',
   ],
   reception: [
     'dashboard.view',
-    'patients.view', 'patients.create', 'patients.edit',
+    'patients.view', 'patients.create', 'patients.edit', 'patients.export', 'patients.override_duplicate',
     'appointments.view', 'appointments.create', 'appointments.edit', 'appointments.cancel',
     'admissions.view', 'admissions.create',
     'emergencies.view',
@@ -125,11 +128,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'patients.view',
     'laboratory.view', 'laboratory.create', 'laboratory.validate',
     'blood_bank.view', 'blood_bank.manage',
+    'imaging.view',
   ],
   radiologie: [
     'dashboard.view',
     'patients.view',
     'imaging.view', 'imaging.request',
+    'laboratory.view',
   ],
   pharmacie: [
     'dashboard.view',
@@ -140,13 +145,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   finance: [
     'dashboard.view',
     'patients.view',
+    'admissions.view',
     'finance.view', 'finance.create_invoice', 'finance.validate',
     'reports.view', 'reports.export',
   ],
   rh: [
     'dashboard.view',
-    'doctors.view', 'doctors.manage',
     'hr.view', 'hr.manage',
+    'doctors.view',
     'reports.view',
   ],
 };

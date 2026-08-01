@@ -7,8 +7,11 @@ import type { UserRole } from '@/types';
 export type AuditAction =
   | 'create' | 'update' | 'delete' | 'view'
   | 'login' | 'logout'
-  | 'export' | 'print'
-  | 'approve' | 'reject';
+  | 'export' | 'import' | 'print'
+  | 'approve' | 'reject'
+  | 'archive' | 'restore'
+  | 'view_audit' | 'view_sensitive'
+  | 'override_duplicate';
 
 export interface AuditEntry {
   id: string;

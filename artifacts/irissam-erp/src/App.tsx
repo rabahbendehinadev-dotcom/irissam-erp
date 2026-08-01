@@ -2,6 +2,8 @@ import { Route, Switch, Router as WouterRouter } from 'wouter';
 import { AppProvider } from '@/store/AppProvider';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import Dashboard from '@/pages/Dashboard';
+import PatientsPage from '@/pages/Patients';
+import PatientDetailPage from '@/pages/PatientDetail';
 import NotFound from '@/pages/not-found';
 import { useLanguage } from '@/i18n';
 
@@ -11,8 +13,8 @@ function PlaceholderPage() {
     <DashboardLayout>
       <div className="flex items-center justify-center h-full min-h-[400px]">
         <div className="text-center text-gray-500">
-          <h2 className="text-2xl font-bold mb-2">{t('page.coming_soon' as any)}</h2>
-          <p className="text-sm">{t('page.coming_soon_desc' as any)}</p>
+          <h2 className="text-2xl font-bold mb-2">{t('page.coming_soon')}</h2>
+          <p className="text-sm">{t('page.coming_soon_desc')}</p>
         </div>
       </div>
     </DashboardLayout>
@@ -23,7 +25,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
-      <Route path="/patients" component={PlaceholderPage} />
+      <Route path="/patients/:id" component={PatientDetailPage} />
+      <Route path="/patients" component={PatientsPage} />
       <Route path="/appointments" component={PlaceholderPage} />
       <Route path="/admissions" component={PlaceholderPage} />
       <Route path="/emergencies" component={PlaceholderPage} />

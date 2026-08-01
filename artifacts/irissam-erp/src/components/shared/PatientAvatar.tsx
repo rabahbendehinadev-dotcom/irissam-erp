@@ -13,10 +13,12 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-interface PatientAvatarProps {
-  firstName: string;
-  lastName: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+export interface PatientAvatarProps {
+  firstName?: string;
+  lastName?: string;
+  /** Convenience: pass a full "LastName FirstName" string instead of firstName+lastName */
+  name?: string;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
 
@@ -25,11 +27,15 @@ const SIZE_CLASSES = {
   sm: 'w-8 h-8 text-xs',
   md: 'w-10 h-10 text-sm',
   lg: 'w-12 h-12 text-base',
+  xl: 'w-16 h-16 text-xl',
 };
 
-export function PatientAvatar({ firstName, lastName, size = 'sm', className }: PatientAvatarProps) {
-  const initials = getInitials(firstName, lastName);
-  const colorClass = getAvatarColor(firstName + lastName);
+export function PatientAvatar({ firstName, lastName, name, size = 'sm', className }: PatientAvatarProps) {
+  const parts = name ? name.split(' ') : [];
+  const resolvedFirst = firstName ?? parts[1] ?? '';
+  const resolvedLast  = lastName  ?? parts[0] ?? '';
+  const initials = getInitials(resolvedFirst, resolvedLast) || (name?.slice(0, 2).toUpperCase() ?? '?');
+  const colorClass = getAvatarColor(name ?? (resolvedFirst + resolvedLast));
   return (
     <div className={cn(
       'rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0',
