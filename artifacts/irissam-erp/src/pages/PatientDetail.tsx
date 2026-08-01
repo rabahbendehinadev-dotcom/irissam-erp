@@ -148,7 +148,7 @@ export default function PatientDetailPage() {
 
   // Try mock data first (p-* IDs), then fall back to API list cache (db-* IDs)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: apiPatients } = useGetPatientsList({} as any);
+  const { data: apiPatients, refetch: refetchPatients } = useGetPatientsList({} as any);
   const patient: Patient | null = (() => {
     if (!patientId) return null;
     const mock = MOCK_PATIENTS.find(p => p.id === patientId);
@@ -159,26 +159,43 @@ export default function PatientDetailPage() {
     if (!api) return null;
     const r = api as unknown as Record<string, unknown>;
     return {
-      id:           r.id as string,
-      mpiId:        (r.mpiId as string) ?? '',
-      fileNumber:   (r.internalNumber as string) ?? (r.mpiId as string) ?? '',
-      firstName:    (r.firstName as string) ?? '',
-      lastName:     (r.lastName  as string) ?? '',
-      status:       (r.status as Patient['status']) ?? 'active',
-      gender:       (r.gender as Patient['gender']) ?? 'M',
-      dateOfBirth:  (r.dateOfBirth as string) ?? '',
-      bloodType:    (r.bloodType as Patient['bloodType']) ?? undefined,
-      rhesus:       undefined,
-      phone:        (r.phone as string) ?? undefined,
-      wilaya:       undefined,
-      commune:      undefined,
-      isIncomplete: Boolean(r.isIncomplete),
-      potentialDuplicate: Boolean(r.potentialDuplicate),
-      syncStatus:   (r.syncStatus as Patient['syncStatus']) ?? 'synced',
-      medical:      { allergies: [], chronicDiseases: [], majorHistory: [], criticalNotes: undefined },
-      createdAt:    (r.createdAt as string) ?? new Date().toISOString(),
-      updatedAt:    (r.updatedAt as string) ?? new Date().toISOString(),
-    } as unknown as Patient;
+      id:                   r.id as string,
+      mpiId:                (r.mpiId as string) ?? '',
+      fileNumber:           (r.fileNumber as string) ?? (r.internalNumber as string) ?? (r.mpiId as string) ?? '',
+      internalNumber:       (r.internalNumber as string) ?? '',
+      firstName:            (r.firstName as string) ?? '',
+      lastName:             (r.lastName as string) ?? '',
+      maidenName:           (r.maidenName as string) ?? undefined,
+      status:               (r.status as Patient['status']) ?? 'active',
+      gender:               (r.gender as Patient['gender']) ?? 'M',
+      dateOfBirth:          (r.dateOfBirth as string) ?? '',
+      placeOfBirth:         (r.placeOfBirth as string) ?? undefined,
+      nationality:          (r.nationality as string) ?? 'Algérienne',
+      maritalStatus:        (r.maritalStatus as Patient['maritalStatus']) ?? undefined,
+      idDocumentType:       (r.idDocumentType as Patient['idDocumentType']) ?? undefined,
+      idDocumentNumber:     (r.idDocumentNumber as string) ?? undefined,
+      socialSecurityNumber: (r.socialSecurityNumber as string) ?? undefined,
+      bloodType:            (r.bloodType as Patient['bloodType']) ?? undefined,
+      rhesus:               (r.rhesus as '+' | '-') ?? undefined,
+      phone:                (r.phone as string) ?? '',
+      phoneSecondary:       (r.phoneSecondary as string) ?? undefined,
+      email:                (r.email as string) ?? undefined,
+      address:              (r.address as string) ?? undefined,
+      commune:              (r.commune as string) ?? undefined,
+      wilaya:               (r.wilaya as string) ?? undefined,
+      postalCode:           (r.postalCode as string) ?? undefined,
+      country:              (r.country as string) ?? 'Algérie',
+      isIncomplete:         Boolean(r.isIncomplete),
+      potentialDuplicate:   Boolean(r.potentialDuplicate),
+      syncStatus:           (r.syncStatus as Patient['syncStatus']) ?? 'synced',
+      medical:              (r.medical as Patient['medical']) ?? { allergies: [], chronicDiseases: [], majorHistory: [] },
+      emergencyContact:     (r.emergencyContact as Patient['emergencyContact']) ?? undefined,
+      insurance:            (r.insurance as Patient['insurance']) ?? undefined,
+      createdAt:            (r.createdAt as string) ?? new Date().toISOString(),
+      updatedAt:            (r.updatedAt as string) ?? new Date().toISOString(),
+      createdById:          'system',
+      siteId:               'site-1',
+    } as Patient;
   })();
   const timeline = MOCK_PATIENT_TIMELINES[patientId ?? ''] ?? [];
 
@@ -418,7 +435,7 @@ export default function PatientDetailPage() {
       {showEdit && (
         <PatientForm
           patient={patient}
-          onSave={() => setShowEdit(false)}
+          onSave={() => { setShowEdit(false); refetchPatients(); }}
           onCancel={() => setShowEdit(false)}
         />
       )}

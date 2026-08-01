@@ -5,6 +5,7 @@ import type { Patient, BloodType, PatientGender, MaritalStatus, IdDocumentType, 
 import { MOCK_PATIENTS } from '@/mock';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { DuplicatePatientModal, type DuplicateCandidate } from './DuplicatePatientModal';
+import { apiClient } from '@/services/api/client';
 
 const WILAYAS = [
   'Adrar','Chlef','Laghouat','Oum El Bouaghi','Batna','Béjaïa','Biskra','Béchar',
@@ -95,6 +96,7 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
   const { log } = useAuditLog();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
   const [showDup, setShowDup] = useState(false);
@@ -164,49 +166,63 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
     setStep(s => s + 1);
   };
 
+  const buildPayload = () => ({
+    lastName: form.lastName, firstName: form.firstName, maidenName: form.maidenName || undefined,
+    gender: form.gender, dateOfBirth: form.dateOfBirth, placeOfBirth: form.placeOfBirth || undefined,
+    nationality: form.nationality, maritalStatus: (form.maritalStatus || undefined) as MaritalStatus | undefined,
+    idDocumentType: (form.idDocumentType || undefined) as IdDocumentType | undefined,
+    idDocumentNumber: form.idDocumentNumber || undefined,
+    socialSecurityNumber: form.socialSecurityNumber || undefined,
+    fileNumber: form.fileNumber, mpiId: form.mpiId, internalNumber: form.internalNumber,
+    phone: form.phone, phoneSecondary: form.phoneSecondary || undefined,
+    email: form.email || undefined,
+    address: form.address || undefined, commune: form.commune || undefined,
+    wilaya: form.wilaya || undefined, postalCode: form.postalCode || undefined, country: form.country,
+    bloodType: (form.bloodType || undefined) as BloodType | undefined,
+    rhesus: (form.rhesus || undefined) as '+' | '-' | undefined,
+    medical: {
+      allergies: form.allergies ? form.allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
+      chronicDiseases: form.chronicDiseases ? form.chronicDiseases.split(',').map(s => s.trim()).filter(Boolean) : [],
+      majorHistory: form.majorHistory ? form.majorHistory.split(',').map(s => s.trim()).filter(Boolean) : [],
+      disability: form.disability || undefined, criticalNotes: form.criticalNotes || undefined,
+    },
+    emergencyContact: form.emergencyName ? {
+      name: form.emergencyName, relation: form.emergencyRelation,
+      phone: form.emergencyPhone, address: form.emergencyAddress || undefined,
+    } : undefined,
+    insurance: form.insuranceType ? {
+      type: form.insuranceType as InsuranceType,
+      organizationName: form.insuranceOrg || undefined,
+      memberNumber: form.memberNumber || undefined,
+      validUntil: form.validUntil || undefined,
+    } : undefined,
+  });
+
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
-    await new Promise(r => setTimeout(r, 600));
-    const patientData: Partial<Patient> = {
-      lastName: form.lastName, firstName: form.firstName, maidenName: form.maidenName || undefined,
-      gender: form.gender, dateOfBirth: form.dateOfBirth, placeOfBirth: form.placeOfBirth || undefined,
-      nationality: form.nationality, maritalStatus: (form.maritalStatus || undefined) as MaritalStatus | undefined,
-      idDocumentType: (form.idDocumentType || undefined) as IdDocumentType | undefined,
-      idDocumentNumber: form.idDocumentNumber || undefined,
-      socialSecurityNumber: form.socialSecurityNumber || undefined,
-      fileNumber: form.fileNumber, mpiId: form.mpiId, internalNumber: form.internalNumber,
-      phone: form.phone, phoneSecondary: form.phoneSecondary || undefined,
-      email: form.email || undefined,
-      address: form.address || undefined, commune: form.commune || undefined,
-      wilaya: form.wilaya || undefined, postalCode: form.postalCode || undefined, country: form.country,
-      bloodType: (form.bloodType || undefined) as BloodType | undefined,
-      rhesus: (form.rhesus || undefined) as '+' | '-' | undefined,
-      medical: {
-        allergies: form.allergies ? form.allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
-        chronicDiseases: form.chronicDiseases ? form.chronicDiseases.split(',').map(s => s.trim()).filter(Boolean) : [],
-        majorHistory: form.majorHistory ? form.majorHistory.split(',').map(s => s.trim()).filter(Boolean) : [],
-        disability: form.disability || undefined, criticalNotes: form.criticalNotes || undefined,
-      },
-      emergencyContact: form.emergencyName ? {
-        name: form.emergencyName, relation: form.emergencyRelation,
-        phone: form.emergencyPhone, address: form.emergencyAddress || undefined,
-      } : undefined,
-      insurance: form.insuranceType ? {
-        type: form.insuranceType as InsuranceType,
-        organizationName: form.insuranceOrg || undefined,
-        memberNumber: form.memberNumber || undefined,
-        validUntil: form.validUntil || undefined,
-      } : undefined,
-      status: 'active', syncStatus: 'pending',
-      isIncomplete: false, potentialDuplicate: false,
-      siteId: 'site-1',
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      createdById: 'u-1',
-    };
-    log(patient ? 'update' : 'create', 'patient', patient?.id, `${patientData.lastName} ${patientData.firstName}`);
-    onSave(patientData);
-    setSaving(false);
+    setSaveError(null);
+    try {
+      const payload = buildPayload();
+      let saved: Partial<Patient>;
+
+      if (patient) {
+        // Update existing patient
+        const patientId = patient.id;
+        saved = await apiClient.put<Partial<Patient>>(`/patients/${patientId}`, payload);
+      } else {
+        // Create new patient
+        saved = await apiClient.post<Partial<Patient>>('/patients', payload);
+      }
+
+      log(patient ? 'update' : 'create', 'patient', patient?.id ?? saved.id, `${payload.lastName} ${payload.firstName}`);
+      onSave(saved);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
+      setSaveError(msg);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const STEPS = [
@@ -467,6 +483,14 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
               </div>
             )}
           </div>
+
+          {/* Save error banner */}
+          {saveError && (
+            <div className="mx-6 mb-2 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
+              <AlertTriangle size={13} className="flex-shrink-0" />
+              <span>{saveError}</span>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50/50 flex-shrink-0">
