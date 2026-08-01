@@ -8,3 +8,4 @@ export * from "./beds";
 export * from "./operating_rooms";
 export * from "./blood_bank";
 export * from "./vehicles";
+export * from "./consultations";

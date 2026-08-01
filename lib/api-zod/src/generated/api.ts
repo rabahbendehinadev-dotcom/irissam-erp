@@ -83,6 +83,47 @@ export const GetRecentPatientsResponse = zod.array(GetRecentPatientsResponseItem
 
 
 /**
+ * @summary Get full patient list
+ */
+export const GetPatientsListQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional(),
+  "gender": zod.coerce.string().optional(),
+  "bloodType": zod.coerce.string().optional()
+})
+
+export const GetPatientsListResponseItem = zod.object({
+  "id": zod.string(),
+  "mpiId": zod.string(),
+  "fileNumber": zod.string(),
+  "internalNumber": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "gender": zod.string(),
+  "dateOfBirth": zod.string(),
+  "phone": zod.string(),
+  "bloodType": zod.string().nullish(),
+  "status": zod.string(),
+  "syncStatus": zod.string(),
+  "isIncomplete": zod.boolean(),
+  "potentialDuplicate": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "nationality": zod.string(),
+  "country": zod.string(),
+  "medical": zod.object({
+  "allergies": zod.array(zod.string()),
+  "chronicDiseases": zod.array(zod.string()),
+  "majorHistory": zod.array(zod.string())
+}),
+  "createdById": zod.string(),
+  "siteId": zod.string(),
+  "service": zod.string()
+})
+export const GetPatientsListResponse = zod.array(GetPatientsListResponseItem)
+
+
+/**
  * @summary Get upcoming appointments for today
  */
 export const GetUpcomingAppointmentsResponseItem = zod.object({
@@ -97,16 +138,266 @@ export const GetUpcomingAppointmentsResponse = zod.array(GetUpcomingAppointments
 
 
 /**
- * @summary Get active alerts
+ * @summary Get full appointment list
+ */
+export const GetAppointmentsListQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional(),
+  "departmentId": zod.coerce.string().optional()
+})
+
+export const GetAppointmentsListResponseItem = zod.object({
+  "id": zod.string(),
+  "patientId": zod.string(),
+  "patient": zod.object({
+  "id": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string()
+}),
+  "doctorId": zod.string(),
+  "doctorName": zod.string(),
+  "departmentId": zod.string(),
+  "departmentName": zod.string(),
+  "scheduledAt": zod.string(),
+  "duration": zod.number(),
+  "status": zod.string(),
+  "notes": zod.string().nullish()
+})
+export const GetAppointmentsListResponse = zod.array(GetAppointmentsListResponseItem)
+
+
+/**
+ * @summary Create a new appointment
+ */
+export const CreateAppointmentBody = zod.object({
+  "patientName": zod.string().optional(),
+  "patientFirstName": zod.string().optional(),
+  "patientLastName": zod.string().optional(),
+  "doctorName": zod.string(),
+  "departmentName": zod.string().optional(),
+  "scheduledAt": zod.string(),
+  "duration": zod.number().optional(),
+  "notes": zod.string().optional(),
+  "status": zod.string().optional()
+})
+
+export const CreateAppointmentResponse = zod.object({
+  "id": zod.string(),
+  "patientId": zod.string(),
+  "patient": zod.object({
+  "id": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string()
+}),
+  "doctorId": zod.string(),
+  "doctorName": zod.string(),
+  "departmentId": zod.string(),
+  "departmentName": zod.string(),
+  "scheduledAt": zod.string(),
+  "duration": zod.number(),
+  "status": zod.string(),
+  "notes": zod.string().nullish()
+})
+
+
+/**
+ * @summary Update appointment status
+ */
+export const UpdateAppointmentStatusParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateAppointmentStatusBody = zod.object({
+  "status": zod.string()
+})
+
+export const UpdateAppointmentStatusResponse = zod.object({
+  "id": zod.string(),
+  "patientId": zod.string(),
+  "patient": zod.object({
+  "id": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string()
+}),
+  "doctorId": zod.string(),
+  "doctorName": zod.string(),
+  "departmentId": zod.string(),
+  "departmentName": zod.string(),
+  "scheduledAt": zod.string(),
+  "duration": zod.number(),
+  "status": zod.string(),
+  "notes": zod.string().nullish()
+})
+
+
+/**
+ * @summary Get active alerts with full details
  */
 export const GetAlertsResponseItem = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "type": zod.string(),
   "title": zod.string(),
   "detail": zod.string(),
-  "createdAt": zod.string()
+  "description": zod.string(),
+  "severity": zod.string(),
+  "category": zod.string(),
+  "isRead": zod.boolean(),
+  "createdAt": zod.string(),
+  "patientId": zod.string().nullish()
 })
 export const GetAlertsResponse = zod.array(GetAlertsResponseItem)
+
+
+/**
+ * @summary Mark all active alerts as read
+ */
+export const MarkAllAlertsReadResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Mark a single alert as read
+ */
+export const MarkAlertReadParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const MarkAlertReadResponse = zod.object({
+  "id": zod.string(),
+  "isRead": zod.boolean()
+})
+
+
+/**
+ * @summary Get full consultation list
+ */
+export const GetConsultationsListQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional(),
+  "type": zod.coerce.string().optional(),
+  "origin": zod.coerce.string().optional(),
+  "doctor": zod.coerce.string().optional(),
+  "specialty": zod.coerce.string().optional(),
+  "dateFrom": zod.coerce.string().optional(),
+  "dateTo": zod.coerce.string().optional()
+})
+
+export const GetConsultationsListResponseItem = zod.object({
+  "id": zod.string(),
+  "number": zod.string(),
+  "patientId": zod.string(),
+  "patientName": zod.string(),
+  "patientMpi": zod.string(),
+  "doctorId": zod.string(),
+  "doctorName": zod.string(),
+  "specialty": zod.string(),
+  "serviceId": zod.string(),
+  "serviceName": zod.string(),
+  "siteId": zod.string(),
+  "siteName": zod.string(),
+  "date": zod.string(),
+  "scheduledAt": zod.string(),
+  "startedAt": zod.string().nullish(),
+  "endedAt": zod.string().nullish(),
+  "duration": zod.number().nullish(),
+  "type": zod.string(),
+  "origin": zod.string(),
+  "reason": zod.string(),
+  "status": zod.string(),
+  "syncStatus": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "createdById": zod.string()
+})
+export const GetConsultationsListResponse = zod.array(GetConsultationsListResponseItem)
+
+
+/**
+ * @summary Create a new consultation
+ */
+export const CreateConsultationBody = zod.object({
+  "patientName": zod.string(),
+  "patientMpi": zod.string().optional(),
+  "patientId": zod.number().optional(),
+  "doctorName": zod.string(),
+  "specialty": zod.string().optional(),
+  "serviceName": zod.string().optional(),
+  "date": zod.string().optional(),
+  "type": zod.string().optional(),
+  "origin": zod.string().optional(),
+  "reason": zod.string(),
+  "status": zod.string().optional(),
+  "duration": zod.number().optional()
+})
+
+export const CreateConsultationResponse = zod.object({
+  "id": zod.string(),
+  "number": zod.string(),
+  "patientId": zod.string(),
+  "patientName": zod.string(),
+  "patientMpi": zod.string(),
+  "doctorId": zod.string(),
+  "doctorName": zod.string(),
+  "specialty": zod.string(),
+  "serviceId": zod.string(),
+  "serviceName": zod.string(),
+  "siteId": zod.string(),
+  "siteName": zod.string(),
+  "date": zod.string(),
+  "scheduledAt": zod.string(),
+  "startedAt": zod.string().nullish(),
+  "endedAt": zod.string().nullish(),
+  "duration": zod.number().nullish(),
+  "type": zod.string(),
+  "origin": zod.string(),
+  "reason": zod.string(),
+  "status": zod.string(),
+  "syncStatus": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "createdById": zod.string()
+})
+
+
+/**
+ * @summary Update consultation status
+ */
+export const UpdateConsultationStatusParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateConsultationStatusBody = zod.object({
+  "status": zod.string()
+})
+
+export const UpdateConsultationStatusResponse = zod.object({
+  "id": zod.string(),
+  "number": zod.string(),
+  "patientId": zod.string(),
+  "patientName": zod.string(),
+  "patientMpi": zod.string(),
+  "doctorId": zod.string(),
+  "doctorName": zod.string(),
+  "specialty": zod.string(),
+  "serviceId": zod.string(),
+  "serviceName": zod.string(),
+  "siteId": zod.string(),
+  "siteName": zod.string(),
+  "date": zod.string(),
+  "scheduledAt": zod.string(),
+  "startedAt": zod.string().nullish(),
+  "endedAt": zod.string().nullish(),
+  "duration": zod.number().nullish(),
+  "type": zod.string(),
+  "origin": zod.string(),
+  "reason": zod.string(),
+  "status": zod.string(),
+  "syncStatus": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "createdById": zod.string()
+})
 
 
 /**

@@ -78,10 +78,12 @@ export function ConsultationTypeBadge({ type }: TypeBadgeProps) {
 // ─── Origin Badge ─────────────────────────────────────────────────────────────
 
 const ORIGIN_MAP: Record<ConsultationOrigin, { label: string; cls: string }> = {
-  rdv:      { label: 'Rendez-vous', cls: 'bg-green-50 text-green-700' },
-  urgence:  { label: 'Urgence',     cls: 'bg-red-50 text-red-700' },
-  admission:{ label: 'Admission',   cls: 'bg-orange-50 text-orange-700' },
-  sans_rdv: { label: 'Sans RDV',    cls: 'bg-gray-100 text-gray-600' },
+  rdv:            { label: 'Rendez-vous',    cls: 'bg-green-50 text-green-700' },
+  urgence:        { label: 'Urgence',        cls: 'bg-red-50 text-red-700' },
+  admission:      { label: 'Admission',      cls: 'bg-orange-50 text-orange-700' },
+  sans_rdv:       { label: 'Sans RDV',       cls: 'bg-gray-100 text-gray-600' },
+  controle:       { label: 'Contrôle',       cls: 'bg-blue-50 text-blue-700' },
+  hospitalisation:{ label: 'Hospitalisation',cls: 'bg-purple-50 text-purple-700' },
 };
 
 interface OriginBadgeProps { origin: ConsultationOrigin }

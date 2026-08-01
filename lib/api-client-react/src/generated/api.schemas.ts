@@ -49,6 +49,37 @@ export interface RecentPatient {
   registeredAt: string;
 }
 
+export interface PatientMedicalInfo {
+  allergies: string[];
+  chronicDiseases: string[];
+  majorHistory: string[];
+}
+
+export interface PatientListItem {
+  id: string;
+  mpiId: string;
+  fileNumber: string;
+  internalNumber: string;
+  firstName: string;
+  lastName: string;
+  gender: string;
+  dateOfBirth: string;
+  phone: string;
+  bloodType?: string | null;
+  status: string;
+  syncStatus: string;
+  isIncomplete: boolean;
+  potentialDuplicate: boolean;
+  createdAt: string;
+  updatedAt: string;
+  nationality: string;
+  country: string;
+  medical: PatientMedicalInfo;
+  createdById: string;
+  siteId: string;
+  service: string;
+}
+
 export interface UpcomingAppointment {
   id: number;
   patientName: string;
@@ -58,12 +89,109 @@ export interface UpcomingAppointment {
   status: string;
 }
 
+export interface AppointmentPatient {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface AppointmentListItem {
+  id: string;
+  patientId: string;
+  patient: AppointmentPatient;
+  doctorId: string;
+  doctorName: string;
+  departmentId: string;
+  departmentName: string;
+  scheduledAt: string;
+  duration: number;
+  status: string;
+  notes?: string | null;
+}
+
+export interface CreateAppointmentBody {
+  patientName?: string;
+  patientFirstName?: string;
+  patientLastName?: string;
+  doctorName: string;
+  departmentName?: string;
+  scheduledAt: string;
+  duration?: number;
+  notes?: string;
+  status?: string;
+}
+
+export interface UpdateAppointmentStatusBody {
+  status: string;
+}
+
 export interface AlertItem {
-  id: number;
+  id: string;
   type: string;
   title: string;
   detail: string;
+  description: string;
+  severity: string;
+  category: string;
+  isRead: boolean;
   createdAt: string;
+  patientId?: string | null;
+}
+
+export interface MarkReadResult {
+  id: string;
+  isRead: boolean;
+}
+
+export interface MarkAllReadResult {
+  success: boolean;
+}
+
+export interface ConsultationListItem {
+  id: string;
+  number: string;
+  patientId: string;
+  patientName: string;
+  patientMpi: string;
+  doctorId: string;
+  doctorName: string;
+  specialty: string;
+  serviceId: string;
+  serviceName: string;
+  siteId: string;
+  siteName: string;
+  date: string;
+  scheduledAt: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  duration?: number | null;
+  type: string;
+  origin: string;
+  reason: string;
+  status: string;
+  syncStatus: string;
+  createdAt: string;
+  updatedAt: string;
+  createdById: string;
+}
+
+export interface CreateConsultationBody {
+  patientName: string;
+  patientMpi?: string;
+  patientId?: number;
+  doctorName: string;
+  specialty?: string;
+  serviceName?: string;
+  date?: string;
+  type?: string;
+  origin?: string;
+  reason: string;
+  status?: string;
+  duration?: number;
+}
+
+export interface UpdateConsultationStatusBody {
+  status: string;
 }
 
 export interface BedsSummary {
@@ -134,6 +262,30 @@ export interface VehiclesStatus {
   available: number;
   maintenance: number;
 }
+
+export type GetPatientsListParams = {
+search?: string;
+status?: string;
+gender?: string;
+bloodType?: string;
+};
+
+export type GetAppointmentsListParams = {
+search?: string;
+status?: string;
+departmentId?: string;
+};
+
+export type GetConsultationsListParams = {
+search?: string;
+status?: string;
+type?: string;
+origin?: string;
+doctor?: string;
+specialty?: string;
+dateFrom?: string;
+dateTo?: string;
+};
 
 export type GetMedicationsParams = {
 status?: GetMedicationsStatus;

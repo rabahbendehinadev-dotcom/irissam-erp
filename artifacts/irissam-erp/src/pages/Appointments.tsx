@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageWrapper } from "@/components/shared/PageWrapper";
@@ -11,9 +11,14 @@ import { formatDate, formatTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import {
   CalendarDays, List, Search, Plus, ChevronLeft, ChevronRight,
-  Clock, Stethoscope, X, FileText
+  Clock, Stethoscope, X, FileText, RefreshCw, AlertTriangle
 } from "lucide-react";
 import type { Appointment, AppointmentStatus } from "@/types";
+import {
+  useGetAppointmentsList,
+  useCreateAppointment,
+  useUpdateAppointmentStatus,
+} from "@workspace/api-client-react";
 
 type BadgeVariant = "success" | "warning" | "danger" | "info" | "neutral";
 
@@ -33,7 +38,6 @@ const STATUS_LABEL_KEY: Record<AppointmentStatus, string> = {
   no_show: "appointments.status.no_show",
 };
 
-// Build a simple weekly calendar grid from appointments
 function buildWeekDays(date: Date): Date[] {
   const monday = new Date(date);
   const day = monday.getDay() || 7;
@@ -53,26 +57,50 @@ export default function Appointments() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "all">("all");
   const [deptFilter, setDeptFilter] = useState("all");
-  const [calendarDate, setCalendarDate] = useState(new Date("2026-08-01"));
+  const [calendarDate, setCalendarDate] = useState(new Date());
   const [editApt, setEditApt] = useState<Appointment | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
 
+  // Form state
+  const formRef = useRef<{
+    patientName: string;
+    doctorName: string;
+    departmentName: string;
+    date: string;
+    time: string;
+    duration: number;
+    notes: string;
+  } | null>(null);
+
+  // ── API hooks ──────────────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: apiAppointments, isLoading, isError, refetch } = useGetAppointmentsList({} as any);
+  const createMutation = useCreateAppointment();
+  const updateStatusMutation = useUpdateAppointmentStatus();
+
+  // Fall back to mock data if API unavailable
+  const rawAppointments = useMemo((): Appointment[] => {
+    if (isLoading) return [];
+    if (isError) return MOCK_APPOINTMENTS;
+    return (apiAppointments as unknown as Appointment[]) ?? [];
+  }, [apiAppointments, isLoading, isError]);
+
   const departments = useMemo(() => {
     const map = new Map<string, string>();
-    MOCK_APPOINTMENTS.forEach((a) => map.set(a.departmentId, a.departmentName));
+    rawAppointments.forEach((a) => map.set(a.departmentId, a.departmentName));
     return Array.from(map.entries());
-  }, []);
+  }, [rawAppointments]);
 
   const filtered = useMemo(() => {
-    return MOCK_APPOINTMENTS.filter((a) => {
+    return rawAppointments.filter((a) => {
       const name = `${a.patient.firstName} ${a.patient.lastName} ${a.doctorName}`.toLowerCase();
       const matchSearch = !search || name.includes(search.toLowerCase());
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
       const matchDept = deptFilter === "all" || a.departmentId === deptFilter;
       return matchSearch && matchStatus && matchDept;
     });
-  }, [search, statusFilter, deptFilter]);
+  }, [rawAppointments, search, statusFilter, deptFilter]);
 
   const weekDays = buildWeekDays(calendarDate);
 
@@ -86,6 +114,8 @@ export default function Appointments() {
     return map;
   }, [filtered]);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const prevWeek = () => {
     const d = new Date(calendarDate);
     d.setDate(d.getDate() - 7);
@@ -96,9 +126,35 @@ export default function Appointments() {
     d.setDate(d.getDate() + 7);
     setCalendarDate(d);
   };
-  const goToday = () => setCalendarDate(new Date("2026-08-01"));
+  const goToday = () => setCalendarDate(new Date());
 
   const weekLabel = `${weekDays[0].getDate()} – ${weekDays[6].getDate()} ${weekDays[6].toLocaleString("fr-FR", { month: "long", year: "numeric" })}`;
+
+  const handleSaveForm = async () => {
+    const f = formRef.current;
+    if (!f?.doctorName || !f?.date || !f?.time) {
+      setShowForm(false);
+      return;
+    }
+    try {
+      await createMutation.mutateAsync({
+        data: {
+          patientName: f.patientName || "Patient inconnu",
+          doctorName: f.doctorName,
+          departmentName: f.departmentName || undefined,
+          scheduledAt: `${f.date}T${f.time}:00.000Z`,
+          duration: f.duration || 30,
+          notes: f.notes || undefined,
+          status: "pending",
+        },
+      });
+      await refetch();
+    } catch (err) {
+      console.error("Failed to create appointment", err);
+    }
+    setShowForm(false);
+    setEditApt(null);
+  };
 
   return (
     <DashboardLayout>
@@ -108,19 +164,42 @@ export default function Appointments() {
           subtitle={t("appointments.subtitle" as any)}
           breadcrumbs={[{ label: t("appointments.title" as any) }]}
           actions={
-            <button
-              onClick={() => { setEditApt(null); setShowForm(true); }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              {t("appointments.new" as any)}
-            </button>
+            <div className="flex items-center gap-2">
+              {isLoading && (
+                <span className="flex items-center gap-1 text-xs px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-full">
+                  <RefreshCw size={11} className="animate-spin" /> Chargement…
+                </span>
+              )}
+              {isError && !isLoading && (
+                <span className="flex items-center gap-1 text-xs px-2.5 py-1 bg-amber-100 text-amber-700 border border-amber-200 rounded-full">
+                  <AlertTriangle size={11} /> Données hors ligne
+                </span>
+              )}
+              <button
+                onClick={() => {
+                formRef.current = {
+                  patientName: "",
+                  doctorName: "",
+                  departmentName: "",
+                  date: new Date().toISOString().slice(0, 10),
+                  time: "09:00",
+                  duration: 30,
+                  notes: "",
+                };
+                setEditApt(null);
+                setShowForm(true);
+              }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                {t("appointments.new" as any)}
+              </button>
+            </div>
           }
         />
 
         {/* View Toggle + Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
-          {/* Toggle */}
           <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm shrink-0">
             <button
               onClick={() => setView("list")}
@@ -178,8 +257,17 @@ export default function Appointments() {
           {t("appointments.total" as any)}
         </p>
 
+        {/* Loading skeleton */}
+        {isLoading && (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        )}
+
         {/* LIST VIEW */}
-        {view === "list" && (
+        {!isLoading && view === "list" && (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -205,13 +293,21 @@ export default function Appointments() {
                         </p>
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => setDrawerPatientId(apt.patientId)}
-                          className="flex items-center gap-2 group text-left"
-                        >
-                          <PatientAvatar firstName={apt.patient.firstName} lastName={apt.patient.lastName} size="xs" />
-                          <span className="font-medium text-blue-700 group-hover:underline">{apt.patient.firstName} {apt.patient.lastName}</span>
-                        </button>
+                        {/* Only open drawer when a real patient record exists (not synthetic db-apt-* IDs) */}
+                        {apt.patientId && !apt.patientId.startsWith("db-apt-") ? (
+                          <button
+                            onClick={() => setDrawerPatientId(apt.patientId)}
+                            className="flex items-center gap-2 group text-left"
+                          >
+                            <PatientAvatar firstName={apt.patient.firstName} lastName={apt.patient.lastName} size="xs" />
+                            <span className="font-medium text-blue-700 group-hover:underline">{apt.patient.firstName} {apt.patient.lastName}</span>
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <PatientAvatar firstName={apt.patient.firstName} lastName={apt.patient.lastName} size="xs" />
+                            <span className="font-medium text-gray-700">{apt.patient.firstName} {apt.patient.lastName}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5 text-gray-700">
@@ -227,8 +323,8 @@ export default function Appointments() {
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge
-                          label={t(STATUS_LABEL_KEY[apt.status] as any)}
-                          variant={STATUS_VARIANT[apt.status]}
+                          label={t(STATUS_LABEL_KEY[apt.status as AppointmentStatus] as any)}
+                          variant={STATUS_VARIANT[apt.status as AppointmentStatus] ?? "neutral"}
                         />
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs max-w-[180px] truncate">
@@ -257,60 +353,42 @@ export default function Appointments() {
         )}
 
         {/* CALENDAR VIEW */}
-        {view === "calendar" && (
+        {!isLoading && view === "calendar" && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            {/* Calendar nav */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
               <div className="flex items-center gap-2">
-                <button
-                  onClick={prevWeek}
-                  className="p-1.5 rounded-lg text-gray-500 hover:bg-white hover:text-gray-700 transition-colors border border-gray-200"
-                >
+                <button onClick={prevWeek} className="p-1.5 rounded-lg text-gray-500 hover:bg-white hover:text-gray-700 transition-colors border border-gray-200">
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={nextWeek}
-                  className="p-1.5 rounded-lg text-gray-500 hover:bg-white hover:text-gray-700 transition-colors border border-gray-200"
-                >
+                <button onClick={nextWeek} className="p-1.5 rounded-lg text-gray-500 hover:bg-white hover:text-gray-700 transition-colors border border-gray-200">
                   <ChevronRight className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={goToday}
-                  className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
-                >
+                <button onClick={goToday} className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200">
                   {t("appointments.calendar.today" as any)}
                 </button>
               </div>
               <p className="text-sm font-semibold text-gray-700 capitalize">{weekLabel}</p>
             </div>
-
-            {/* Week grid */}
             <div className="grid grid-cols-7 divide-x divide-gray-200">
               {weekDays.map((day, i) => {
                 const key = day.toISOString().slice(0, 10);
                 const dayApts = aptsByDay.get(key) ?? [];
-                const isToday = key === "2026-08-01";
+                const isToday = key === todayStr;
                 return (
                   <div key={key} className="min-h-[200px]">
-                    {/* Day header */}
-                    <div className={cn(
-                      "text-center py-2 border-b border-gray-200",
-                      isToday ? "bg-blue-50" : "bg-gray-50"
-                    )}>
+                    <div className={cn("text-center py-2 border-b border-gray-200", isToday ? "bg-blue-50" : "bg-gray-50")}>
                       <p className="text-xs font-medium text-gray-400">{WEEK_DAYS_SHORT[i]}</p>
-                      <p className={cn(
-                        "text-lg font-bold mt-0.5",
-                        isToday ? "text-blue-600" : "text-gray-700"
-                      )}>
-                        {day.getDate()}
-                      </p>
+                      <p className={cn("text-lg font-bold mt-0.5", isToday ? "text-blue-600" : "text-gray-700")}>{day.getDate()}</p>
                     </div>
-                    {/* Appointments */}
                     <div className="p-1.5 space-y-1">
                       {dayApts.slice(0, 4).map((a) => (
                         <button
                           key={a.id}
-                          onClick={() => setDrawerPatientId(a.patientId)}
+                          onClick={() => {
+                            if (a.patientId && !a.patientId.startsWith("db-apt-")) {
+                              setDrawerPatientId(a.patientId);
+                            }
+                          }}
                           className={cn(
                             "text-xs px-1.5 py-1 rounded-md border truncate w-full text-left hover:opacity-80 transition-opacity",
                             a.status === "confirmed" ? "bg-green-50 border-green-200 text-green-800" :
@@ -350,35 +428,21 @@ export default function Appointments() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <FormField label={t("appointments.form.patient" as any)}>
-                <input type="text" defaultValue={editApt ? `${editApt.patient.firstName} ${editApt.patient.lastName}` : ""} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nom du patient" />
-              </FormField>
-              <FormField label={t("appointments.form.doctor" as any)}>
-                <input type="text" defaultValue={editApt?.doctorName ?? ""} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nom du médecin" />
-              </FormField>
-              <div className="grid grid-cols-2 gap-3">
-                <FormField label={t("appointments.form.date" as any)}>
-                  <input type="date" defaultValue={editApt?.scheduledAt.slice(0, 10) ?? "2026-08-01"} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </FormField>
-                <FormField label={t("appointments.form.time" as any)}>
-                  <input type="time" defaultValue={editApt?.scheduledAt.slice(11, 16) ?? "09:00"} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </FormField>
-              </div>
-              <FormField label={t("appointments.form.duration" as any)}>
-                <input type="number" defaultValue={editApt?.duration ?? 30} min={5} step={5} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </FormField>
-              <FormField label={t("appointments.form.notes" as any)}>
-                <textarea defaultValue={editApt?.notes ?? ""} rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Notes optionnelles..." />
-              </FormField>
-            </div>
+            <AppointmentFormFields
+              apt={editApt}
+              onChange={(v) => { formRef.current = v; }}
+            />
 
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 {t("appointments.form.cancel" as any)}
               </button>
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                {t("appointments.form.save" as any)}
+              <button
+                onClick={handleSaveForm}
+                disabled={createMutation.isPending}
+                className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
+              >
+                {createMutation.isPending ? "Enregistrement…" : t("appointments.form.save" as any)}
               </button>
             </div>
           </div>
@@ -386,19 +450,74 @@ export default function Appointments() {
       )}
 
       {/* Patient drawer */}
-      <PatientDrawer
-        patientId={drawerPatientId}
-        onClose={() => setDrawerPatientId(null)}
-      />
+      <PatientDrawer patientId={drawerPatientId} onClose={() => setDrawerPatientId(null)} />
     </DashboardLayout>
   );
 }
+
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
       <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function AppointmentFormFields({
+  apt,
+  onChange,
+}: {
+  apt: Appointment | null;
+  onChange: (v: { patientName: string; doctorName: string; departmentName: string; date: string; time: string; duration: number; notes: string }) => void;
+}) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [patientName, setPatientName] = useState(apt ? `${apt.patient.firstName} ${apt.patient.lastName}` : "");
+  const [doctorName, setDoctorName] = useState(apt?.doctorName ?? "");
+  const [departmentName, setDepartmentName] = useState(apt?.departmentName ?? "");
+  const [date, setDate] = useState(apt?.scheduledAt.slice(0, 10) ?? todayStr);
+  const [time, setTime] = useState(apt?.scheduledAt.slice(11, 16) ?? "09:00");
+  const [duration, setDuration] = useState(apt?.duration ?? 30);
+  const [notes, setNotes] = useState(apt?.notes ?? "");
+  const { t } = useLanguage();
+
+  const emit = (overrides: object = {}) =>
+    onChange({ patientName, doctorName, departmentName, date, time, duration, notes, ...overrides });
+
+  return (
+    <div className="space-y-4">
+      <FormField label={t("appointments.form.patient" as any)}>
+        <input type="text" value={patientName} onChange={(e) => { setPatientName(e.target.value); emit({ patientName: e.target.value }); }}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nom du patient" />
+      </FormField>
+      <FormField label={t("appointments.form.doctor" as any)}>
+        <input type="text" value={doctorName} onChange={(e) => { setDoctorName(e.target.value); emit({ doctorName: e.target.value }); }}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nom du médecin" />
+      </FormField>
+      <FormField label={t("appointments.table.department" as any)}>
+        <input type="text" value={departmentName} onChange={(e) => { setDepartmentName(e.target.value); emit({ departmentName: e.target.value }); }}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Service / Département" />
+      </FormField>
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label={t("appointments.form.date" as any)}>
+          <input type="date" value={date} onChange={(e) => { setDate(e.target.value); emit({ date: e.target.value }); }}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </FormField>
+        <FormField label={t("appointments.form.time" as any)}>
+          <input type="time" value={time} onChange={(e) => { setTime(e.target.value); emit({ time: e.target.value }); }}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </FormField>
+      </div>
+      <FormField label={t("appointments.form.duration" as any)}>
+        <input type="number" value={duration} min={5} step={5} onChange={(e) => { setDuration(+e.target.value); emit({ duration: +e.target.value }); }}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </FormField>
+      <FormField label={t("appointments.form.notes" as any)}>
+        <textarea value={notes} rows={2} onChange={(e) => { setNotes(e.target.value); emit({ notes: e.target.value }); }}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Notes optionnelles…" />
+      </FormField>
     </div>
   );
 }

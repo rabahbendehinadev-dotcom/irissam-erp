@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRoute } from 'wouter';
 import { getAllConsultations } from '@/mock/consultations';
 import { ConsultationWorkspace } from '@/components/consultations/ConsultationWorkspace';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import type { Consultation, ConsultationStatus } from '@/types/consultation';
+import { useGetConsultationsList } from '@workspace/api-client-react';
 
 // The workspace page renders inside DashboardLayout (sidebar present).
 // ConsultationWorkspace owns its own sticky header and tab bar.
@@ -12,10 +13,24 @@ export default function ConsultationWorkspacePage() {
   const [, params] = useRoute('/consultations/:id');
   const id = params?.id;
 
-  const initial = getAllConsultations().find(c => c.id === id);
+  // 1. Check mock data (c-* IDs)
+  const mockMatch = getAllConsultations().find(c => c.id === id);
+
+  // 2. Fetch API list (cached from Consultations page visit) for db-* IDs
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: apiConsultations } = useGetConsultationsList({} as any);
+
   const [consultation, setConsultation] = useState<Consultation | undefined>(
-    initial as Consultation | undefined
+    mockMatch as Consultation | undefined
   );
+
+  // Hydrate from API data when available (handles db-* IDs navigated to from API-backed list)
+  useEffect(() => {
+    if (consultation) return; // already resolved from mock
+    if (!id || !apiConsultations) return;
+    const apiMatch = (apiConsultations as unknown as Consultation[]).find(c => c.id === id);
+    if (apiMatch) setConsultation(apiMatch);
+  }, [id, apiConsultations, consultation]);
 
   if (!consultation) {
     return (
@@ -23,7 +38,11 @@ export default function ConsultationWorkspacePage() {
         <div className="flex items-center justify-center h-full min-h-[400px]">
           <div className="text-center text-gray-400">
             <p className="text-xl font-bold mb-2">Consultation introuvable</p>
-            <p className="text-sm">L'identifiant <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">{id}</code> ne correspond à aucune consultation.</p>
+            <p className="text-sm">
+              L'identifiant{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">{id}</code>{' '}
+              ne correspond à aucune consultation.
+            </p>
           </div>
         </div>
       </DashboardLayout>

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
-import { UserPlus, Download, Upload, Users, UserCheck, AlertTriangle, Copy } from 'lucide-react';
+import { UserPlus, Download, Upload, Users, UserCheck, AlertTriangle, Copy, RefreshCw } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PatientFilters, type PatientFiltersState } from '@/components/patients/PatientFilters';
@@ -11,6 +11,7 @@ import type { Patient } from '@/types';
 import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { useGetPatientsList } from '@workspace/api-client-react';
 
 const DEFAULT_FILTERS: PatientFiltersState = { search: '', status: 'all', gender: 'all', bloodType: 'all' };
 
@@ -43,6 +44,17 @@ export default function PatientsPage() {
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [archivingPatient, setArchivingPatient] = useState<Patient | null>(null);
 
+  // ── API data ─────────────────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: apiPatients, isLoading, isError, refetch } = useGetPatientsList({} as any);
+
+  // Fall back to mock data if API is unavailable
+  const rawPatients = useMemo((): Patient[] => {
+    if (isLoading) return [];
+    if (isError) return MOCK_PATIENTS;
+    return (apiPatients as unknown as Patient[]) ?? [];
+  }, [apiPatients, isLoading, isError]);
+
   const handleSort = (field: string) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortDir('asc'); }
@@ -51,7 +63,7 @@ export default function PatientsPage() {
 
   const filtered = useMemo(() => {
     const q = filters.search.toLowerCase();
-    return MOCK_PATIENTS
+    return rawPatients
       .filter(p => {
         if (q) {
           const searchable = [p.firstName, p.lastName, p.mpiId, p.fileNumber, p.phone, p.internalNumber]
@@ -66,24 +78,24 @@ export default function PatientsPage() {
       .sort((a, b) => {
         const val = (x: Patient): string => {
           switch (sortField) {
-            case 'lastName':   return x.lastName + x.firstName;
-            case 'dateOfBirth':return x.dateOfBirth;
-            case 'status':     return x.status;
-            case 'createdAt':  return x.createdAt;
-            default:           return x.lastName;
+            case 'lastName':    return x.lastName + x.firstName;
+            case 'dateOfBirth': return x.dateOfBirth;
+            case 'status':      return x.status;
+            case 'createdAt':   return x.createdAt;
+            default:            return x.lastName;
           }
         };
         const cmp = val(a).localeCompare(val(b), 'fr');
         return sortDir === 'asc' ? cmp : -cmp;
       });
-  }, [filters, sortField, sortDir]);
+  }, [rawPatients, filters, sortField, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const stats = {
-    total:       MOCK_PATIENTS.length,
-    active:      MOCK_PATIENTS.filter(p => p.status === 'active').length,
-    incomplete:  MOCK_PATIENTS.filter(p => p.isIncomplete).length,
-    duplicates:  MOCK_PATIENTS.filter(p => p.potentialDuplicate).length,
+    total:      rawPatients.length,
+    active:     rawPatients.filter(p => p.status === 'active').length,
+    incomplete: rawPatients.filter(p => p.isIncomplete).length,
+    duplicates: rawPatients.filter(p => p.potentialDuplicate).length,
   };
 
   const handleView = (patient: Patient) => {
@@ -103,9 +115,9 @@ export default function PatientsPage() {
   };
 
   const handleSave = (_data: Partial<Patient>) => {
-    // Mock save — in production this would call API
     setShowForm(false);
     setEditingPatient(null);
+    refetch();
   };
 
   if (!can('patients.view')) {
@@ -130,11 +142,20 @@ export default function PatientsPage() {
           subtitle={t('pat.page.subtitle')}
           actions={
             <div className="flex items-center gap-2">
-              {/* Demo badge */}
-              <span className="flex items-center gap-1 text-xs px-2.5 py-1 bg-amber-100 text-amber-700 border border-amber-200 rounded-full font-medium">
-                <AlertTriangle size={11} />
-                {t('pat.page.demo')}
-              </span>
+              {/* Loading indicator */}
+              {isLoading && (
+                <span className="flex items-center gap-1 text-xs px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-full font-medium">
+                  <RefreshCw size={11} className="animate-spin" />
+                  Chargement…
+                </span>
+              )}
+              {/* Error indicator */}
+              {isError && !isLoading && (
+                <span className="flex items-center gap-1 text-xs px-2.5 py-1 bg-amber-100 text-amber-700 border border-amber-200 rounded-full font-medium">
+                  <AlertTriangle size={11} />
+                  Données hors ligne
+                </span>
+              )}
 
               {/* Export */}
               {can('patients.export') && (
@@ -179,66 +200,93 @@ export default function PatientsPage() {
           <StatCard icon={<Copy size={20} className="text-red-600" />}            label={t('pat.stats.duplicates')} value={stats.duplicates} color="bg-red-50" />
         </div>
 
-        {/* Filters */}
-        <PatientFilters
-          filters={filters}
-          onChange={f => { setFilters(f); setPage(1); }}
-          resultCount={filtered.length}
-          total={MOCK_PATIENTS.length}
-        />
-
-        {/* Table */}
-        <PatientTable
-          patients={filtered}
-          page={page}
-          perPage={perPage}
-          onView={handleView}
-          onEdit={handleEdit}
-          onArchive={p => setArchivingPatient(p)}
-          canEdit={can('patients.edit')}
-          canArchive={can('patients.archive')}
-          sortField={sortField}
-          sortDir={sortDir}
-          onSort={handleSort}
-        />
-
-        {/* Pagination */}
-        {filtered.length > 0 && (
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <span>
-              {Math.min((page - 1) * perPage + 1, filtered.length)}–{Math.min(page * perPage, filtered.length)} {t('pat.pagination.of')} {filtered.length} {t('pat.filter.results')}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {t('pat.pagination.prev')}
-              </button>
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const p = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={`w-8 h-8 text-xs rounded-lg transition-colors ${p === page ? 'bg-blue-600 text-white' : 'border border-gray-200 hover:bg-gray-50'}`}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {t('pat.pagination.next')}
-              </button>
-            </div>
+        {/* Loading skeleton */}
+        {isLoading && (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />
+            ))}
           </div>
+        )}
+
+        {/* Error state */}
+        {isError && !isLoading && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3 text-amber-700 text-sm">
+            <AlertTriangle size={18} className="shrink-0" />
+            <div>
+              <p className="font-semibold">Connexion API impossible</p>
+              <p className="text-xs mt-0.5">Affichage des données de démonstration. Vérifiez que le serveur API est en ligne.</p>
+            </div>
+            <button onClick={() => refetch()} className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs border border-amber-300 rounded-lg hover:bg-amber-100">
+              <RefreshCw size={12} /> Réessayer
+            </button>
+          </div>
+        )}
+
+        {/* Filters */}
+        {!isLoading && (
+          <>
+            <PatientFilters
+              filters={filters}
+              onChange={f => { setFilters(f); setPage(1); }}
+              resultCount={filtered.length}
+              total={rawPatients.length}
+            />
+
+            {/* Table */}
+            <PatientTable
+              patients={filtered}
+              page={page}
+              perPage={perPage}
+              onView={handleView}
+              onEdit={handleEdit}
+              onArchive={p => setArchivingPatient(p)}
+              canEdit={can('patients.edit')}
+              canArchive={can('patients.archive')}
+              sortField={sortField}
+              sortDir={sortDir}
+              onSort={handleSort}
+            />
+
+            {/* Pagination */}
+            {filtered.length > 0 && (
+              <div className="flex items-center justify-between text-sm text-gray-500">
+                <span>
+                  {Math.min((page - 1) * perPage + 1, filtered.length)}–{Math.min(page * perPage, filtered.length)} {t('pat.pagination.of')} {filtered.length} {t('pat.filter.results')}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {t('pat.pagination.prev')}
+                  </button>
+                  <div className="flex gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const p = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className={`w-8 h-8 text-xs rounded-lg transition-colors ${p === page ? 'bg-blue-600 text-white' : 'border border-gray-200 hover:bg-gray-50'}`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {t('pat.pagination.next')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

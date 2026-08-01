@@ -6,15 +6,59 @@ import { PatientAvatar } from '@/components/shared/PatientAvatar';
 import { PatientStatusBadge } from '@/components/patients/PatientStatusBadge';
 import { calculateAge, formatDate } from '@/utils/format';
 import { cn } from '@/lib/utils';
+import { useGetPatientsList } from '@workspace/api-client-react';
+import type { Patient } from '@/types';
 
 interface PatientDrawerProps {
   patientId: string | null;
   onClose: () => void;
 }
 
+/** Build a Patient-compatible object from API list item data. */
+function apiToDrawerPatient(raw: Record<string, unknown>): Patient {
+  const firstName = (raw.firstName as string) ?? '';
+  const lastName  = (raw.lastName  as string) ?? '';
+  return {
+    id:           raw.id as string,
+    mpiId:        (raw.mpiId as string) ?? '',
+    fileNumber:   (raw.internalNumber as string) ?? (raw.mpiId as string) ?? '',
+    firstName,
+    lastName,
+    status:       (raw.status as Patient['status']) ?? 'active',
+    gender:       (raw.gender as Patient['gender']) ?? 'M',
+    dateOfBirth:  (raw.dateOfBirth as string) ?? '',
+    bloodType:    (raw.bloodType as Patient['bloodType']) ?? undefined,
+    rhesus:       undefined,
+    phone:        (raw.phone as string) ?? undefined,
+    wilaya:       undefined,
+    commune:      undefined,
+    isIncomplete: Boolean(raw.isIncomplete),
+    potentialDuplicate: Boolean(raw.potentialDuplicate),
+    syncStatus:   (raw.syncStatus as Patient['syncStatus']) ?? 'synced',
+    medical:      undefined,
+    createdAt:    (raw.createdAt as string) ?? new Date().toISOString(),
+    updatedAt:    (raw.updatedAt as string) ?? new Date().toISOString(),
+  } as unknown as Patient;
+}
+
 export function PatientDrawer({ patientId, onClose }: PatientDrawerProps) {
   const [, setLocation] = useLocation();
-  const patient = patientId ? MOCK_PATIENTS.find(p => p.id === patientId) ?? null : null;
+
+  // Always call the hook; result is cached from Patients page visits
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: apiPatients } = useGetPatientsList({} as any);
+
+  // 1. Try mock data first (handles p-* IDs from mock-only pages)
+  // 2. Fall back to API list (handles db-* IDs from real API data)
+  const patient: Patient | null = (() => {
+    if (!patientId) return null;
+    const mock = MOCK_PATIENTS.find(p => p.id === patientId);
+    if (mock) return mock;
+    const apiMatch = (apiPatients ?? []).find(
+      (p) => (p as unknown as Record<string, unknown>).id === patientId,
+    );
+    return apiMatch ? apiToDrawerPatient(apiMatch as unknown as Record<string, unknown>) : null;
+  })();
 
   // Close on Escape key
   useEffect(() => {
@@ -59,7 +103,11 @@ export function PatientDrawer({ patientId, onClose }: PatientDrawerProps) {
           {!patient ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-2 p-8">
               <User size={40} className="opacity-30" />
-              <p className="text-sm text-center">Patient introuvable dans la base de données locale.</p>
+              <p className="text-sm text-center">
+                {patientId
+                  ? 'Patient introuvable.'
+                  : 'Aucun patient sélectionné.'}
+              </p>
             </div>
           ) : (
             <>
@@ -87,12 +135,16 @@ export function PatientDrawer({ patientId, onClose }: PatientDrawerProps) {
                       <PatientStatusBadge status={patient.status} />
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      <span className="text-[11px] font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
-                        MPI {patient.mpiId}
-                      </span>
-                      <span className="text-[11px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                        {patient.fileNumber}
-                      </span>
+                      {patient.mpiId && (
+                        <span className="text-[11px] font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+                          MPI {patient.mpiId}
+                        </span>
+                      )}
+                      {patient.fileNumber && (
+                        <span className="text-[11px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                          {patient.fileNumber}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -101,17 +153,19 @@ export function PatientDrawer({ patientId, onClose }: PatientDrawerProps) {
               {/* Key info */}
               <div className="px-5 py-4 space-y-3">
                 {/* Demographics */}
-                <Row
-                  icon={<User size={14} className="text-gray-400" />}
-                  label={`${patient.gender === 'M' ? 'Homme' : 'Femme'} · ${calculateAge(patient.dateOfBirth)} ans`}
-                  sub={formatDate(patient.dateOfBirth)}
-                />
+                {patient.dateOfBirth && (
+                  <Row
+                    icon={<User size={14} className="text-gray-400" />}
+                    label={`${patient.gender === 'M' ? 'Homme' : 'Femme'} · ${calculateAge(patient.dateOfBirth)} ans`}
+                    sub={formatDate(patient.dateOfBirth)}
+                  />
+                )}
 
                 {/* Blood type */}
                 {patient.bloodType && (
                   <Row
                     icon={<Droplets size={14} className="text-red-500" />}
-                    label={`${patient.bloodType} (Rh ${patient.rhesus ?? '?'})`}
+                    label={`${patient.bloodType}${patient.rhesus ? ` (Rh ${patient.rhesus})` : ''}`}
                     highlight="red"
                   />
                 )}

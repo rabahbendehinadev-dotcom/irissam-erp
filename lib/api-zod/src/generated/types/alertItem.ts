@@ -7,9 +7,14 @@
  */
 
 export interface AlertItem {
-  id: number;
+  id: string;
   type: string;
   title: string;
   detail: string;
+  description: string;
+  severity: string;
+  category: string;
+  isRead: boolean;
   createdAt: string;
+  patientId?: string | null;
 }

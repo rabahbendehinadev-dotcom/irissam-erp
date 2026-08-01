@@ -24,6 +24,7 @@ import { useAuditLog } from '@/hooks/useAuditLog';
 import { formatDate } from '@/utils/format';
 import { cn } from '@/lib/utils';
 import type { Patient } from '@/types';
+import { useGetPatientsList } from '@workspace/api-client-react';
 
 function InfoRow({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
   if (!value) return null;
@@ -145,7 +146,40 @@ export default function PatientDetailPage() {
   const [showEdit,  setShowEdit]  = useState(false);
   const [archiving, setArchiving] = useState(false);
 
-  const patient  = MOCK_PATIENTS.find(p => p.id === patientId);
+  // Try mock data first (p-* IDs), then fall back to API list cache (db-* IDs)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: apiPatients } = useGetPatientsList({} as any);
+  const patient: Patient | null = (() => {
+    if (!patientId) return null;
+    const mock = MOCK_PATIENTS.find(p => p.id === patientId);
+    if (mock) return mock;
+    const api = (apiPatients ?? []).find(
+      p => (p as unknown as Record<string, unknown>).id === patientId,
+    );
+    if (!api) return null;
+    const r = api as unknown as Record<string, unknown>;
+    return {
+      id:           r.id as string,
+      mpiId:        (r.mpiId as string) ?? '',
+      fileNumber:   (r.internalNumber as string) ?? (r.mpiId as string) ?? '',
+      firstName:    (r.firstName as string) ?? '',
+      lastName:     (r.lastName  as string) ?? '',
+      status:       (r.status as Patient['status']) ?? 'active',
+      gender:       (r.gender as Patient['gender']) ?? 'M',
+      dateOfBirth:  (r.dateOfBirth as string) ?? '',
+      bloodType:    (r.bloodType as Patient['bloodType']) ?? undefined,
+      rhesus:       undefined,
+      phone:        (r.phone as string) ?? undefined,
+      wilaya:       undefined,
+      commune:      undefined,
+      isIncomplete: Boolean(r.isIncomplete),
+      potentialDuplicate: Boolean(r.potentialDuplicate),
+      syncStatus:   (r.syncStatus as Patient['syncStatus']) ?? 'synced',
+      medical:      { allergies: [], chronicDiseases: [], majorHistory: [], criticalNotes: undefined },
+      createdAt:    (r.createdAt as string) ?? new Date().toISOString(),
+      updatedAt:    (r.updatedAt as string) ?? new Date().toISOString(),
+    } as unknown as Patient;
+  })();
   const timeline = MOCK_PATIENT_TIMELINES[patientId ?? ''] ?? [];
 
   if (!can('patients.view')) {

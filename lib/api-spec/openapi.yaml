@@ -28,6 +28,8 @@ tags:
     description: Vehicle / ambulance fleet
   - name: medications
     description: Pharmacy / medication stock
+  - name: consultations
+    description: Consultation operations
 paths:
   /healthz:
     get:
@@ -117,6 +119,38 @@ paths:
                 items:
                   $ref: "#/components/schemas/RecentPatient"
 
+  /patients:
+    get:
+      operationId: getPatientsList
+      tags: [patients]
+      summary: Get full patient list
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: gender
+          in: query
+          schema:
+            type: string
+        - name: bloodType
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full patient list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PatientListItem"
+
   /appointments/upcoming:
     get:
       operationId: getUpcomingAppointments
@@ -132,11 +166,85 @@ paths:
                 items:
                   $ref: "#/components/schemas/UpcomingAppointment"
 
+  /appointments:
+    get:
+      operationId: getAppointmentsList
+      tags: [appointments]
+      summary: Get full appointment list
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: departmentId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full appointment list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AppointmentListItem"
+    post:
+      operationId: createAppointment
+      tags: [appointments]
+      summary: Create a new appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppointmentBody"
+      responses:
+        "201":
+          description: Created appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentListItem"
+        "400":
+          description: Invalid input
+
+  /appointments/{id}:
+    patch:
+      operationId: updateAppointmentStatus
+      tags: [appointments]
+      summary: Update appointment status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppointmentStatusBody"
+      responses:
+        "200":
+          description: Updated appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentListItem"
+        "404":
+          description: Not found
+
   /alerts:
     get:
       operationId: getAlerts
       tags: [alerts]
-      summary: Get active alerts
+      summary: Get active alerts with full details
       responses:
         "200":
           description: List of active alerts
@@ -146,6 +254,134 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AlertItem"
+
+  /alerts/read-all:
+    post:
+      operationId: markAllAlertsRead
+      tags: [alerts]
+      summary: Mark all active alerts as read
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkAllReadResult"
+
+  /alerts/{id}/read:
+    post:
+      operationId: markAlertRead
+      tags: [alerts]
+      summary: Mark a single alert as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated alert read state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkReadResult"
+        "404":
+          description: Not found
+
+  /consultations:
+    get:
+      operationId: getConsultationsList
+      tags: [consultations]
+      summary: Get full consultation list
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: origin
+          in: query
+          schema:
+            type: string
+        - name: doctor
+          in: query
+          schema:
+            type: string
+        - name: specialty
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full consultation list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsultationListItem"
+    post:
+      operationId: createConsultation
+      tags: [consultations]
+      summary: Create a new consultation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateConsultationBody"
+      responses:
+        "201":
+          description: Created consultation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultationListItem"
+        "400":
+          description: Invalid input
+
+  /consultations/{id}:
+    patch:
+      operationId: updateConsultationStatus
+      tags: [consultations]
+      summary: Update consultation status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConsultationStatusBody"
+      responses:
+        "200":
+          description: Updated consultation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultationListItem"
+        "404":
+          description: Not found
 
   /beds/summary:
     get:
@@ -371,6 +607,97 @@ components:
         - service
         - registeredAt
 
+    PatientMedicalInfo:
+      type: object
+      properties:
+        allergies:
+          type: array
+          items:
+            type: string
+        chronicDiseases:
+          type: array
+          items:
+            type: string
+        majorHistory:
+          type: array
+          items:
+            type: string
+      required:
+        - allergies
+        - chronicDiseases
+        - majorHistory
+
+    PatientListItem:
+      type: object
+      properties:
+        id:
+          type: string
+        mpiId:
+          type: string
+        fileNumber:
+          type: string
+        internalNumber:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        gender:
+          type: string
+        dateOfBirth:
+          type: string
+        phone:
+          type: string
+        bloodType:
+          type: string
+          nullable: true
+        status:
+          type: string
+        syncStatus:
+          type: string
+        isIncomplete:
+          type: boolean
+        potentialDuplicate:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        nationality:
+          type: string
+        country:
+          type: string
+        medical:
+          $ref: "#/components/schemas/PatientMedicalInfo"
+        createdById:
+          type: string
+        siteId:
+          type: string
+        service:
+          type: string
+      required:
+        - id
+        - mpiId
+        - fileNumber
+        - internalNumber
+        - firstName
+        - lastName
+        - gender
+        - dateOfBirth
+        - phone
+        - status
+        - syncStatus
+        - isIncomplete
+        - potentialDuplicate
+        - createdAt
+        - updatedAt
+        - nationality
+        - country
+        - medical
+        - createdById
+        - siteId
+        - service
+
     UpcomingAppointment:
       type: object
       properties:
@@ -394,25 +721,264 @@ components:
         - scheduledAt
         - status
 
+    AppointmentPatient:
+      type: object
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+      required:
+        - id
+        - firstName
+        - lastName
+
+    AppointmentListItem:
+      type: object
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        patient:
+          $ref: "#/components/schemas/AppointmentPatient"
+        doctorId:
+          type: string
+        doctorName:
+          type: string
+        departmentId:
+          type: string
+        departmentName:
+          type: string
+        scheduledAt:
+          type: string
+        duration:
+          type: number
+        status:
+          type: string
+        notes:
+          type: string
+          nullable: true
+      required:
+        - id
+        - patientId
+        - patient
+        - doctorId
+        - doctorName
+        - departmentId
+        - departmentName
+        - scheduledAt
+        - duration
+        - status
+
+    CreateAppointmentBody:
+      type: object
+      properties:
+        patientName:
+          type: string
+        patientFirstName:
+          type: string
+        patientLastName:
+          type: string
+        doctorName:
+          type: string
+        departmentName:
+          type: string
+        scheduledAt:
+          type: string
+        duration:
+          type: number
+        notes:
+          type: string
+        status:
+          type: string
+      required:
+        - doctorName
+        - scheduledAt
+
+    UpdateAppointmentStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
     AlertItem:
       type: object
       properties:
         id:
-          type: number
+          type: string
         type:
           type: string
         title:
           type: string
         detail:
           type: string
+        description:
+          type: string
+        severity:
+          type: string
+        category:
+          type: string
+        isRead:
+          type: boolean
         createdAt:
           type: string
+        patientId:
+          type: string
+          nullable: true
       required:
         - id
         - type
         - title
         - detail
+        - description
+        - severity
+        - category
+        - isRead
         - createdAt
+
+    MarkReadResult:
+      type: object
+      properties:
+        id:
+          type: string
+        isRead:
+          type: boolean
+      required:
+        - id
+        - isRead
+
+    MarkAllReadResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    ConsultationListItem:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        patientId:
+          type: string
+        patientName:
+          type: string
+        patientMpi:
+          type: string
+        doctorId:
+          type: string
+        doctorName:
+          type: string
+        specialty:
+          type: string
+        serviceId:
+          type: string
+        serviceName:
+          type: string
+        siteId:
+          type: string
+        siteName:
+          type: string
+        date:
+          type: string
+        scheduledAt:
+          type: string
+        startedAt:
+          type: string
+          nullable: true
+        endedAt:
+          type: string
+          nullable: true
+        duration:
+          type: number
+          nullable: true
+        type:
+          type: string
+        origin:
+          type: string
+        reason:
+          type: string
+        status:
+          type: string
+        syncStatus:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        createdById:
+          type: string
+      required:
+        - id
+        - number
+        - patientId
+        - patientName
+        - patientMpi
+        - doctorId
+        - doctorName
+        - specialty
+        - serviceId
+        - serviceName
+        - siteId
+        - siteName
+        - date
+        - scheduledAt
+        - type
+        - origin
+        - reason
+        - status
+        - syncStatus
+        - createdAt
+        - updatedAt
+        - createdById
+
+    CreateConsultationBody:
+      type: object
+      properties:
+        patientName:
+          type: string
+        patientMpi:
+          type: string
+        patientId:
+          type: number
+        doctorName:
+          type: string
+        specialty:
+          type: string
+        serviceName:
+          type: string
+        date:
+          type: string
+        type:
+          type: string
+        origin:
+          type: string
+        reason:
+          type: string
+        status:
+          type: string
+        duration:
+          type: number
+      required:
+        - patientName
+        - doctorName
+        - reason
+
+    UpdateConsultationStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
 
     BedsSummary:
       type: object
