@@ -1,0 +1,81 @@
+نفّذ الآن المهمة رقم #52 فقط:
+
+اربط صفحات Laboratoire وImagerie وPharmacie بالـMockRepository الموحد الموجود حاليًا.
+
+مهم جدًا:
+- لا تبدأ PostgreSQL الآن.
+- لا تغيّر التصميم الحالي.
+- لا تنشئ Architecture جديدة.
+- لا تنسخ البيانات داخل كل Module.
+- جميع الصفحات يجب أن تقرأ وتكتب من نفس Repository.
+
+المطلوب:
+
+1. Laboratoire
+- قراءة جميع LabOrders من repository.labOrders.
+- إظهار الطلبات القادمة من Urgences وConsultations.
+- عرض Patient، MPI، Encounter، الطبيب، الأولوية، وقت الطلب والحالة.
+- تغيير الحالات:
+  Demandée → Prélevée → En cours → Validée
+- عند اعتماد النتيجة:
+  - تحديث نفس LabOrder.
+  - إضافة الحدث إلى Timeline المريض والـEncounter.
+  - إرسال Notification للطبيب.
+  - تسجيل العملية في Audit.
+- النتيجة الحرجة تولد تنبيهًا واضحًا.
+
+2. Imagerie
+- قراءة ImagingOrders من repository.imagingOrders.
+- إظهار الطلبات القادمة من Urgences وConsultations.
+- تغيير الحالات:
+  Demandée → Planifiée → Réalisée → Interprétée
+- إضافة compte rendu Mock.
+- عند اعتماد التقرير:
+  - تحديث Patient Timeline.
+  - تحديث Encounter.
+  - إرسال Notification للطبيب.
+  - تسجيل Audit.
+
+3. Pharmacie
+- قراءة Prescriptions من repository.prescriptions.
+- إظهار الوصفات القادمة من Urgences وConsultations.
+- عرض المريض والطبيب والدواء والجرعة والطريق والكمية.
+- تغيير الحالات:
+  Prescrite → Préparée → Délivrée
+- عند الصرف:
+  - تحديث Prescription.
+  - تسجيل اسم الصيدلي والوقت.
+  - إضافة حدث إلى Timeline.
+  - تسجيل Audit.
+- أضف تنبيه Mock في حالة نقص المخزون أو الحساسية.
+
+4. الترابط
+كل سجل يجب أن يحمل:
+- id
+- patientId
+- encounterId
+- emergencyVisitId أو consultationId عند وجوده
+- requestedBy
+- department
+- status
+- createdAt
+- updatedAt
+
+5. Realtime
+أي تغيير في Laboratoire أو Imagerie أو Pharmacie يجب أن يظهر مباشرة في:
+- ملف المريض.
+- Dossier Urgence.
+- Consultation Workspace.
+- Notifications.
+- Audit.
+بدون Refresh.
+
+6. الصلاحيات
+طبّق Permissions منفصلة للعرض، التعديل، اعتماد النتيجة والصرف.
+
+7. الجودة
+- لا توجد بيانات ثابتة منفصلة داخل الصفحات.
+- لا يوجد Reload.
+- لا توجد أخطاء TypeScript أو Console.
+- حافظ على الفرنسية والعربية RTL والإنجليزية.
+- لا تبدأ المهمة #53 أو #54 حتى تنتهي هذه المهمة وتعرض لي اختبارات الربط.

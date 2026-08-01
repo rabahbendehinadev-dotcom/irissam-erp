@@ -101,8 +101,9 @@ export interface MockRepositoryContextType {
   createSurgicalRequest: (req:   Omit<SurgicalRequest,  'id' | 'createdAt'>) => string;
   createICUAdmission:    (adm:   Omit<ICUAdmission,     'id' | 'createdAt'>) => string;
 
-  updateLabOrderStatus:  (orderId: string, status: RepoLabOrder['status'],     result?: string, isCritical?: boolean) => void;
-  updateImagingStatus:   (orderId: string, status: RepoImagingOrder['status'], result?: string) => void;
+  updateLabOrderStatus: (orderId: string, status: RepoLabOrder['status'], result?: string, isCritical?: boolean, ctx?: AuditCtx) => void;
+  updateImagingStatus:  (orderId: string, status: RepoImagingOrder['status'], result?: string, meta?: { report?: string; reportedBy?: string; interpretedBy?: string }, ctx?: AuditCtx) => void;
+  updatePrescriptionStatus: (prescriptionId: string, status: RepoPrescription['status'], ctx: AuditCtx, meta?: { dispensedBy?: string; comment?: string }) => void;
 
   // ── Visit closure (Phase 6: frees occupancy; Phase 5: notifies modules) ──
   closeVisitDischarged:   (patientId: string, ctx: AuditCtx) => void;
@@ -537,30 +538,130 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
   }, [addNotification, audit]);
 
   const updateLabOrderStatus = useCallback((
-    orderId: string, status: RepoLabOrder['status'], result?: string, isCritical?: boolean,
+    orderId: string, status: RepoLabOrder['status'], result?: string, isCritical?: boolean, ctx?: AuditCtx,
   ) => {
+    const now = new Date().toISOString();
+    const order = labOrders.find(o => o.id === orderId);
     setLabOrders(prev => prev.map(o =>
       o.id !== orderId ? o : {
-        ...o, status,
-        ...(result ? { result, resultAt: new Date().toISOString() } : {}),
+        ...o, status, updatedAt: now,
+        ...(result ? { result, resultAt: now, validatedBy: ctx?.userName } : {}),
         ...(isCritical !== undefined ? { isCritical } : {}),
       }
     ));
+    // Critical alert
     if (isCritical && result) {
-      addNotification({ title: '⚠ Résultat critique', body: result, type: 'error', link: '/laboratory' });
+      addNotification({
+        title: '⚠ Résultat critique',
+        body: `${order?.test ?? ''} — ${order?.patientName ?? ''}: ${result}`,
+        type: 'error', link: '/laboratory',
+      });
     }
-  }, [addNotification]);
+    // On validation: notify doctor + link to encounter timeline
+    if (status === 'validee' && order && result) {
+      if (!isCritical) {
+        addNotification({
+          title: 'Résultat biologique disponible',
+          body: `${order.test} — ${order.patientName}`,
+          type: 'success', link: '/laboratory',
+        });
+      }
+      if (order.encounterId) {
+        linkRecordToEncounter(order.encounterId, {
+          recordType: 'lab_order', recordId: orderId,
+          summary: `Résultat ${order.test}${isCritical ? ' ⚠ CRITIQUE' : ''}: ${result}`,
+          createdAt: now,
+        });
+      }
+    }
+    // Audit
+    if (ctx) {
+      audit('laboratoire', `Analyse ${status}: ${order?.test ?? orderId}`, ctx, {
+        patientId: order?.patientId, encounterId: order?.encounterId,
+        visitId: order?.visitId, resourceId: orderId, resourceType: 'LabOrder',
+        oldValue: order?.status, newValue: status,
+      });
+    }
+  }, [labOrders, addNotification, linkRecordToEncounter, audit]);
 
   const updateImagingStatus = useCallback((
     orderId: string, status: RepoImagingOrder['status'], result?: string,
+    meta?: { report?: string; reportedBy?: string; interpretedBy?: string },
+    ctx?: AuditCtx,
   ) => {
+    const now = new Date().toISOString();
+    const order = imagingOrders.find(o => o.id === orderId);
     setImagingOrders(prev => prev.map(o =>
       o.id !== orderId ? o : {
-        ...o, status,
-        ...(result ? { result, resultAt: new Date().toISOString() } : {}),
+        ...o, status, updatedAt: now,
+        ...(result ? { result, resultAt: now } : {}),
+        ...(meta?.report ? { report: meta.report, reportedBy: meta.reportedBy ?? ctx?.userName, reportedAt: now } : {}),
+        ...(meta?.interpretedBy ? { interpretedBy: meta.interpretedBy, interpretedAt: now } : {}),
       }
     ));
-  }, []);
+    // On interprétation: notify doctor + link to encounter
+    if (status === 'interpretee' && order) {
+      addNotification({
+        title: "Rapport d'imagerie disponible",
+        body: `${order.exam} (${order.region}) — ${order.patientName}`,
+        type: 'success', link: '/imaging',
+      });
+      if (order.encounterId) {
+        linkRecordToEncounter(order.encounterId, {
+          recordType: 'imaging_order', recordId: orderId,
+          summary: `Rapport: ${order.exam} (${order.region}) — ${result ?? 'voir rapport'}`,
+          createdAt: now,
+        });
+      }
+    }
+    // Audit
+    if (ctx) {
+      audit('imagerie', `Imagerie ${status}: ${order?.exam ?? orderId}`, ctx, {
+        patientId: order?.patientId, encounterId: order?.encounterId,
+        visitId: order?.visitId, resourceId: orderId, resourceType: 'ImagingOrder',
+        oldValue: order?.status, newValue: status,
+      });
+    }
+  }, [imagingOrders, addNotification, linkRecordToEncounter, audit]);
+
+  const updatePrescriptionStatus = useCallback((
+    prescriptionId: string, status: RepoPrescription['status'], ctx: AuditCtx,
+    meta?: { dispensedBy?: string; comment?: string },
+  ) => {
+    const now = new Date().toISOString();
+    const rx = prescriptions.find(p => p.id === prescriptionId);
+    setPrescriptions(prev => prev.map(p =>
+      p.id !== prescriptionId ? p : {
+        ...p, status, updatedAt: now,
+        ...(status === 'prepare' ? { preparedBy: meta?.dispensedBy ?? ctx.userName, preparedAt: now } : {}),
+        ...(status === 'delivre' ? {
+          dispensedBy: meta?.dispensedBy ?? ctx.userName,
+          dispensedAt: now,
+          dispenserComment: meta?.comment,
+        } : {}),
+      }
+    ));
+    // Notify doctor on delivery
+    if (status === 'delivre' && rx) {
+      addNotification({
+        title: 'Médicament délivré',
+        body: `${rx.drug} ${rx.dosage} — ${rx.patientName}`,
+        type: 'success', link: '/pharmacy',
+      });
+      if (rx.encounterId) {
+        linkRecordToEncounter(rx.encounterId, {
+          recordType: 'prescription', recordId: prescriptionId,
+          summary: `Délivré: ${rx.drug} ${rx.dosage} par ${meta?.dispensedBy ?? ctx.userName}`,
+          createdAt: now,
+        });
+      }
+    }
+    audit('pharmacie', `Prescription ${status}: ${rx?.drug ?? prescriptionId}`, ctx, {
+      patientId: rx?.patientId, encounterId: rx?.encounterId,
+      visitId: rx?.visitId, resourceId: prescriptionId, resourceType: 'Prescription',
+      oldValue: rx?.status, newValue: status,
+    });
+  }, [prescriptions, addNotification, linkRecordToEncounter, audit]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PHASE 6: Visit closure — free occupancy + close encounter
@@ -671,7 +772,7 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
       startCare, updatePatientStatus,
       createLabOrder, createImagingOrder, createPrescription,
       createSurgicalRequest, createICUAdmission,
-      updateLabOrderStatus, updateImagingStatus,
+      updateLabOrderStatus, updateImagingStatus, updatePrescriptionStatus,
       closeVisitDischarged, closeVisitHospitalized, closeVisitBloc,
       closeVisitICU, closeVisitTransferred, closeVisitDeceased,
     }}>

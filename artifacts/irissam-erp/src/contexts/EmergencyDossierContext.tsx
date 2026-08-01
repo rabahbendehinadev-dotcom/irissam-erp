@@ -230,7 +230,7 @@ export function EmergencyDossierProvider({
       patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
       test: r.test, category: r.category, urgency: r.urgency,
       requestedBy: who, requestedById: whoId,
-      status: r.status, sourceModule: 'urgences',
+      status: 'demandee', sourceModule: 'urgences',
       laboratory: r.laboratory,
     });
   }, [who, whoId, pushAudit, repo, patientId, toast]);
@@ -269,7 +269,7 @@ export function EmergencyDossierProvider({
       exam: r.exam, region: r.region, side: r.side,
       urgency: r.urgency, withContrast: r.withContrast,
       requestedBy: who, requestedById: whoId,
-      status: r.status, sourceModule: 'urgences',
+      status: 'demandee', sourceModule: 'urgences',
     });
   }, [who, whoId, pushAudit, repo, patientId, toast]);
 

@@ -77,7 +77,9 @@ export interface RepoLabOrder {
   result?: string;
   isCritical?: boolean;
   resultAt?: string;
+  validatedBy?: string;
   laboratory?: string;
+  updatedAt?: string;
   sourceModule: 'urgences' | 'consultation' | 'hospitalisation';
 }
 
@@ -100,6 +102,12 @@ export interface RepoImagingOrder {
   status: 'demandee' | 'planifiee' | 'realisee' | 'interpretee' | 'annulee';
   result?: string;
   resultAt?: string;
+  report?: string;         // compte rendu radiologique
+  reportedBy?: string;
+  reportedAt?: string;
+  interpretedBy?: string;
+  interpretedAt?: string;
+  updatedAt?: string;
   sourceModule: 'urgences' | 'consultation' | 'hospitalisation';
 }
 
@@ -119,7 +127,13 @@ export interface RepoPrescription {
   prescribedBy: string;
   prescribedById: string;
   prescribedAt: string;
-  status: 'prescrit' | 'administre' | 'annule';
+  status: 'prescrit' | 'prepare' | 'delivre' | 'annule';
+  preparedBy?: string;
+  preparedAt?: string;
+  dispensedBy?: string;
+  dispensedAt?: string;
+  dispenserComment?: string;
+  updatedAt?: string;
   sourceModule: 'urgences' | 'consultation';
 }
 

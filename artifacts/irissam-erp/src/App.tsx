@@ -18,6 +18,8 @@ const Consultations = lazy(() => import('@/pages/Consultations'));
 const ConsultationWorkspacePage = lazy(() => import('@/pages/ConsultationWorkspacePage'));
 const LoginPage = lazy(() => import('@/pages/Login'));
 const PharmacyPage = lazy(() => import('@/pages/Pharmacy'));
+const LaboratoryPage = lazy(() => import('@/pages/Laboratory'));
+const ImagingPage = lazy(() => import('@/pages/Imaging'));
 const EmergenciesPage = lazy(() => import('@/pages/Emergencies'));
 const EmergencyPatientDetail = lazy(() => import('@/pages/EmergencyPatientDetail'));
 
@@ -121,8 +123,8 @@ function Router() {
       <Route path="/operating-room" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/resuscitation" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/maternity" component={() => <ProtectedRoute component={PlaceholderPage} />} />
-      <Route path="/laboratory" component={() => <ProtectedRoute component={PlaceholderPage} />} />
-      <Route path="/imaging" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/laboratory" component={() => <ProtectedRoute component={LaboratoryPage} />} />
+      <Route path="/imaging" component={() => <ProtectedRoute component={ImagingPage} />} />
       <Route path="/pharmacy" component={() => <ProtectedRoute component={PharmacyPage} />} />
       <Route path="/blood-bank" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/medical-stock" component={() => <ProtectedRoute component={PlaceholderPage} />} />
