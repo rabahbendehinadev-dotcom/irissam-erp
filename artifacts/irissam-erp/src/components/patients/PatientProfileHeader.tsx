@@ -20,7 +20,7 @@ const TABS = [
   { key: 'emergency_contact',  labelKey: 'pat.tab.emergency_contact' },
   { key: 'appointments',       labelKey: 'pat.tab.appointments',     soon: true },
   { key: 'admissions',         labelKey: 'pat.tab.admissions',       soon: true },
-  { key: 'consultations',      labelKey: 'pat.tab.consultations',    soon: true },
+  { key: 'consultations',      labelKey: 'pat.tab.consultations' },
   { key: 'emergencies',        labelKey: 'pat.tab.emergencies',      soon: true },
   { key: 'hospitalizations',   labelKey: 'pat.tab.hospitalizations', soon: true },
   { key: 'laboratory',         labelKey: 'pat.tab.laboratory',       soon: true },
@@ -53,11 +53,12 @@ interface Props {
   onTabChange: (tab: string) => void;
   onEdit: () => void;
   onArchive: () => void;
+  onQuickAction?: (key: string) => void;
   canEdit: boolean;
   canArchive: boolean;
 }
 
-export function PatientProfileHeader({ patient, activeTab, onTabChange, onEdit, onArchive, canEdit, canArchive }: Props) {
+export function PatientProfileHeader({ patient, activeTab, onTabChange, onEdit, onArchive, onQuickAction, canEdit, canArchive }: Props) {
   const { t } = useLanguage();
   const fullName = `${patient.lastName} ${patient.firstName}`;
   const age = calculateAge(patient.dateOfBirth);
@@ -152,7 +153,7 @@ export function PatientProfileHeader({ patient, activeTab, onTabChange, onEdit, 
                     return (
                       <button
                         key={a.key}
-                        onClick={() => { alert(`${a.label} — disponible avec le backend`); setQaOpen(false); }}
+                        onClick={() => { onQuickAction ? onQuickAction(a.key) : alert(`${a.label} — disponible avec le backend`); setQaOpen(false); }}
                         className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
                       >
                         <Icon size={14} className="text-gray-400" />

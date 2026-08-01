@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { ArrowLeft, AlertTriangle, Phone, Droplets, User, Shield, Clock, Stethoscope, ChevronRight } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Phone, Droplets, User, Shield, Clock, Stethoscope, ChevronRight, PlusCircle } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PatientProfileHeader } from '@/components/patients/PatientProfileHeader';
 import { PatientTimeline } from '@/components/patients/PatientTimeline';
@@ -17,7 +17,12 @@ import { PatientVaccinationsTab } from '@/components/patients/PatientVaccination
 import { PatientConsentsTab } from '@/components/patients/PatientConsentsTab';
 import { PatientAllergyManager } from '@/components/patients/PatientAllergyManager';
 import { PatientMedicalHistoryTab } from '@/components/patients/PatientMedicalHistoryTab';
+import { ConsultationTable } from '@/components/consultations/ConsultationTable';
+import { ConsultationForm } from '@/components/consultations/ConsultationForm';
+import { ConsultationStatusBadge } from '@/components/consultations/ConsultationStatusBadge';
 import { MOCK_PATIENTS, MOCK_PATIENT_TIMELINES } from '@/mock';
+import { getConsultationsByPatient } from '@/mock/consultations';
+import type { Consultation } from '@/types/consultation';
 import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
@@ -59,28 +64,18 @@ function PlaceholderTab({ label }: { label: string }) {
   );
 }
 
-// ─── Mock recent consultations ────────────────────────────────────────────────
+// ─── Recent Consultations widget (overview tab) ───────────────────────────────
 
-interface RecentConsult {
-  id: string; date: string; doctor: string; specialty: string;
-  diagnosis: string; prescription: string; status: 'terminee' | 'en_cours' | 'suspendue';
-}
+function DernieresConsultations({ consultations, onOpen, onNew }: {
+  consultations: Consultation[];
+  onOpen: (id: string) => void;
+  onNew: () => void;
+}) {
+  // Show only the 5 most recent
+  const recent = [...consultations]
+    .sort((a, b) => (b.scheduledAt ?? b.date).localeCompare(a.scheduledAt ?? a.date))
+    .slice(0, 5);
 
-const MOCK_RECENT_CONSULTATIONS: RecentConsult[] = [
-  { id:'con-1', date:'2026-08-01T09:14:00', doctor:'Dr. Meziane Farid', specialty:'Médecine interne', diagnosis:'Hypertension artérielle (I10) — HTA stable', prescription:'Amlodipine 5 mg + Perindopril 4 mg', status:'terminee' },
-  { id:'con-2', date:'2026-06-20T10:30:00', doctor:'Dr. Benamara Karim', specialty:'Cardiologie', diagnosis:'Cardiopathie ischémique chronique (I25) + HTA résistante', prescription:'Bisoprolol 5 mg + Furosémide 40 mg', status:'terminee' },
-  { id:'con-3', date:'2026-05-20T22:30:00', doctor:'Dr. Merabet', specialty:'Urgences médicales', diagnosis:'Douleur thoracique atypique (R07) — bilan négatif', prescription:'Surveillance — aucune prescription', status:'terminee' },
-  { id:'con-4', date:'2026-01-20T10:30:00', doctor:'Dr. Meziane Farid', specialty:'Médecine interne', diagnosis:'HTA déséquilibrée — ajustement thérapeutique', prescription:'Renforcement : Bisoprolol 2.5 mg ajouté', status:'terminee' },
-  { id:'con-5', date:'2025-11-05T09:00:00', doctor:'Dr. Meziane Farid', specialty:'Médecine interne', diagnosis:'Diabète de type 2 (E11) — HbA1c : 7.8%', prescription:'Metformine 500 mg × 2/jour', status:'terminee' },
-];
-
-const STATUS_CONSULT_CFG = {
-  terminee:  { label: 'Terminée',  color: 'text-green-700', bg: 'bg-green-50',  border: 'border-green-200' },
-  en_cours:  { label: 'En cours',  color: 'text-blue-700',  bg: 'bg-blue-50',   border: 'border-blue-200'  },
-  suspendue: { label: 'Suspendue', color: 'text-amber-700', bg: 'bg-amber-50',  border: 'border-amber-200' },
-};
-
-function DernieresConsultations({ onOpen }: { onOpen: (id: string) => void }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden md:col-span-2">
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
@@ -88,39 +83,53 @@ function DernieresConsultations({ onOpen }: { onOpen: (id: string) => void }) {
           <Stethoscope size={15} className="text-blue-600" />
           <h3 className="font-semibold text-gray-800 text-sm">Dernières consultations</h3>
         </div>
-        <span className="text-xs text-gray-400">{MOCK_RECENT_CONSULTATIONS.length} consultations</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">{consultations.length} au total</span>
+          <button
+            onClick={onNew}
+            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
+          >
+            <PlusCircle size={11} /> Nouvelle
+          </button>
+        </div>
       </div>
-      <div className="divide-y divide-gray-50">
-        {MOCK_RECENT_CONSULTATIONS.map(c => {
-          const cfg = STATUS_CONSULT_CFG[c.status];
-          return (
-            <div key={c.id} className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
-              <div className="flex-shrink-0 text-right w-20">
-                <p className="text-xs font-semibold text-gray-700">
-                  {new Date(c.date).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' })}
-                </p>
-                <p className="text-xs text-gray-400 font-mono">{c.date.substring(11, 16)}</p>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-semibold text-gray-700">{c.doctor}</span>
-                  <span className="text-xs text-gray-400">·</span>
-                  <span className="text-xs text-gray-500">{c.specialty}</span>
-                  <span className={cn('text-xs px-1.5 py-0.5 rounded-full border font-medium', cfg.color, cfg.bg, cfg.border)}>
-                    {cfg.label}
-                  </span>
+      {recent.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-gray-400 space-y-1">
+          <Stethoscope size={32} className="opacity-20" />
+          <p className="text-sm">Aucune consultation enregistrée</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-50">
+          {recent.map(c => {
+            const dateStr = c.scheduledAt ?? c.date;
+            const diagnosis = c.diagnoses?.[0]?.label ?? '—';
+            return (
+              <div key={c.id} className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                <div className="flex-shrink-0 text-right w-20">
+                  <p className="text-xs font-semibold text-gray-700">
+                    {new Date(dateStr).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' })}
+                  </p>
+                  <p className="text-xs text-gray-400 font-mono">{dateStr.substring(11, 16)}</p>
                 </div>
-                <p className="text-xs text-gray-800 mt-0.5 font-medium">{c.diagnosis}</p>
-                <p className="text-xs text-gray-400 mt-0.5">💊 {c.prescription}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-gray-700">{c.doctorName}</span>
+                    <span className="text-xs text-gray-400">·</span>
+                    <span className="text-xs text-gray-500">{c.specialty}</span>
+                    <ConsultationStatusBadge status={c.status} />
+                  </div>
+                  <p className="text-xs text-gray-800 mt-0.5 font-medium truncate">{diagnosis}</p>
+                  <p className="text-xs text-gray-400 mt-0.5 truncate">{c.reason}</p>
+                </div>
+                <button onClick={() => onOpen(c.id)}
+                  className="flex-shrink-0 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-colors">
+                  Ouvrir <ChevronRight size={11} />
+                </button>
               </div>
-              <button onClick={() => onOpen(c.id)}
-                className="flex-shrink-0 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-colors">
-                Ouvrir <ChevronRight size={11} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -128,7 +137,7 @@ function DernieresConsultations({ onOpen }: { onOpen: (id: string) => void }) {
 // ─── Tabs that remain as placeholders ────────────────────────────────────────
 
 const SOON_TABS = [
-  'appointments', 'admissions', 'consultations', 'emergencies', 'hospitalizations',
+  'appointments', 'admissions', 'emergencies', 'hospitalizations',
   'laboratory', 'imaging', 'prescriptions', 'invoices', 'billing', 'payments',
 ];
 
@@ -145,6 +154,7 @@ export default function PatientDetailPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [showEdit,  setShowEdit]  = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [showNewConsultation, setShowNewConsultation] = useState(false);
 
   // Try mock data first (p-* IDs), then fall back to API list cache (db-* IDs)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -199,6 +209,9 @@ export default function PatientDetailPage() {
   })();
   const timeline = MOCK_PATIENT_TIMELINES[patientId ?? ''] ?? [];
 
+  // Consultations for this patient from the shared mock store
+  const patientConsultations = patientId ? getConsultationsByPatient(patientId) : [];
+
   if (!can('patients.view')) {
     return (
       <DashboardLayout>
@@ -235,6 +248,14 @@ export default function PatientDetailPage() {
     if (tab === 'audit') log('view_audit', 'patient', patient.id);
   };
 
+  const handleQuickAction = (key: string) => {
+    if (key === 'consultation') {
+      setShowNewConsultation(true);
+    } else {
+      alert(`Action "${key}" — disponible avec le backend`);
+    }
+  };
+
   const fullName = `${patient.lastName} ${patient.firstName}`;
 
   return (
@@ -265,6 +286,7 @@ export default function PatientDetailPage() {
           onTabChange={handleTabChange}
           onEdit={() => setShowEdit(true)}
           onArchive={() => setArchiving(true)}
+          onQuickAction={handleQuickAction}
           canEdit={canEdit}
           canArchive={canArchive}
         />
@@ -333,9 +355,11 @@ export default function PatientDetailPage() {
                 : <span className="text-sm text-gray-400">{t('pat.overview.no_insurance')}</span>}
             </Section>
 
-            {/* Dernières consultations — full width */}
+            {/* Dernières consultations — full width, real data */}
             <DernieresConsultations
-              onOpen={id => alert(`Ouverture consultation ${id} — disponible avec le backend`)}
+              consultations={patientConsultations}
+              onOpen={id => setLocation(`/consultations/${id}`)}
+              onNew={() => setShowNewConsultation(true)}
             />
           </div>
         )}
@@ -419,6 +443,36 @@ export default function PatientDetailPage() {
         {/* ─── CONSENTEMENTS ─── */}
         {activeTab === 'consents' && <PatientConsentsTab />}
 
+        {/* ─── CONSULTATIONS ─── */}
+        {activeTab === 'consultations' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-gray-800">Historique des consultations</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{patientConsultations.length} consultation{patientConsultations.length !== 1 ? 's' : ''} enregistrée{patientConsultations.length !== 1 ? 's' : ''}</p>
+              </div>
+              <button
+                onClick={() => setShowNewConsultation(true)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <PlusCircle size={14} /> Nouvelle consultation
+              </button>
+            </div>
+            {patientConsultations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center min-h-[300px] text-gray-400 space-y-3">
+                <Stethoscope size={40} className="opacity-20" />
+                <p className="font-semibold">Aucune consultation enregistrée</p>
+                <p className="text-sm">Créez la première consultation pour ce patient.</p>
+              </div>
+            ) : (
+              <ConsultationTable
+                consultations={patientConsultations}
+                onPatientClick={undefined}
+              />
+            )}
+          </div>
+        )}
+
         {/* ─── TIMELINE ─── */}
         {activeTab === 'timeline' && <PatientTimeline events={timeline} />}
 
@@ -437,6 +491,18 @@ export default function PatientDetailPage() {
           patient={patient}
           onSave={() => { setShowEdit(false); refetchPatients(); }}
           onCancel={() => setShowEdit(false)}
+        />
+      )}
+
+      {/* New Consultation modal */}
+      {showNewConsultation && (
+        <ConsultationForm
+          initialPatientId={patient.id}
+          onClose={() => setShowNewConsultation(false)}
+          onCreated={c => {
+            setShowNewConsultation(false);
+            setLocation(`/consultations/${c.id}`);
+          }}
         />
       )}
 
