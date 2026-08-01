@@ -1,0 +1,330 @@
+أريد تطوير صفحة "ملف المريض" الحالية فقط، بدون تغيير التصميم العام، وبدون تغيير الألوان أو الـ Layout أو الـ Sidebar أو الـ Topbar.
+
+ممنوع إنشاء تصميم جديد أو تغيير الـ UI الحالي، فقط إضافة الخصائص التالية بنفس الـ Design System الموجود.
+
+========================
+1- Historique médical (Timeline)
+========================
+
+أضف Tab جديد باسم:
+
+Historique
+
+يعرض Timeline احترافي لجميع أحداث المريض بترتيب زمني.
+
+كل حدث يحتوي على:
+
+- التاريخ
+- الوقت
+- نوع الحدث
+- الطبيب أو المستخدم
+- أيقونة حسب نوع الحدث
+- لون حسب نوع الحدث
+
+مثال:
+
+Création du dossier
+
+Consultation
+
+Prescription
+
+Analyse laboratoire
+
+Résultat laboratoire
+
+Imagerie
+
+Admission
+
+Hospitalisation
+
+Sortie
+
+Urgence
+
+Facture
+
+Paiement
+
+Modification dossier
+
+Documents ajoutés
+
+========================
+2- Journal des actions (Audit Trail)
+========================
+
+أضف Tab جديد باسم:
+
+Audit
+
+يعرض جميع العمليات التي تمت على الملف.
+
+كل سجل يحتوي على:
+
+- المستخدم
+- الرتبة
+- العملية
+- التاريخ
+- الوقت
+- عنوان IP
+- الجهاز
+- القسم
+
+مثال:
+
+Dr Karim
+a ajouté une consultation
+
+Admin
+a modifié l'adresse
+
+Laboratoire
+a validé une analyse
+
+========================
+3- Documents
+========================
+
+استبدل صفحة Documents الحالية.
+
+كل نوع وثيقة يصبح Card احترافية تحتوي على:
+
+- صورة مصغرة Preview
+- اسم الوثيقة
+- تاريخ الرفع
+- حجم الملف
+- نوع الملف
+- الشخص الذي رفعه
+
+إضافة زر:
+
+Ajouter document
+
+يدعم:
+
+Carte identité
+
+Passeport
+
+Assurance
+
+Ordonnance
+
+Compte rendu
+
+Scanner
+
+Radiologie
+
+Analyse
+
+Photos
+
+Autres documents
+
+مع إمكانية:
+
+Prévisualiser
+
+Télécharger
+
+Supprimer
+
+========================
+4- Contact d'urgence
+========================
+
+أضف Tab جديد:
+
+Contact d'urgence
+
+الحقول:
+
+Nom
+
+Prénom
+
+Relation
+
+Téléphone
+
+Adresse
+
+Email
+
+Remarques
+
+يمكن إضافة أكثر من شخص.
+
+========================
+5- Assurance
+========================
+
+طور صفحة Assurance الحالية.
+
+تحتوي على:
+
+Organisme
+
+Numéro
+
+Date début
+
+Date expiration
+
+Plafond
+
+Taux couverture
+
+Statut
+
+Historique
+
+Documents
+
+========================
+6- Alertes patient
+========================
+
+أعلى الصفحة أضف Alert Banner يظهر مباشرة إذا كان المريض لديه:
+
+Allergies
+
+Diabète
+
+Hypertension
+
+Maladie chronique
+
+Risque infectieux
+
+Groupe sanguin rare
+
+Grossesse
+
+مع ألوان واضحة.
+
+========================
+7- Quick Actions
+========================
+
+أعلى اليمين أضف أزرار سريعة:
+
+Nouvelle consultation
+
+Nouveau rendez-vous
+
+Nouvelle admission
+
+Nouvelle hospitalisation
+
+Nouvelle urgence
+
+Nouvelle ordonnance
+
+Nouvelle analyse
+
+Nouvelle imagerie
+
+Nouvelle facture
+
+========================
+8- Statistiques patient
+========================
+
+أضف Cards صغيرة تعرض:
+
+Nombre consultations
+
+Nombre hospitalisations
+
+Nombre admissions
+
+Nombre urgences
+
+Nombre analyses
+
+Nombre imageries
+
+Nombre prescriptions
+
+Montant facturé
+
+Montant payé
+
+Dernière visite
+
+========================
+9- Timeline médicale
+========================
+
+داخل صفحة Historique أضف Timeline طبية احترافية تعرض المسار الطبي:
+
+Consultation
+
+↓
+
+Prescription
+
+↓
+
+Analyse
+
+↓
+
+Résultat
+
+↓
+
+Radiologie
+
+↓
+
+Admission
+
+↓
+
+Hospitalisation
+
+↓
+
+Sortie
+
+========================
+10- Tabs
+========================
+
+حافظ على جميع Tabs الحالية.
+
+وأضف فقط:
+
+Historique
+
+Audit
+
+Contact d'urgence
+
+Vaccinations
+
+Facturation
+
+Paiements
+
+Consentements
+
+========================
+قواعد مهمة
+========================
+
+- لا تغير أي تصميم موجود.
+- لا تغير الـ Sidebar.
+- لا تغير الـ Header.
+- لا تغير الألوان.
+- لا تغير الخطوط.
+- لا تغير الـ Responsive.
+- استعمل نفس Design System الموجود.
+- استعمل نفس Components الحالية.
+- كل شيء يجب أن يكون قابل للربط لاحقاً مع PostgreSQL و Backend.
+- استعمل بيانات Mock فقط حالياً.

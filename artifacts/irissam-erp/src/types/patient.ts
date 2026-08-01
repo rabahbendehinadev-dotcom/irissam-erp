@@ -7,7 +7,11 @@ export type AppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'complet
 export type MaritalStatus = 'celibataire' | 'marie' | 'divorce' | 'veuf';
 export type IdDocumentType = 'cni' | 'passeport' | 'permis' | 'autre';
 export type InsuranceType = 'cnas' | 'casnos' | 'mutuelle' | 'militaire' | 'gratuite' | 'payant';
-export type TimelineEventType = 'creation' | 'update' | 'document' | 'appointment' | 'admission' | 'result' | 'discharge' | 'consultation';
+export type TimelineEventType =
+  | 'creation' | 'update' | 'document' | 'document_update'
+  | 'appointment' | 'admission' | 'result' | 'discharge' | 'consultation'
+  | 'prescription' | 'laboratory' | 'imaging' | 'hospitalization'
+  | 'emergency' | 'invoice' | 'payment';
 
 export interface PatientMedicalInfo {
   allergies: string[];

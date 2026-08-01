@@ -1,4 +1,6 @@
-import { Pencil, Printer, Archive, Droplets, Phone, MapPin, AlertTriangle } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Pencil, Printer, Archive, Droplets, Phone, MapPin, AlertTriangle, ChevronDown,
+  Stethoscope, Calendar, Bed, AlertCircle, Pill, Microscope, Scan, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/i18n';
 import type { Patient } from '@/types';
@@ -8,25 +10,42 @@ import { SyncStatusBadge } from './SyncStatusBadge';
 import { calculateAge } from '@/utils/format';
 
 const TABS = [
-  { key: 'overview',         labelKey: 'pat.tab.overview' },
-  { key: 'identity',         labelKey: 'pat.tab.identity' },
-  { key: 'contacts',         labelKey: 'pat.tab.contacts' },
-  { key: 'insurance',        labelKey: 'pat.tab.insurance' },
-  { key: 'documents',        labelKey: 'pat.tab.documents' },
-  { key: 'history',          labelKey: 'pat.tab.history' },
-  { key: 'allergies',        labelKey: 'pat.tab.allergies' },
-  { key: 'appointments',     labelKey: 'pat.tab.appointments',     soon: true },
-  { key: 'admissions',       labelKey: 'pat.tab.admissions',       soon: true },
-  { key: 'consultations',    labelKey: 'pat.tab.consultations',    soon: true },
-  { key: 'emergencies',      labelKey: 'pat.tab.emergencies',      soon: true },
-  { key: 'hospitalizations', labelKey: 'pat.tab.hospitalizations', soon: true },
-  { key: 'laboratory',       labelKey: 'pat.tab.laboratory',       soon: true },
-  { key: 'imaging',          labelKey: 'pat.tab.imaging',          soon: true },
-  { key: 'prescriptions',    labelKey: 'pat.tab.prescriptions',    soon: true },
-  { key: 'invoices',         labelKey: 'pat.tab.invoices',         soon: true },
-  { key: 'timeline',         labelKey: 'pat.tab.timeline' },
-  { key: 'audit',            labelKey: 'pat.tab.audit' },
+  { key: 'overview',           labelKey: 'pat.tab.overview' },
+  { key: 'identity',           labelKey: 'pat.tab.identity' },
+  { key: 'contacts',           labelKey: 'pat.tab.contacts' },
+  { key: 'insurance',          labelKey: 'pat.tab.insurance' },
+  { key: 'documents',          labelKey: 'pat.tab.documents' },
+  { key: 'history',            labelKey: 'pat.tab.history' },
+  { key: 'allergies',          labelKey: 'pat.tab.allergies' },
+  { key: 'emergency_contact',  labelKey: 'pat.tab.emergency_contact' },
+  { key: 'appointments',       labelKey: 'pat.tab.appointments',     soon: true },
+  { key: 'admissions',         labelKey: 'pat.tab.admissions',       soon: true },
+  { key: 'consultations',      labelKey: 'pat.tab.consultations',    soon: true },
+  { key: 'emergencies',        labelKey: 'pat.tab.emergencies',      soon: true },
+  { key: 'hospitalizations',   labelKey: 'pat.tab.hospitalizations', soon: true },
+  { key: 'laboratory',         labelKey: 'pat.tab.laboratory',       soon: true },
+  { key: 'imaging',            labelKey: 'pat.tab.imaging',          soon: true },
+  { key: 'prescriptions',      labelKey: 'pat.tab.prescriptions',    soon: true },
+  { key: 'invoices',           labelKey: 'pat.tab.invoices',         soon: true },
+  { key: 'vaccinations',       labelKey: 'pat.tab.vaccinations',     soon: true },
+  { key: 'billing',            labelKey: 'pat.tab.billing',          soon: true },
+  { key: 'payments',           labelKey: 'pat.tab.payments',         soon: true },
+  { key: 'consents',           labelKey: 'pat.tab.consents',         soon: true },
+  { key: 'timeline',           labelKey: 'pat.tab.timeline' },
+  { key: 'audit',              labelKey: 'pat.tab.audit' },
 ] as const;
+
+const QUICK_ACTIONS = [
+  { icon: Stethoscope, label: 'Nouvelle consultation',    key: 'consultation' },
+  { icon: Calendar,    label: 'Nouveau rendez-vous',      key: 'appointment' },
+  { icon: Bed,         label: 'Nouvelle admission',       key: 'admission' },
+  { icon: Bed,         label: 'Nouvelle hospitalisation', key: 'hospitalization' },
+  { icon: AlertCircle, label: 'Nouvelle urgence',         key: 'emergency' },
+  { icon: Pill,        label: 'Nouvelle ordonnance',      key: 'prescription' },
+  { icon: Microscope,  label: 'Nouvelle analyse',         key: 'analysis' },
+  { icon: Scan,        label: 'Nouvelle imagerie',        key: 'imaging' },
+  { icon: Receipt,     label: 'Nouvelle facture',         key: 'invoice' },
+];
 
 interface Props {
   patient: Patient;
@@ -42,6 +61,17 @@ export function PatientProfileHeader({ patient, activeTab, onTabChange, onEdit, 
   const { t } = useLanguage();
   const fullName = `${patient.lastName} ${patient.firstName}`;
   const age = calculateAge(patient.dateOfBirth);
+
+  const [qaOpen, setQaOpen] = useState(false);
+  const qaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (qaRef.current && !qaRef.current.contains(e.target as Node)) setQaOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   return (
     <div className="bg-white border-b border-gray-200">
@@ -105,7 +135,35 @@ export function PatientProfileHeader({ patient, activeTab, onTabChange, onEdit, 
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+            {/* Quick Actions dropdown */}
+            <div ref={qaRef} className="relative">
+              <button
+                onClick={() => setQaOpen(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Actions rapides
+                <ChevronDown size={14} className={`transition-transform ${qaOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {qaOpen && (
+                <div className="absolute right-0 top-10 z-50 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-hidden">
+                  {QUICK_ACTIONS.map(a => {
+                    const Icon = a.icon;
+                    return (
+                      <button
+                        key={a.key}
+                        onClick={() => { alert(`${a.label} — disponible avec le backend`); setQaOpen(false); }}
+                        className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                      >
+                        <Icon size={14} className="text-gray-400" />
+                        {a.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {canEdit && (
               <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 <Pencil size={14} /> {t('pat.profile.edit')}

@@ -4,9 +4,14 @@ import { ArrowLeft, AlertTriangle, Phone, Mail, MapPin, Droplets, User, Shield, 
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PatientProfileHeader } from '@/components/patients/PatientProfileHeader';
 import { PatientTimeline } from '@/components/patients/PatientTimeline';
-import { PatientDocuments } from '@/components/patients/PatientDocuments';
+import { PatientDocumentsV2 } from '@/components/patients/PatientDocumentsV2';
 import { PatientForm } from '@/components/patients/PatientForm';
 import { SensitiveField } from '@/components/patients/SensitiveField';
+import { PatientAlertBanner } from '@/components/patients/PatientAlertBanner';
+import { PatientStatsCards } from '@/components/patients/PatientStatsCards';
+import { PatientAuditLog } from '@/components/patients/PatientAuditLog';
+import { PatientEmergencyContacts } from '@/components/patients/PatientEmergencyContacts';
+import { PatientInsuranceDetail } from '@/components/patients/PatientInsuranceDetail';
 import { MOCK_PATIENTS, MOCK_PATIENT_TIMELINES } from '@/mock';
 import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
@@ -46,6 +51,12 @@ function PlaceholderTab({ label }: { label: string }) {
     </div>
   );
 }
+
+const SOON_TABS = [
+  'appointments','admissions','consultations','emergencies','hospitalizations',
+  'laboratory','imaging','prescriptions','invoices',
+  'vaccinations','billing','payments','consents',
+];
 
 export default function PatientDetailPage() {
   const { t } = useLanguage();
@@ -113,6 +124,9 @@ export default function PatientDetailPage() {
         </button>
       </div>
 
+      {/* Alert Banner — critical medical flags */}
+      <PatientAlertBanner patient={patient} />
+
       {/* Sticky profile header */}
       <div className="sticky top-0 z-20">
         <PatientProfileHeader
@@ -128,6 +142,11 @@ export default function PatientDetailPage() {
 
       {/* Tab content */}
       <div className="p-6">
+
+        {/* Stats cards — shown on overview and most clinical tabs */}
+        {['overview', 'history', 'allergies', 'timeline'].includes(activeTab) && (
+          <PatientStatsCards patient={patient} />
+        )}
 
         {/* ─── OVERVIEW ─── */}
         {activeTab === 'overview' && (
@@ -244,29 +263,11 @@ export default function PatientDetailPage() {
 
         {/* ─── INSURANCE ─── */}
         {activeTab === 'insurance' && (
-          <div className="max-w-xl">
-            <Section title={t('pat.tab.insurance')} icon={<Shield size={16} />}>
-              {patient.insurance?.type ? (
-                <>
-                  <InfoRow label={t('pat.form.insurance.type')} value={t(`pat.insurance.${patient.insurance.type}` as any)} />
-                  {patient.insurance.organizationName && <InfoRow label={t('pat.form.insurance.org')} value={patient.insurance.organizationName} />}
-                  {patient.insurance.memberNumber && (
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs text-gray-400 uppercase tracking-wide">{t('pat.form.insurance.memberNumber')}</span>
-                      <SensitiveField value={patient.insurance.memberNumber} canView={canViewSensitive} />
-                    </div>
-                  )}
-                  {patient.insurance.validUntil && <InfoRow label={t('pat.form.insurance.validUntil')} value={formatDate(patient.insurance.validUntil)} />}
-                </>
-              ) : (
-                <p className="text-sm text-gray-400">{t('pat.overview.no_insurance')}</p>
-              )}
-            </Section>
-          </div>
+          <PatientInsuranceDetail patient={patient} />
         )}
 
         {/* ─── DOCUMENTS ─── */}
-        {activeTab === 'documents' && <PatientDocuments patientId={patient.id} />}
+        {activeTab === 'documents' && <PatientDocumentsV2 patientId={patient.id} />}
 
         {/* ─── HISTORY ─── */}
         {activeTab === 'history' && (
@@ -317,40 +318,23 @@ export default function PatientDetailPage() {
           </div>
         )}
 
-        {/* ─── TIMELINE ─── */}
+        {/* ─── EMERGENCY CONTACT ─── */}
+        {activeTab === 'emergency_contact' && (
+          <PatientEmergencyContacts patient={patient} />
+        )}
+
+        {/* ─── TIMELINE / HISTORIQUE ─── */}
         {activeTab === 'timeline' && (
-          <div className="max-w-2xl">
-            <h3 className="font-semibold text-gray-800 mb-4">{t('pat.timeline.title')}</h3>
-            <PatientTimeline events={timeline} />
-          </div>
+          <PatientTimeline events={timeline} />
         )}
 
         {/* ─── AUDIT ─── */}
         {activeTab === 'audit' && (
-          <div className="max-w-2xl">
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-              <p className="text-sm text-blue-700">L'historique d'audit complet sera disponible une fois le système d'authentification et le backend connectés.</p>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
-              {[
-                { action: 'Création du dossier', user: 'Hachichi Admin', date: patient.createdAt, icon: '🆕' },
-                { action: 'Consultation du dossier', user: 'Hachichi Admin', date: new Date().toISOString(), icon: '👁️' },
-              ].map((ev, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3">
-                  <span className="text-lg">{ev.icon}</span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-800">{ev.action}</p>
-                    <p className="text-xs text-gray-500">{ev.user}</p>
-                  </div>
-                  <p className="text-xs text-gray-400 font-mono">{formatDate(ev.date)}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PatientAuditLog />
         )}
 
         {/* ─── PLACEHOLDER TABS ─── */}
-        {['appointments','admissions','consultations','emergencies','hospitalizations','laboratory','imaging','prescriptions','invoices'].includes(activeTab) && (
+        {SOON_TABS.includes(activeTab) && (
           <PlaceholderTab label={t(`pat.tab.${activeTab}` as any)} />
         )}
       </div>
