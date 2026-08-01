@@ -1,6 +1,8 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import type { Session } from '@/types';
-import { authService, MOCK_ADMIN_USER } from '@/services/authService';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { Session, User } from '@/types';
+import { authService } from '@/services/authService';
+import { apiClient } from '@/services/api/client';
+import { setAuthTokenGetter } from '@workspace/api-client-react';
 
 interface AuthContextType extends Session {
   login: (email: string, password: string) => Promise<void>;
@@ -9,32 +11,69 @@ interface AuthContextType extends Session {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const TOKEN_KEY = 'irissam_auth_token';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session>({
-    user: MOCK_ADMIN_USER, // Use mock user until auth module is built
-    token: 'mock-token',
-    isAuthenticated: true,
-    isLoading: false,
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    isLoading: true,
   });
 
-  useEffect(() => {
-    // TODO: check stored token and fetch user when auth is implemented
+  /** Sync a token into both fetch pipelines (local apiClient + generated hooks). */
+  const applyToken = useCallback((token: string | null) => {
+    apiClient.setAuthToken(token);
+    setAuthTokenGetter(token ? () => token : null);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  // On mount: restore token from localStorage and validate it
+  useEffect(() => {
+    const stored = localStorage.getItem(TOKEN_KEY);
+    if (!stored) {
+      applyToken(null);
+      setSession({ user: null, token: null, isAuthenticated: false, isLoading: false });
+      return;
+    }
+
+    applyToken(stored);
+    authService
+      .getMe()
+      .then((user: User | null) => {
+        if (user) {
+          setSession({ user, token: stored, isAuthenticated: true, isLoading: false });
+        } else {
+          localStorage.removeItem(TOKEN_KEY);
+          applyToken(null);
+          setSession({ user: null, token: null, isAuthenticated: false, isLoading: false });
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem(TOKEN_KEY);
+        applyToken(null);
+        setSession({ user: null, token: null, isAuthenticated: false, isLoading: false });
+      });
+  }, [applyToken]);
+
+  const login = useCallback(async (email: string, password: string) => {
     setSession(s => ({ ...s, isLoading: true }));
     try {
       const { user, token } = await authService.login({ email, password });
+      localStorage.setItem(TOKEN_KEY, token);
+      applyToken(token);
       setSession({ user, token, isAuthenticated: true, isLoading: false });
-    } catch {
+    } catch (err: unknown) {
       setSession(s => ({ ...s, isLoading: false }));
-      throw new Error('Login failed');
+      const msg = err instanceof Error ? err.message : 'Identifiants invalides.';
+      throw new Error(msg);
     }
-  };
+  }, [applyToken]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY);
+    applyToken(null);
     setSession({ user: null, token: null, isAuthenticated: false, isLoading: false });
-  };
+  }, [applyToken]);
 
   return (
     <AuthContext.Provider value={{ ...session, login, logout }}>

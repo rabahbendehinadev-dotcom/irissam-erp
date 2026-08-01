@@ -1,4 +1,4 @@
-import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
 import { AppProvider } from '@/store/AppProvider';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import Dashboard from '@/pages/Dashboard';
@@ -10,6 +10,8 @@ import { useLanguage } from '@/i18n';
 import Appointments from '@/pages/Appointments';
 import AlertsPage from '@/pages/Alerts';
 import Consultations from '@/pages/Consultations';
+import LoginPage from '@/pages/Login';
+import { useAuth } from '@/store/AuthContext';
 
 function PlaceholderPage() {
   const { t } = useLanguage();
@@ -25,34 +27,68 @@ function PlaceholderPage() {
   );
 }
 
+/** Shows a full-screen spinner while the session is being restored */
+function AuthLoadingScreen() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#0a2540] via-[#0e3460] to-[#1a5c8a] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+        <p className="text-white/70 text-sm font-medium">Chargement…</p>
+      </div>
+    </div>
+  );
+}
+
+/** Wrapper that redirects unauthenticated users to /login */
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <AuthLoadingScreen />;
+  if (!isAuthenticated) return <Redirect to="/login" />;
+  return <Component />;
+}
+
 function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/patients/:id" component={PatientDetailPage} />
-      <Route path="/patients" component={PatientsPage} />
-      <Route path="/appointments" component={Appointments} />
-      <Route path="/admissions" component={AdmissionsPage} />
-      <Route path="/emergencies" component={PlaceholderPage} />
-      <Route path="/consultations" component={Consultations} />
-      <Route path="/alerts" component={AlertsPage} />
-      <Route path="/hospitalization" component={PlaceholderPage} />
-      <Route path="/operating-room" component={PlaceholderPage} />
-      <Route path="/resuscitation" component={PlaceholderPage} />
-      <Route path="/maternity" component={PlaceholderPage} />
-      <Route path="/laboratory" component={PlaceholderPage} />
-      <Route path="/imaging" component={PlaceholderPage} />
-      <Route path="/pharmacy" component={PlaceholderPage} />
-      <Route path="/blood-bank" component={PlaceholderPage} />
-      <Route path="/medical-stock" component={PlaceholderPage} />
-      <Route path="/biomedical" component={PlaceholderPage} />
-      <Route path="/doctors" component={PlaceholderPage} />
-      <Route path="/hr" component={PlaceholderPage} />
-      <Route path="/finance" component={PlaceholderPage} />
-      <Route path="/ambulances" component={PlaceholderPage} />
-      <Route path="/archives" component={PlaceholderPage} />
-      <Route path="/reports" component={PlaceholderPage} />
-      <Route path="/settings" component={PlaceholderPage} />
+      {/* Public route */}
+      <Route path="/login">
+        {isLoading ? (
+          <AuthLoadingScreen />
+        ) : isAuthenticated ? (
+          <Redirect to="/" />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      {/* Protected routes */}
+      <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
+      <Route path="/patients/:id" component={() => <ProtectedRoute component={PatientDetailPage} />} />
+      <Route path="/patients" component={() => <ProtectedRoute component={PatientsPage} />} />
+      <Route path="/appointments" component={() => <ProtectedRoute component={Appointments} />} />
+      <Route path="/admissions" component={() => <ProtectedRoute component={AdmissionsPage} />} />
+      <Route path="/consultations" component={() => <ProtectedRoute component={Consultations} />} />
+      <Route path="/alerts" component={() => <ProtectedRoute component={AlertsPage} />} />
+      <Route path="/emergencies" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/hospitalization" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/operating-room" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/resuscitation" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/maternity" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/laboratory" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/imaging" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/pharmacy" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/blood-bank" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/medical-stock" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/biomedical" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/doctors" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/hr" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/finance" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/ambulances" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/archives" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/reports" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/settings" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route component={NotFound} />
     </Switch>
   );
