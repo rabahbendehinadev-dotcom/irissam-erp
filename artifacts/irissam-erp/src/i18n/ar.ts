@@ -129,6 +129,7 @@ export default {
   "widget.stock.title": "أدوية في نقص المخزون",
   "widget.stock.units": "وحدات",
   "widget.stock.view_all": "عرض الكل",
+  "widget.stock.all_ok": "جميع مستويات المخزون بخير",
 
   // Footer
   "footer.copyright": "© 2024 نظام IRISSAM – جميع الحقوق محفوظة",

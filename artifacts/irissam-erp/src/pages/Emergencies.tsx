@@ -221,6 +221,7 @@ function PainScale({ level, isDark }: { level: number; isDark: boolean }) {
 function PatientExpandedCard({ patient, isDark, onClose }: {
   patient: EmergencyPatient; isDark: boolean; onClose: () => void;
 }) {
+  const [, setLocation] = useLocation();
   const bloodType = BLOOD_TYPES[patient.id] ?? '?';
   const allergies = PATIENT_ALLERGIES[patient.id] ?? [];
   const v = patient.vitals;
@@ -412,6 +413,7 @@ function PatientExpandedCard({ patient, isDark, onClose }: {
 type PriorityFilter = 'all' | 'P1' | 'P2' | 'P3' | 'P4P5';
 
 function PatientRow({ patient, tick, isDark }: { patient: EmergencyPatient; tick: number; isDark: boolean }) {
+  const [, setLocation] = useLocation();
   const [expanded, setExpanded] = useState(false);
   const cfg = PRIORITY_CFG[patient.priority];
   const statusCfg = STATUS_CFG[patient.status];

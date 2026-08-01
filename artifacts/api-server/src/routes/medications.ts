@@ -66,6 +66,59 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+/** GET /medications/low-stock — top N items closest to or below their threshold */
+router.get("/low-stock", async (req, res, next) => {
+  try {
+    const limit = Math.min(20, Math.max(1, parseInt((req.query.limit as string) ?? "3", 10)));
+
+    const rows = await db.select().from(medicationsTable).orderBy(medicationsTable.name);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const thirtyDays = new Date(today);
+    thirtyDays.setDate(thirtyDays.getDate() + 30);
+
+    const items = rows
+      .map((m) => {
+        const expiry = m.expiryDate ? new Date(m.expiryDate) : null;
+        let status: "ok" | "low" | "critical" | "expired";
+
+        if (expiry && expiry <= today) {
+          status = "expired";
+        } else if (m.quantity === 0) {
+          status = "critical";
+        } else if (m.quantity <= m.lowStockThreshold) {
+          status = "low";
+        } else {
+          status = "ok";
+        }
+
+        return {
+          id: m.id,
+          name: m.name,
+          quantity: m.quantity,
+          unit: m.unit,
+          lowStockThreshold: m.lowStockThreshold,
+          status,
+        };
+      })
+      // keep only items that are not "ok"
+      .filter((m) => m.status !== "ok")
+      // sort: critical first, then expired, then low; within same status sort by quantity ascending
+      .sort((a, b) => {
+        const priority: Record<string, number> = { critical: 0, expired: 1, low: 2 };
+        const pd = priority[a.status] - priority[b.status];
+        if (pd !== 0) return pd;
+        return a.quantity - b.quantity;
+      })
+      .slice(0, limit);
+
+    res.json({ items });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** PATCH /medications/:id — update stock quantity */
 router.patch("/:id", async (req, res, next) => {
   try {

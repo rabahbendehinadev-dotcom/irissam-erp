@@ -9,6 +9,7 @@ import {
   useGetOrStatus,
   useGetBloodBankSummary,
   useGetVehiclesStatus,
+  useGetMedicationsLowStock,
 } from "@workspace/api-client-react";
 
 function WidgetCard({ title, children }: { title: string, children: React.ReactNode }) {
@@ -51,6 +52,7 @@ export function MiniWidgets() {
   const { data: or } = useGetOrStatus({ query: { refetchInterval: 60_000 } });
   const { data: blood } = useGetBloodBankSummary({ query: { refetchInterval: 60_000 } });
   const { data: vehicles } = useGetVehiclesStatus({ query: { refetchInterval: 60_000 } });
+  const { data: lowStock } = useGetMedicationsLowStock({ limit: 3 }, { query: { refetchInterval: 60_000 } });
 
   const reaSvc = bedsByService?.services.find((s) => s.service === "Réanimation");
 
@@ -182,7 +184,7 @@ export function MiniWidgets() {
         </div>
       </WidgetCard>
 
-      {/* Widget 6: Stock */}
+      {/* Widget 6: Stock — live low-stock data */}
       <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100 flex flex-col h-[130px]">
         <div className="flex justify-between items-center mb-2 shrink-0">
           <h4 className="text-[11px] font-bold text-gray-900 truncate pr-2">{t("widget.stock.title")}</h4>
@@ -191,18 +193,27 @@ export function MiniWidgets() {
           </Link>
         </div>
         <div className="flex-1 flex flex-col justify-center gap-1.5 overflow-hidden">
-          <div className="flex justify-between items-center text-[10px]">
-            <span className="text-gray-600 truncate mr-2">Paracétamol 1G</span>
-            <span className="text-gray-900 font-medium whitespace-nowrap">15 <span className="text-gray-400 font-normal">{t("widget.stock.units")}</span></span>
-          </div>
-          <div className="flex justify-between items-center text-[10px]">
-            <span className="text-gray-600 truncate mr-2">Amoxicilline 500mg</span>
-            <span className="text-gray-900 font-medium whitespace-nowrap">20 <span className="text-gray-400 font-normal">{t("widget.stock.units")}</span></span>
-          </div>
-          <div className="flex justify-between items-center text-[10px]">
-            <span className="text-gray-600 truncate mr-2">Sérum physiologique 250ml</span>
-            <span className="text-gray-900 font-medium whitespace-nowrap">18 <span className="text-gray-400 font-normal">{t("widget.stock.units")}</span></span>
-          </div>
+          {lowStock ? (
+            lowStock.items.length === 0 ? (
+              <p className="text-[10px] text-gray-400 text-center">{t("widget.stock.all_ok")}</p>
+            ) : (
+              lowStock.items.map((item) => (
+                <div key={item.id} className="flex justify-between items-center text-[10px]">
+                  <span className={cn(
+                    "truncate mr-2",
+                    item.status === "critical" ? "text-red-600 font-medium" :
+                    item.status === "expired"  ? "text-orange-600 font-medium" :
+                    "text-gray-600"
+                  )}>{item.name}</span>
+                  <span className="font-medium whitespace-nowrap text-gray-900">
+                    {item.quantity} <span className="text-gray-400 font-normal">{item.unit}</span>
+                  </span>
+                </div>
+              ))
+            )
+          ) : (
+            <><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
+          )}
         </div>
       </div>
     </div>

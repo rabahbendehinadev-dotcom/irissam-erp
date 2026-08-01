@@ -483,6 +483,27 @@ export const GetMedicationsResponse = zod.object({
 
 
 /**
+ * @summary Get medications closest to or below their low-stock threshold
+ */
+export const getMedicationsLowStockQueryLimitDefault = 3;
+
+export const GetMedicationsLowStockQueryParams = zod.object({
+  "limit": zod.coerce.number().int().default(getMedicationsLowStockQueryLimitDefault)
+})
+
+export const GetMedicationsLowStockResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "quantity": zod.number().int(),
+  "unit": zod.string(),
+  "lowStockThreshold": zod.number().int(),
+  "status": zod.enum(['low', 'critical', 'expired'])
+}))
+})
+
+
+/**
  * @summary Update medication stock quantity
  */
 export const UpdateMedicationStockParams = zod.object({

@@ -468,6 +468,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/MedicationPage"
 
+  /medications/low-stock:
+    get:
+      operationId: getMedicationsLowStock
+      tags: [medications]
+      summary: Get medications closest to or below their low-stock threshold
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 3
+      responses:
+        "200":
+          description: List of low/critical/expired medications sorted by urgency
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LowStockResponse"
+
   /medications/{id}:
     patch:
       operationId: updateMedicationStock
@@ -1119,6 +1138,40 @@ components:
         - expiringSoon
         - status
         - createdAt
+
+    LowStockItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        quantity:
+          type: integer
+        unit:
+          type: string
+        lowStockThreshold:
+          type: integer
+        status:
+          type: string
+          enum: [low, critical, expired]
+      required:
+        - id
+        - name
+        - quantity
+        - unit
+        - lowStockThreshold
+        - status
+
+    LowStockResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LowStockItem"
+      required:
+        - items
 
     MedicationPage:
       type: object

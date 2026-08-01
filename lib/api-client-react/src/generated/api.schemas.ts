@@ -253,6 +253,28 @@ export interface MedicationItem {
   createdAt: string;
 }
 
+export type LowStockItemStatus = typeof LowStockItemStatus[keyof typeof LowStockItemStatus];
+
+
+export const LowStockItemStatus = {
+  low: 'low',
+  critical: 'critical',
+  expired: 'expired',
+} as const;
+
+export interface LowStockItem {
+  id: number;
+  name: string;
+  quantity: number;
+  unit: string;
+  lowStockThreshold: number;
+  status: LowStockItemStatus;
+}
+
+export interface LowStockResponse {
+  items: LowStockItem[];
+}
+
 export interface MedicationPage {
   data: MedicationItem[];
   total: number;
@@ -318,4 +340,8 @@ export const GetMedicationsStatus = {
   critical: 'critical',
   expired: 'expired',
 } as const;
+
+export type GetMedicationsLowStockParams = {
+limit?: number;
+};
 

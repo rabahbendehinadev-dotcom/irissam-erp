@@ -33,9 +33,11 @@ import type {
   DashboardStats,
   GetAppointmentsListParams,
   GetConsultationsListParams,
+  GetMedicationsLowStockParams,
   GetMedicationsParams,
   GetPatientsListParams,
   HealthStatus,
+  LowStockResponse,
   MarkAllReadResult,
   MarkReadResult,
   MedicationPage,
@@ -61,13 +63,10 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
-
-
 /** UseQueryOptions with queryKey made optional — orval provides it internally. */
 type UseQueryOptionsCompat<TData, TError, TSelectData = TData> =
   Omit<UseQueryOptions<TData, TError, TSelectData>, 'queryKey'> &
   { queryKey?: ReadonlyArray<unknown> };
-
 
 
 const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
@@ -1763,6 +1762,90 @@ export function useGetMedications<TData = Awaited<ReturnType<typeof getMedicatio
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetMedicationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMedicationsLowStockUrl = (params?: GetMedicationsLowStockParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/medications/low-stock?${stringifiedParams}` : `/api/medications/low-stock`
+}
+
+/**
+ * @summary Get medications closest to or below their low-stock threshold
+ */
+export const getMedicationsLowStock = async (params?: GetMedicationsLowStockParams, options?: Parameters<typeof customFetch>[1]): Promise<LowStockResponse> => {
+
+  return customFetch<LowStockResponse>(getGetMedicationsLowStockUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMedicationsLowStockQueryKey = (params?: GetMedicationsLowStockParams,) => {
+    return [
+    `/api/medications/low-stock`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMedicationsLowStockQueryOptions = <TData = Awaited<ReturnType<typeof getMedicationsLowStock>>, TError = ErrorType<unknown>>(params?: GetMedicationsLowStockParams, options?: { query?:UseQueryOptionsCompat<Awaited<ReturnType<typeof getMedicationsLowStock>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMedicationsLowStockQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMedicationsLowStock>>> = ({ signal }) => getMedicationsLowStock(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMedicationsLowStock>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMedicationsLowStockQueryResult = NonNullable<Awaited<ReturnType<typeof getMedicationsLowStock>>>
+export type GetMedicationsLowStockQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get medications closest to or below their low-stock threshold
+ */
+
+export function useGetMedicationsLowStock<TData = Awaited<ReturnType<typeof getMedicationsLowStock>>, TError = ErrorType<unknown>>(
+ params?: GetMedicationsLowStockParams, options?: { query?:UseQueryOptionsCompat<Awaited<ReturnType<typeof getMedicationsLowStock>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMedicationsLowStockQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

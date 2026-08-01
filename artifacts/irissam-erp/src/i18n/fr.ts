@@ -129,6 +129,7 @@ export default {
   "widget.stock.title": "Médicaments en stock faible",
   "widget.stock.units": "unités",
   "widget.stock.view_all": "Voir tout",
+  "widget.stock.all_ok": "Tous les stocks sont OK",
 
   // Footer
   "footer.copyright": "© 2024 IRISSAM HOSPITAL ERP – Tous droits réservés",
