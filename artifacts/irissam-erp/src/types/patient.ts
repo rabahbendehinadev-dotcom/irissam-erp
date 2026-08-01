@@ -8,6 +8,7 @@ export type MaritalStatus = 'celibataire' | 'marie' | 'divorce' | 'veuf';
 export type IdDocumentType = 'cni' | 'passeport' | 'permis' | 'autre';
 export type InsuranceType = 'cnas' | 'casnos' | 'mutuelle' | 'militaire' | 'gratuite' | 'payant';
 export type TimelineEventType =
+  | 'vaccination'
   | 'creation' | 'update' | 'document' | 'document_update'
   | 'appointment' | 'admission' | 'result' | 'discharge' | 'consultation'
   | 'prescription' | 'laboratory' | 'imaging' | 'hospitalization'
@@ -105,6 +106,8 @@ export interface PatientTimelineEvent {
   userName: string;
   siteId: string;
   siteName: string;
+  doctor?: string;
+  service?: string;
 }
 
 // Admission moved to ./admission (full type)

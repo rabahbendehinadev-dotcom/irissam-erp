@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { ArrowLeft, AlertTriangle, Phone, Mail, MapPin, Droplets, User, Shield, Clock } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Phone, Droplets, User, Shield, Clock, Stethoscope, ChevronRight } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PatientProfileHeader } from '@/components/patients/PatientProfileHeader';
 import { PatientTimeline } from '@/components/patients/PatientTimeline';
@@ -12,11 +12,14 @@ import { PatientStatsCards } from '@/components/patients/PatientStatsCards';
 import { PatientAuditLog } from '@/components/patients/PatientAuditLog';
 import { PatientEmergencyContacts } from '@/components/patients/PatientEmergencyContacts';
 import { PatientInsuranceDetail } from '@/components/patients/PatientInsuranceDetail';
+import { PatientVaccinationsTab } from '@/components/patients/PatientVaccinationsTab';
+import { PatientConsentsTab } from '@/components/patients/PatientConsentsTab';
 import { MOCK_PATIENTS, MOCK_PATIENT_TIMELINES } from '@/mock';
 import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { formatDate } from '@/utils/format';
+import { cn } from '@/lib/utils';
 import type { Patient } from '@/types';
 
 function InfoRow({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
@@ -52,11 +55,133 @@ function PlaceholderTab({ label }: { label: string }) {
   );
 }
 
-const SOON_TABS = [
-  'appointments','admissions','consultations','emergencies','hospitalizations',
-  'laboratory','imaging','prescriptions','invoices',
-  'vaccinations','billing','payments','consents',
+// ─── Mock recent consultations ────────────────────────────────────────────────
+
+interface RecentConsult {
+  id: string;
+  date: string;
+  doctor: string;
+  specialty: string;
+  diagnosis: string;
+  prescription: string;
+  status: 'terminee' | 'en_cours' | 'suspendue';
+}
+
+const MOCK_RECENT_CONSULTATIONS: RecentConsult[] = [
+  {
+    id: 'con-1',
+    date: '2026-08-01T09:14:00',
+    doctor: 'Dr. Meziane Farid',
+    specialty: 'Médecine interne',
+    diagnosis: 'Hypertension artérielle (I10) — HTA stable',
+    prescription: 'Amlodipine 5 mg + Perindopril 4 mg',
+    status: 'terminee',
+  },
+  {
+    id: 'con-2',
+    date: '2026-06-20T10:30:00',
+    doctor: 'Dr. Benamara Karim',
+    specialty: 'Cardiologie',
+    diagnosis: 'Cardiopathie ischémique chronique (I25) + HTA résistante',
+    prescription: 'Bisoprolol 5 mg + Furosémide 40 mg',
+    status: 'terminee',
+  },
+  {
+    id: 'con-3',
+    date: '2026-05-20T22:30:00',
+    doctor: 'Dr. Merabet',
+    specialty: 'Urgences médicales',
+    diagnosis: 'Douleur thoracique atypique (R07) — bilan négatif',
+    prescription: 'Surveillance — aucune prescription',
+    status: 'terminee',
+  },
+  {
+    id: 'con-4',
+    date: '2026-01-20T10:30:00',
+    doctor: 'Dr. Meziane Farid',
+    specialty: 'Médecine interne',
+    diagnosis: 'HTA déséquilibrée — ajustement thérapeutique',
+    prescription: 'Renforcement : Bisoprolol 2.5 mg ajouté',
+    status: 'terminee',
+  },
+  {
+    id: 'con-5',
+    date: '2025-11-05T09:00:00',
+    doctor: 'Dr. Meziane Farid',
+    specialty: 'Médecine interne',
+    diagnosis: 'Diabète de type 2 (E11) — HbA1c : 7.8%',
+    prescription: 'Metformine 500 mg × 2/jour',
+    status: 'terminee',
+  },
 ];
+
+const STATUS_CONSULT_CFG = {
+  terminee:   { label: 'Terminée',  color: 'text-green-700',  bg: 'bg-green-50',  border: 'border-green-200' },
+  en_cours:   { label: 'En cours',  color: 'text-blue-700',   bg: 'bg-blue-50',   border: 'border-blue-200' },
+  suspendue:  { label: 'Suspendue', color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200' },
+};
+
+function DernieresConsultations({ patientId, onOpen }: { patientId: string; onOpen: (id: string) => void }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden md:col-span-2">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <Stethoscope size={15} className="text-blue-600" />
+          <h3 className="font-semibold text-gray-800 text-sm">Dernières consultations</h3>
+        </div>
+        <span className="text-xs text-gray-400">{MOCK_RECENT_CONSULTATIONS.length} consultations</span>
+      </div>
+      <div className="divide-y divide-gray-50">
+        {MOCK_RECENT_CONSULTATIONS.map(c => {
+          const cfg = STATUS_CONSULT_CFG[c.status];
+          return (
+            <div key={c.id} className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+              {/* Date */}
+              <div className="flex-shrink-0 text-right w-20">
+                <p className="text-xs font-semibold text-gray-700">
+                  {new Date(c.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                </p>
+                <p className="text-xs text-gray-400 font-mono">{c.date.substring(11, 16)}</p>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-gray-700">{c.doctor}</span>
+                  <span className="text-xs text-gray-400">·</span>
+                  <span className="text-xs text-gray-500">{c.specialty}</span>
+                  <span className={cn('text-xs px-1.5 py-0.5 rounded-full border font-medium', cfg.color, cfg.bg, cfg.border)}>
+                    {cfg.label}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-800 mt-0.5 font-medium">{c.diagnosis}</p>
+                <p className="text-xs text-gray-400 mt-0.5">💊 {c.prescription}</p>
+              </div>
+
+              {/* Action */}
+              <button
+                onClick={() => onOpen(c.id)}
+                className="flex-shrink-0 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-colors"
+              >
+                Ouvrir <ChevronRight size={11} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tabs that remain as placeholders ────────────────────────────────────────
+
+const SOON_TABS = [
+  'appointments', 'admissions', 'consultations', 'emergencies', 'hospitalizations',
+  'laboratory', 'imaging', 'prescriptions', 'invoices',
+  'billing', 'payments',
+];
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PatientDetailPage() {
   const { t } = useLanguage();
@@ -66,11 +191,11 @@ export default function PatientDetailPage() {
   const [, params] = useRoute('/patients/:id');
   const patientId = params?.id;
 
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showEdit, setShowEdit] = useState(false);
-  const [archiving, setArchiving] = useState(false);
+  const [activeTab,  setActiveTab]  = useState('overview');
+  const [showEdit,   setShowEdit]   = useState(false);
+  const [archiving,  setArchiving]  = useState(false);
 
-  const patient = MOCK_PATIENTS.find(p => p.id === patientId);
+  const patient  = MOCK_PATIENTS.find(p => p.id === patientId);
   const timeline = MOCK_PATIENT_TIMELINES[patientId ?? ''] ?? [];
 
   if (!can('patients.view')) {
@@ -101,7 +226,7 @@ export default function PatientDetailPage() {
   }
 
   const canViewSensitive = can('patients.view_sensitive');
-  const canEdit = can('patients.edit');
+  const canEdit    = can('patients.edit');
   const canArchive = can('patients.archive');
 
   const handleTabChange = (tab: string) => {
@@ -124,10 +249,10 @@ export default function PatientDetailPage() {
         </button>
       </div>
 
-      {/* Alert Banner — critical medical flags */}
+      {/* Alert Banner */}
       <PatientAlertBanner patient={patient} />
 
-      {/* Sticky profile header */}
+      {/* Sticky profile header with tabs */}
       <div className="sticky top-0 z-20">
         <PatientProfileHeader
           patient={patient}
@@ -143,7 +268,7 @@ export default function PatientDetailPage() {
       {/* Tab content */}
       <div className="p-6">
 
-        {/* Stats cards — shown on overview and most clinical tabs */}
+        {/* Stats cards — shown on overview and clinical tabs */}
         {['overview', 'history', 'allergies', 'timeline'].includes(activeTab) && (
           <PatientStatsCards patient={patient} />
         )}
@@ -151,26 +276,31 @@ export default function PatientDetailPage() {
         {/* ─── OVERVIEW ─── */}
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Identity */}
             <Section title={t('pat.overview.identity')} icon={<User size={16} />}>
               <InfoRow label="Nom complet" value={fullName} />
               <InfoRow label="Genre" value={patient.gender === 'M' ? t('pat.gender.m') : t('pat.gender.f')} />
               <InfoRow label="Date de naissance" value={formatDate(patient.dateOfBirth)} />
-              {patient.placeOfBirth && <InfoRow label="Lieu de naissance" value={patient.placeOfBirth} />}
-              {patient.nationality && <InfoRow label="Nationalité" value={patient.nationality} />}
+              {patient.placeOfBirth  && <InfoRow label="Lieu de naissance"  value={patient.placeOfBirth} />}
+              {patient.nationality   && <InfoRow label="Nationalité"         value={patient.nationality} />}
               {patient.maritalStatus && <InfoRow label="Situation familiale" value={t(`pat.marital.${patient.maritalStatus}` as any)} />}
             </Section>
 
+            {/* Contact */}
             <Section title={t('pat.overview.contact')} icon={<Phone size={16} />}>
-              <InfoRow label="Téléphone" value={patient.phone} />
+              <InfoRow label="Téléphone"   value={patient.phone} />
               {patient.phoneSecondary && <InfoRow label="Téléphone 2" value={patient.phoneSecondary} />}
-              {patient.email && <InfoRow label="Email" value={patient.email} />}
-              {patient.address && <InfoRow label="Adresse" value={patient.address} />}
-              {patient.commune && <InfoRow label="Commune" value={patient.commune} />}
-              {patient.wilaya && <InfoRow label="Wilaya" value={patient.wilaya} />}
+              {patient.email          && <InfoRow label="Email"        value={patient.email} />}
+              {patient.address        && <InfoRow label="Adresse"      value={patient.address} />}
+              {patient.commune        && <InfoRow label="Commune"      value={patient.commune} />}
+              {patient.wilaya         && <InfoRow label="Wilaya"       value={patient.wilaya} />}
             </Section>
 
+            {/* Medical */}
             <Section title={t('pat.overview.medical')} icon={<Droplets size={16} />}>
-              {patient.bloodType && <InfoRow label="Groupe sanguin" value={`${patient.bloodType} (Rh ${patient.rhesus ?? '?'})`} />}
+              {patient.bloodType && (
+                <InfoRow label="Groupe sanguin" value={`${patient.bloodType} (Rh ${patient.rhesus ?? '?'})`} />
+              )}
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs text-gray-400 uppercase tracking-wide">{t('pat.form.allergies')}</span>
                 {patient.medical?.allergies?.length
@@ -185,11 +315,12 @@ export default function PatientDetailPage() {
               </div>
             </Section>
 
+            {/* Insurance */}
             <Section title={t('pat.overview.insurance')} icon={<Shield size={16} />}>
               {patient.insurance?.type
                 ? <>
-                    <InfoRow label="Type" value={t(`pat.insurance.${patient.insurance.type}` as any)} />
-                    {patient.insurance.organizationName && <InfoRow label="Organisme" value={patient.insurance.organizationName} />}
+                    <InfoRow label="Type"     value={t(`pat.insurance.${patient.insurance.type}` as any)} />
+                    {patient.insurance.organizationName && <InfoRow label="Organisme"      value={patient.insurance.organizationName} />}
                     {patient.insurance.memberNumber && (
                       <div className="flex flex-col gap-0.5">
                         <span className="text-xs text-gray-400 uppercase tracking-wide">N° Adhérent</span>
@@ -200,6 +331,12 @@ export default function PatientDetailPage() {
                   </>
                 : <span className="text-sm text-gray-400">{t('pat.overview.no_insurance')}</span>}
             </Section>
+
+            {/* Dernières consultations — full width */}
+            <DernieresConsultations
+              patientId={patient.id}
+              onOpen={id => alert(`Ouverture consultation ${id} — disponible avec le backend`)}
+            />
           </div>
         )}
 
@@ -207,20 +344,20 @@ export default function PatientDetailPage() {
         {activeTab === 'identity' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Section title="État civil" icon={<User size={16} />}>
-              <InfoRow label={t('pat.form.lastName')} value={patient.lastName} />
-              <InfoRow label={t('pat.form.firstName')} value={patient.firstName} />
-              {patient.maidenName && <InfoRow label={t('pat.form.maidenName')} value={patient.maidenName} />}
-              <InfoRow label={t('pat.form.gender')} value={patient.gender === 'M' ? t('pat.gender.m') : t('pat.gender.f')} />
+              <InfoRow label={t('pat.form.lastName')}   value={patient.lastName} />
+              <InfoRow label={t('pat.form.firstName')}  value={patient.firstName} />
+              {patient.maidenName && <InfoRow label={t('pat.form.maidenName')}  value={patient.maidenName} />}
+              <InfoRow label={t('pat.form.gender')}     value={patient.gender === 'M' ? t('pat.gender.m') : t('pat.gender.f')} />
               <InfoRow label={t('pat.form.dateOfBirth')} value={formatDate(patient.dateOfBirth)} />
-              {patient.placeOfBirth && <InfoRow label={t('pat.form.placeOfBirth')} value={patient.placeOfBirth} />}
-              {patient.nationality && <InfoRow label={t('pat.form.nationality')} value={patient.nationality} />}
+              {patient.placeOfBirth  && <InfoRow label={t('pat.form.placeOfBirth')}   value={patient.placeOfBirth} />}
+              {patient.nationality   && <InfoRow label={t('pat.form.nationality')}    value={patient.nationality} />}
               {patient.maritalStatus && <InfoRow label={t('pat.form.maritalStatus')} value={t(`pat.marital.${patient.maritalStatus}` as any)} />}
             </Section>
             <Section title="Identifiants" icon={<Shield size={16} />}>
-              <InfoRow label={t('pat.form.mpiId')} value={patient.mpiId} mono />
-              <InfoRow label={t('pat.form.fileNumber')} value={patient.fileNumber} mono />
-              <InfoRow label={t('pat.form.internalNumber')} value={patient.internalNumber} mono />
-              {patient.idDocumentType && <InfoRow label={t('pat.form.idType')} value={t(`pat.id_type.${patient.idDocumentType}` as any)} />}
+              <InfoRow label={t('pat.form.mpiId')}          value={patient.mpiId}         mono />
+              <InfoRow label={t('pat.form.fileNumber')}      value={patient.fileNumber}    mono />
+              <InfoRow label={t('pat.form.internalNumber')}  value={patient.internalNumber} mono />
+              {patient.idDocumentType   && <InfoRow label={t('pat.form.idType')} value={t(`pat.id_type.${patient.idDocumentType}` as any)} />}
               {patient.idDocumentNumber && (
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs text-gray-400 uppercase tracking-wide">{t('pat.form.idNumber')}</span>
@@ -241,20 +378,20 @@ export default function PatientDetailPage() {
         {activeTab === 'contacts' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Section title="Coordonnées" icon={<Phone size={16} />}>
-              <InfoRow label={t('pat.form.phone')} value={patient.phone} />
+              <InfoRow label={t('pat.form.phone')}          value={patient.phone} />
               {patient.phoneSecondary && <InfoRow label={t('pat.form.phoneSecondary')} value={patient.phoneSecondary} />}
-              {patient.email && <InfoRow label={t('pat.form.email')} value={patient.email} />}
-              {patient.address && <InfoRow label={t('pat.form.address')} value={patient.address} />}
-              {patient.commune && <InfoRow label={t('pat.form.commune')} value={patient.commune} />}
-              {patient.wilaya && <InfoRow label={t('pat.form.wilaya')} value={patient.wilaya} />}
-              {patient.postalCode && <InfoRow label={t('pat.form.postalCode')} value={patient.postalCode} />}
+              {patient.email          && <InfoRow label={t('pat.form.email')}          value={patient.email} />}
+              {patient.address        && <InfoRow label={t('pat.form.address')}        value={patient.address} />}
+              {patient.commune        && <InfoRow label={t('pat.form.commune')}        value={patient.commune} />}
+              {patient.wilaya         && <InfoRow label={t('pat.form.wilaya')}         value={patient.wilaya} />}
+              {patient.postalCode     && <InfoRow label={t('pat.form.postalCode')}     value={patient.postalCode} />}
               <InfoRow label={t('pat.form.country')} value={patient.country} />
             </Section>
             {patient.emergencyContact && (
               <Section title={t('pat.overview.emergency')} icon={<AlertTriangle size={16} />}>
-                <InfoRow label={t('pat.form.emergency.name')} value={patient.emergencyContact.name} />
-                <InfoRow label={t('pat.form.emergency.relation')} value={patient.emergencyContact.relation} />
-                <InfoRow label={t('pat.form.emergency.phone')} value={patient.emergencyContact.phone} />
+                <InfoRow label={t('pat.form.emergency.name')}      value={patient.emergencyContact.name} />
+                <InfoRow label={t('pat.form.emergency.relation')}  value={patient.emergencyContact.relation} />
+                <InfoRow label={t('pat.form.emergency.phone')}     value={patient.emergencyContact.phone} />
                 {patient.emergencyContact.address && <InfoRow label={t('pat.form.emergency.address')} value={patient.emergencyContact.address} />}
               </Section>
             )}
@@ -262,9 +399,7 @@ export default function PatientDetailPage() {
         )}
 
         {/* ─── INSURANCE ─── */}
-        {activeTab === 'insurance' && (
-          <PatientInsuranceDetail patient={patient} />
-        )}
+        {activeTab === 'insurance' && <PatientInsuranceDetail patient={patient} />}
 
         {/* ─── DOCUMENTS ─── */}
         {activeTab === 'documents' && <PatientDocumentsV2 patientId={patient.id} />}
@@ -319,19 +454,19 @@ export default function PatientDetailPage() {
         )}
 
         {/* ─── EMERGENCY CONTACT ─── */}
-        {activeTab === 'emergency_contact' && (
-          <PatientEmergencyContacts patient={patient} />
-        )}
+        {activeTab === 'emergency_contact' && <PatientEmergencyContacts patient={patient} />}
 
-        {/* ─── TIMELINE / HISTORIQUE ─── */}
-        {activeTab === 'timeline' && (
-          <PatientTimeline events={timeline} />
-        )}
+        {/* ─── VACCINATIONS ─── */}
+        {activeTab === 'vaccinations' && <PatientVaccinationsTab />}
+
+        {/* ─── CONSENTEMENTS ─── */}
+        {activeTab === 'consents' && <PatientConsentsTab />}
+
+        {/* ─── TIMELINE ─── */}
+        {activeTab === 'timeline' && <PatientTimeline events={timeline} />}
 
         {/* ─── AUDIT ─── */}
-        {activeTab === 'audit' && (
-          <PatientAuditLog />
-        )}
+        {activeTab === 'audit' && <PatientAuditLog />}
 
         {/* ─── PLACEHOLDER TABS ─── */}
         {SOON_TABS.includes(activeTab) && (

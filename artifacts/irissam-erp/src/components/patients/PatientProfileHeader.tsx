@@ -27,10 +27,10 @@ const TABS = [
   { key: 'imaging',            labelKey: 'pat.tab.imaging',          soon: true },
   { key: 'prescriptions',      labelKey: 'pat.tab.prescriptions',    soon: true },
   { key: 'invoices',           labelKey: 'pat.tab.invoices',         soon: true },
-  { key: 'vaccinations',       labelKey: 'pat.tab.vaccinations',     soon: true },
+  { key: 'vaccinations',       labelKey: 'pat.tab.vaccinations' },
   { key: 'billing',            labelKey: 'pat.tab.billing',          soon: true },
   { key: 'payments',           labelKey: 'pat.tab.payments',         soon: true },
-  { key: 'consents',           labelKey: 'pat.tab.consents',         soon: true },
+  { key: 'consents',           labelKey: 'pat.tab.consents' },
   { key: 'timeline',           labelKey: 'pat.tab.timeline' },
   { key: 'audit',              labelKey: 'pat.tab.audit' },
 ] as const;
