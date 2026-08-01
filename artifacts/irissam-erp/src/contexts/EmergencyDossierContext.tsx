@@ -2,8 +2,9 @@ import {
   createContext, useContext, useState, useEffect, useCallback, useRef,
 } from 'react';
 import { useAuth } from '@/store/AuthContext';
+import { useMockRepository } from '@/store/MockRepository';
+import { useAdmissions } from '@/store/AdmissionsContext';
 import { getMockDossier } from '@/mock/emergencyDossier';
-import { MOCK_EMERGENCY_PATIENTS } from '@/mock/emergency';
 import type {
   EmergencyDossier, EmergencyWorkflowStatus, WorkflowTransition,
   VitalReading, GlasgowBreakdown, ABCDEAssessment, LabRequest, ImagingRequest,
@@ -73,13 +74,16 @@ export function EmergencyDossierProvider({
   children: React.ReactNode;
 }) {
   const { user } = useAuth();
+  const repo = useMockRepository();
+  const { addAdmission: admissionsAddAdmission } = useAdmissions();
   const [dossier, setDossier] = useState<EmergencyDossier>(() => getMockDossier(patientId));
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const patient = MOCK_EMERGENCY_PATIENTS.find(p => p.id === patientId) ?? null;
+  // Live patient from repository — updates when startCare / decisions mutate status
+  const patient = repo.getPatient(patientId);
 
   // ── Auto-save on every dossier change (2-second debounce) ─────────────────
   useEffect(() => {
@@ -198,7 +202,17 @@ export function EmergencyDossierProvider({
     };
     setDossier(d => ({ ...d, labRequests: [...d.labRequests, r] }));
     pushAudit({ action: 'Analyse demandée', category: 'lab', details: r.test });
-  }, [who, whoId, pushAudit]);
+    // Cross-module: register in global repository so Lab module can see it
+    const pt = repo.getPatient(patientId);
+    repo.createLabOrder({
+      visitId: `visit-${patientId}`, patientId,
+      patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
+      test: r.test, category: r.category, urgency: r.urgency,
+      requestedBy: who, requestedById: whoId,
+      status: r.status, sourceModule: 'urgences',
+      laboratory: r.laboratory,
+    });
+  }, [who, whoId, pushAudit, repo, patientId]);
 
   const updateLabStatus = useCallback((id: string, status: LabRequest['status'], result?: string, isCritical?: boolean) => {
     setDossier(d => ({
@@ -220,7 +234,17 @@ export function EmergencyDossierProvider({
     };
     setDossier(d => ({ ...d, imagingRequests: [...d.imagingRequests, r] }));
     pushAudit({ action: 'Imagerie demandée', category: 'imaging', details: `${r.exam} — ${r.region}` });
-  }, [who, whoId, pushAudit]);
+    // Cross-module: register in global repository so Radiology module can see it
+    const pt = repo.getPatient(patientId);
+    repo.createImagingOrder({
+      visitId: `visit-${patientId}`, patientId,
+      patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
+      exam: r.exam, region: r.region, side: r.side,
+      urgency: r.urgency, withContrast: r.withContrast,
+      requestedBy: who, requestedById: whoId,
+      status: r.status, sourceModule: 'urgences',
+    });
+  }, [who, whoId, pushAudit, repo, patientId]);
 
   const updateImagingStatus = useCallback((id: string, status: ImagingRequest['status'], result?: string) => {
     setDossier(d => ({
@@ -242,7 +266,17 @@ export function EmergencyDossierProvider({
     };
     setDossier(d => ({ ...d, prescriptions: [...d.prescriptions, p] }));
     pushAudit({ action: 'Prescription', category: 'prescription', details: `${p.drug} ${p.dosage} ${p.route}` });
-  }, [who, whoId, pushAudit]);
+    // Cross-module: register in global repository so patient history can see it
+    const pt = repo.getPatient(patientId);
+    repo.createPrescription({
+      visitId: `visit-${patientId}`, patientId,
+      patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
+      drug: p.drug, dosage: p.dosage, route: p.route,
+      frequency: p.frequency, duration: p.duration,
+      prescribedBy: who, prescribedById: whoId,
+      status: 'prescrit', sourceModule: 'urgences',
+    });
+  }, [who, whoId, pushAudit, repo, patientId]);
 
   const updatePrescriptionStatus = useCallback((id: string, status: Prescription['status'], adminAt?: string, by?: string) => {
     setDossier(d => ({
@@ -342,28 +376,102 @@ export function EmergencyDossierProvider({
     const d = dossier;
     const decision = d.finalDecision.decision;
     if (!decision) return;
+
+    const now = new Date().toISOString();
+    const auditCtx = { userId: whoId, userName: who, userRole: whoRole };
+    const visitId = `visit-${patientId}`;
+    const pt = repo.getPatient(patientId);
+    const patientName = pt ? `${pt.lastName} ${pt.firstName}` : patientId;
+
     setDossier(prev => ({
       ...prev,
       finalDecision: {
         ...prev.finalDecision,
         decidedBy: who,
         decidedById: whoId,
-        decidedAt: new Date().toISOString(),
+        decidedAt: now,
       },
     }));
-    // Auto-transition workflow
+
+    // ── Cross-module actions based on decision ─────────────────────────────
+    if (decision === 'domicile') {
+      repo.closeVisitDischarged(patientId, auditCtx);
+
+    } else if (decision === 'hospitalisation') {
+      const admId = `adm-urg-${Date.now()}`;
+      admissionsAddAdmission({
+        id: admId,
+        admissionNumber: `URG-${now.replace(/\D/g, '').slice(0, 12)}`,
+        patientId,
+        patientMpiId: pt?.mpiId ?? '',
+        patientName,
+        type: 'urgence' as const,
+        status: 'active' as const,
+        priority: 'urgent' as const,
+        serviceId: d.finalDecision.ward ?? 'service-inconnu',
+        serviceName: d.finalDecision.ward ?? 'À déterminer',
+        doctorId: whoId,
+        doctorName: who,
+        motif: d.chiefComplaint,
+        diagnosis: d.finalDecision.medicalSummary,
+        admissionDate: now.split('T')[0],
+        admissionTime: now.split('T')[1].slice(0, 5),
+        notes: d.finalDecision.medicalSummary ?? '',
+        siteId: user?.siteId ?? 'default',
+        createdAt: now,
+        updatedAt: now,
+        createdById: whoId,
+      });
+      repo.closeVisitHospitalized(patientId, admId, auditCtx);
+
+    } else if (decision === 'bloc') {
+      const surgId = repo.createSurgicalRequest({
+        visitId, patientId, patientName,
+        intervention: d.finalDecision.intervention ?? 'À déterminer',
+        surgeon: d.finalDecision.surgeon,
+        anesthesist: d.finalDecision.anesthesist,
+        urgencyDegree: d.finalDecision.urgencyDegree ?? 'urgent',
+        preOpPrep: d.finalDecision.preOpPrep,
+        consentSigned: d.finalDecision.consentSigned ?? false,
+        status: 'demande' as const,
+        requestedBy: who,
+        requestedById: whoId,
+      });
+      repo.closeVisitBloc(patientId, surgId, auditCtx);
+
+    } else if (decision === 'reanimation') {
+      const icuId = repo.createICUAdmission({
+        visitId, patientId, patientName,
+        motif: d.finalDecision.icuMotif ?? d.chiefComplaint,
+        priority: d.finalDecision.icuPriority ?? 'urgent',
+        icuBed: d.finalDecision.icuBed,
+        teamNotified: d.finalDecision.icuTeamNotified ?? false,
+        status: 'demande' as const,
+        requestedBy: who,
+        requestedById: whoId,
+      });
+      repo.closeVisitICU(patientId, icuId, auditCtx);
+
+    } else if (decision === 'transfert') {
+      repo.closeVisitTransferred(patientId, auditCtx, d.finalDecision.destEtablissement);
+
+    } else if (decision === 'deces') {
+      repo.closeVisitDeceased(patientId, auditCtx, d.finalDecision.provisionalCause);
+    }
+
+    // Auto-transition dossier workflow
     const statusMap: Partial<Record<NonNullable<typeof decision>, EmergencyWorkflowStatus>> = {
       hospitalisation: 'hospitalise',
-      transfert: 'transfere',
-      domicile: 'sorti',
-      deces: 'decede',
-      reanimation: 'hospitalise',
-      bloc: 'hospitalise',
+      transfert:       'transfere',
+      domicile:        'sorti',
+      deces:           'decede',
+      reanimation:     'hospitalise',
+      bloc:            'hospitalise',
     };
     const nextStatus = statusMap[decision];
     if (nextStatus) transitionStatus(nextStatus, `Décision: ${decision}`);
     pushAudit({ action: 'Décision finale', category: 'decision', details: decision });
-  }, [dossier, who, whoId, transitionStatus, pushAudit]);
+  }, [dossier, who, whoId, whoRole, patientId, user, repo, admissionsAddAdmission, transitionStatus, pushAudit]);
 
   // ── Manual save & audit ───────────────────────────────────────────────────
   const triggerSave = useCallback(() => {

@@ -1,0 +1,221 @@
+الآن لا أريد إنشاء أي Components جديدة.
+
+أريد تحويل Module Urgences من Mock إلى Workflow حقيقي داخل النظام.
+
+ركز فقط على الربط بين Modules الحالية.
+
+========================
+1
+========================
+
+عند إنشاء مريض جديد في Urgences:
+
+ينشأ EmergencyVisit جديدة.
+
+ترتبط بـ:
+
+Patient
+
+Doctor
+
+Nurse
+
+Salle
+
+Service
+
+Triage
+
+========================
+2
+========================
+
+عند الضغط على:
+
+Prendre en charge
+
+يتغير مباشرة:
+
+Dashboard Urgences
+
+Statut Patient
+
+Chronomètre
+
+Salle
+
+Charge médecin
+
+Charge infirmier
+
+Audit
+
+Timeline
+
+بدون Refresh.
+
+========================
+3
+========================
+
+إذا الطبيب طلب:
+
+Analyse
+
+ينشأ LabOrder مرتبط بنفس EmergencyVisit.
+
+ويظهر مباشرة داخل:
+
+Laboratoire
+
+ملف المريض
+
+Timeline
+
+Dashboard Laboratoire
+
+========================
+4
+========================
+
+إذا طلب:
+
+Imagerie
+
+ينشأ ImagingOrder.
+
+ويرتبط بـ:
+
+Patient
+
+Emergency
+
+Radiologie
+
+Timeline
+
+========================
+5
+========================
+
+إذا وصف دواء:
+
+ينشأ Prescription.
+
+ويرتبط مباشرة مع:
+
+Patient
+
+Urgence
+
+Médecin
+
+Historique
+
+========================
+6
+========================
+
+إذا اختار:
+
+Hospitalisation
+
+ينشأ Admission.
+
+وينتقل المريض من Urgences إلى Hospitalisation.
+
+وتتحرر غرفة الطوارئ.
+
+========================
+7
+========================
+
+إذا اختار:
+
+Bloc opératoire
+
+ينشأ SurgicalRequest.
+
+ويظهر داخل Module Bloc.
+
+========================
+8
+========================
+
+إذا اختار:
+
+Réanimation
+
+ينشأ ICUAdmission.
+
+ويظهر داخل Module Réanimation.
+
+========================
+9
+========================
+
+إذا اختار:
+
+Retour domicile
+
+يغلق EmergencyVisit.
+
+ويحدث Dashboard.
+
+========================
+10
+========================
+
+إذا اختار:
+
+Décès
+
+يغلق الملف.
+
+ويمنع أي تعديل.
+
+إلا بصلاحية Super Admin.
+
+========================
+11
+========================
+
+كل عملية يجب أن تسجل:
+
+Date
+
+Heure
+
+Utilisateur
+
+Ancienne valeur
+
+Nouvelle valeur
+
+Module
+
+Adresse IP
+
+Audit
+
+========================
+12
+========================
+
+لا أريد APIs حقيقية الآن.
+
+أريد Mock Repository موحد بحيث لاحقًا نستبدله فقط بـ PostgreSQL بدون تغيير الـ UI.
+
+========================
+13
+========================
+
+في النهاية تحقق من:
+
+- لا يوجد أي Reload.
+- جميع Modules تتحدث مباشرة.
+- جميع Relations صحيحة.
+- جميع IDs مرتبطة.
+- جميع Permissions مطبقة.
+- لا يوجد TypeScript Errors.
+- لا يوجد Console Errors.

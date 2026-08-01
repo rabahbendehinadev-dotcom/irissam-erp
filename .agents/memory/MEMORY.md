@@ -1,2 +1,4 @@
 - [Emergency Dossier Architecture](emergency-dossier.md) — multi-component EMR dossier; context-driven state, 8 lazy tabs, mock data in src/mock/emergencyDossier.ts
 - [User type shape](user-type.md) — User has firstName/lastName (not name); no siteId guarantee; role from UserRole
+- [Mock Repository](mock-repository.md) — unified cross-module store in src/store/MockRepository.tsx; swap point for PostgreSQL
+- [FinalDecision field names](final-decision-fields.md) — ward/icuMotif/icuPriority/icuBed/icuTeamNotified (not service/reanimationMotif/priority/teamNotified)

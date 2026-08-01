@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { cn } from '@/lib/utils';
+import { useMockRepository } from '@/store/MockRepository';
+import { useAuth } from '@/store/AuthContext';
 import { EmergencyPriorityBadge, PRIORITY_CFG } from '@/components/emergencies/EmergencyPriorityBadge';
 import { EmergencyAlertStrip } from '@/components/emergencies/EmergencyAlertStrip';
 import { EmergencyKPIs } from '@/components/emergencies/EmergencyKPIs';
@@ -222,6 +224,9 @@ function PatientExpandedCard({ patient, isDark, onClose }: {
   const bloodType = BLOOD_TYPES[patient.id] ?? '?';
   const allergies = PATIENT_ALLERGIES[patient.id] ?? [];
   const v = patient.vitals;
+  const [, setLocation] = useLocation();
+  const { startCare: repoStartCare } = useMockRepository();
+  const { user } = useAuth();
 
   return (
     <div className={cn(
@@ -386,7 +391,14 @@ function PatientExpandedCard({ patient, isDark, onClose }: {
 
       {/* Start care button */}
       <button
-        onClick={() => setLocation(`/emergencies/${patient.id}`)}
+        onClick={() => {
+          repoStartCare(patient.id, {
+            userId: user?.id ?? '',
+            userName: user ? `${user.firstName} ${user.lastName}` : 'Personnel',
+            userRole: user?.role ?? 'medecin',
+          });
+          setLocation(`/emergencies/${patient.id}`);
+        }}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
       >
         <Play size={15} fill="white" /> Démarrer la prise en charge
@@ -405,6 +417,9 @@ function PatientRow({ patient, tick, isDark }: { patient: EmergencyPatient; tick
   const statusCfg = STATUS_CFG[patient.status];
   const elapsed = elapsedMs(patient.arrivalTime);
   const target = cfg.targetMin;
+  const [, setLocation] = useLocation();
+  const { startCare: repoStartCare } = useMockRepository();
+  const { user } = useAuth();
 
   // Timer size: big for P1 (immédiat), normal for others
   const isP1 = patient.priority === 'P1';
@@ -515,7 +530,16 @@ function PatientRow({ patient, tick, isDark }: { patient: EmergencyPatient; tick
         {/* Start care + expand */}
         <div className="flex-shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
           <button
-            onClick={() => setLocation(`/emergencies/${patient.id}`)}
+            onClick={() => {
+              if (patient.status === 'attente_soins' || patient.status === 'attente_triage') {
+                repoStartCare(patient.id, {
+                  userId: user?.id ?? '',
+                  userName: user ? `${user.firstName} ${user.lastName}` : 'Personnel',
+                  userRole: user?.role ?? 'medecin',
+                });
+              }
+              setLocation(`/emergencies/${patient.id}`);
+            }}
             className={cn(
               'flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors whitespace-nowrap',
               patient.status === 'attente_soins' || patient.status === 'attente_triage'
@@ -867,7 +891,7 @@ export default function EmergenciesPage() {
   const [, setLocation] = useLocation();
   const { isDark, toggle: toggleDark } = useDarkMode();
 
-  const patients   = MOCK_EMERGENCY_PATIENTS;
+  const { patients } = useMockRepository();
   const rooms      = MOCK_EMERGENCY_ROOMS;
   const ambulances = MOCK_EMERGENCY_AMBULANCES;
   const doctors    = MOCK_EMERGENCY_DOCTORS;
