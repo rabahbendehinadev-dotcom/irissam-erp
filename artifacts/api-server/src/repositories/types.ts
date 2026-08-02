@@ -71,3 +71,15 @@ export function paged<T>(data: T[], total: number, opts: PaginationOpts): PagedR
 export function qb(db: DbOrTx, ctx?: Pick<TxContext, "tx">): DbOrTx {
   return ctx?.tx ?? db;
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Returns the string if it is a valid UUID, otherwise undefined.
+ * Used to guard `createdBy`/`updatedBy` FK columns against non-UUID
+ * values that come from in-memory auth stubs (e.g. "user-1").
+ */
+export function safeUuid(id: string | undefined | null): string | undefined {
+  if (!id) return undefined;
+  return UUID_RE.test(id) ? id : undefined;
+}

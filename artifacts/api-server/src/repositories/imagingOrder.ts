@@ -13,7 +13,7 @@ import { eq, and, isNull, desc, count } from "drizzle-orm";
 import {
   db as globalDb, imagingOrdersTable, type DbImagingOrder, type InsertImagingOrder,
 } from "@workspace/db";
-import { type TxContext, type QueryOptions, type PagedResult, paged, qb } from "./types";
+import { type TxContext, type QueryOptions, type PagedResult, paged, qb , safeUuid } from "./types";
 
 export type { DbImagingOrder };
 
@@ -54,7 +54,7 @@ export class ImagingOrderRepository {
   async create(data: InsertImagingOrder, ctx: TxContext): Promise<DbImagingOrder> {
     const [row] = await qb(this.db, ctx)
       .insert(imagingOrdersTable)
-      .values({ ...data, createdBy: ctx.userId, updatedBy: ctx.userId })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), updatedBy: safeUuid(ctx.userId) })
       .returning();
     return row;
   }
@@ -62,7 +62,7 @@ export class ImagingOrderRepository {
   async update(id: string, data: Partial<InsertImagingOrder>, ctx: TxContext): Promise<DbImagingOrder | null> {
     const [row] = await qb(this.db, ctx)
       .update(imagingOrdersTable)
-      .set({ ...data, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ ...data, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(imagingOrdersTable.id, id), isNull(imagingOrdersTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -71,7 +71,7 @@ export class ImagingOrderRepository {
   async softDelete(id: string, ctx: TxContext): Promise<boolean> {
     const [row] = await qb(this.db, ctx)
       .update(imagingOrdersTable)
-      .set({ deletedAt: new Date(), updatedBy: ctx.userId })
+      .set({ deletedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(imagingOrdersTable.id, id), isNull(imagingOrdersTable.deletedAt)))
       .returning({ id: imagingOrdersTable.id });
     return !!row;

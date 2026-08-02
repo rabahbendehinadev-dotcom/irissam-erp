@@ -5,4 +5,5 @@
 - [FinalDecision field names](final-decision-fields.md) — ward/icuMotif/icuPriority/icuBed/icuTeamNotified (not service/reanimationMotif/priority/teamNotified)
 - [Occupancy Architecture](occupancy-arch.md) — Phase 6b: OccupancyBed/ICUBed/OperatingRoom in MockRepository; AdmissionsContext no longer owns beds; BedSelector reads useMockRepository().beds
 - [Clinical Schema](clinical-schema.md) — 36-table UUID schema + MRN/encounterNumber/attachments/user_activity_logs; migrations 001-003 in lib/db/migrations/
-- [DAL Layer](dal-layer.md) — Task #70 done: repositories + services in artifacts/api-server/src/; 79 route errors are Task #71 (not DAL)
+- [DAL Layer](dal-layer.md) — Task #70+83 done: repositories + services + all 12 routes wired; 0 TS errors
+- [Task 84 DB Migration](task84-db-migration.md) — migration bugs, enum values, safeUuid(), audit_logs columns, seed fix, missing admissions route

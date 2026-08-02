@@ -299,17 +299,17 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Add FK from departments.head_doctor_id → users (deferred to avoid circular)
-DO $$ BEGIN
-  ALTER TABLE departments ADD CONSTRAINT fk_departments_head_doctor FOREIGN KEY (head_doctor_id) REFERENCES users(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE departments
+  ADD CONSTRAINT IF NOT EXISTS fk_departments_head_doctor
+  FOREIGN KEY (head_doctor_id) REFERENCES users(id) ON DELETE SET NULL;
 
-DO $$ BEGIN
-  ALTER TABLE departments ADD CONSTRAINT fk_departments_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE departments
+  ADD CONSTRAINT IF NOT EXISTS fk_departments_created_by
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
 
-DO $$ BEGIN
-  ALTER TABLE departments ADD CONSTRAINT fk_departments_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE departments
+  ADD CONSTRAINT IF NOT EXISTS fk_departments_updated_by
+  FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS user_sessions (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -640,9 +640,9 @@ CREATE TABLE IF NOT EXISTS icu_admissions (
 );
 
 -- Close the circular ref: icu_beds.icu_admission_id → icu_admissions
-DO $$ BEGIN
-  ALTER TABLE icu_beds ADD CONSTRAINT fk_icu_beds_icu_admission FOREIGN KEY (icu_admission_id) REFERENCES icu_admissions(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE icu_beds
+  ADD CONSTRAINT IF NOT EXISTS fk_icu_beds_icu_admission
+  FOREIGN KEY (icu_admission_id) REFERENCES icu_admissions(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS bed_stats (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -707,9 +707,9 @@ CREATE TABLE IF NOT EXISTS admissions (
 );
 
 -- Close the circular ref: occupancy_beds.admission_id → admissions
-DO $$ BEGIN
-  ALTER TABLE occupancy_beds ADD CONSTRAINT fk_occ_beds_admission FOREIGN KEY (admission_id) REFERENCES admissions(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE occupancy_beds
+  ADD CONSTRAINT IF NOT EXISTS fk_occ_beds_admission
+  FOREIGN KEY (admission_id) REFERENCES admissions(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS admission_timeline_events (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -790,15 +790,15 @@ CREATE TABLE IF NOT EXISTS or_slots (
 );
 
 -- Close the circular ref: emergency_visits.linked_* columns
-DO $$ BEGIN
-  ALTER TABLE emergency_visits ADD CONSTRAINT fk_ev_linked_admission FOREIGN KEY (linked_admission_id) REFERENCES admissions(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  ALTER TABLE emergency_visits ADD CONSTRAINT fk_ev_linked_surgical FOREIGN KEY (linked_surgical_request_id) REFERENCES surgical_requests(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  ALTER TABLE emergency_visits ADD CONSTRAINT fk_ev_linked_icu FOREIGN KEY (linked_icu_admission_id) REFERENCES icu_admissions(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE emergency_visits
+  ADD CONSTRAINT IF NOT EXISTS fk_ev_linked_admission
+  FOREIGN KEY (linked_admission_id) REFERENCES admissions(id) ON DELETE SET NULL;
+ALTER TABLE emergency_visits
+  ADD CONSTRAINT IF NOT EXISTS fk_ev_linked_surgical
+  FOREIGN KEY (linked_surgical_request_id) REFERENCES surgical_requests(id) ON DELETE SET NULL;
+ALTER TABLE emergency_visits
+  ADD CONSTRAINT IF NOT EXISTS fk_ev_linked_icu
+  FOREIGN KEY (linked_icu_admission_id) REFERENCES icu_admissions(id) ON DELETE SET NULL;
 
 -- ---------------------------------------------------------------------------
 -- SECTION 10: Clinical Orders

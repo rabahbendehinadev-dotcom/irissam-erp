@@ -16,7 +16,7 @@ import { eq, and, isNull, desc, count } from "drizzle-orm";
 import {
   db as globalDb, labOrdersTable, type DbLabOrder, type InsertLabOrder,
 } from "@workspace/db";
-import { type TxContext, type QueryOptions, type PagedResult, paged, qb } from "./types";
+import { type TxContext, type QueryOptions, type PagedResult, paged, qb , safeUuid } from "./types";
 
 export type { DbLabOrder };
 
@@ -57,7 +57,7 @@ export class LabOrderRepository {
   async create(data: InsertLabOrder, ctx: TxContext): Promise<DbLabOrder> {
     const [row] = await qb(this.db, ctx)
       .insert(labOrdersTable)
-      .values({ ...data, createdBy: ctx.userId, updatedBy: ctx.userId })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), updatedBy: safeUuid(ctx.userId) })
       .returning();
     return row;
   }
@@ -65,7 +65,7 @@ export class LabOrderRepository {
   async update(id: string, data: Partial<InsertLabOrder>, ctx: TxContext): Promise<DbLabOrder | null> {
     const [row] = await qb(this.db, ctx)
       .update(labOrdersTable)
-      .set({ ...data, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ ...data, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(labOrdersTable.id, id), isNull(labOrdersTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -74,7 +74,7 @@ export class LabOrderRepository {
   async updateStatus(id: string, status: string, ctx: TxContext): Promise<DbLabOrder | null> {
     const [row] = await qb(this.db, ctx)
       .update(labOrdersTable)
-      .set({ status: status as any, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ status: status as any, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(labOrdersTable.id, id), isNull(labOrdersTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -83,7 +83,7 @@ export class LabOrderRepository {
   async softDelete(id: string, ctx: TxContext): Promise<boolean> {
     const [row] = await qb(this.db, ctx)
       .update(labOrdersTable)
-      .set({ deletedAt: new Date(), updatedBy: ctx.userId })
+      .set({ deletedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(labOrdersTable.id, id), isNull(labOrdersTable.deletedAt)))
       .returning({ id: labOrdersTable.id });
     return !!row;

@@ -11,7 +11,7 @@ import { eq, and, isNull, gte, lte, desc, count } from "drizzle-orm";
 import {
   db as globalDb, appointmentsTable, type DbAppointment, type InsertAppointment,
 } from "@workspace/db";
-import { type TxContext, type QueryOptions, type PagedResult, paged, qb } from "./types";
+import { type TxContext, type QueryOptions, type PagedResult, paged, qb , safeUuid } from "./types";
 
 export type { DbAppointment };
 
@@ -58,7 +58,7 @@ export class AppointmentRepository {
   async create(data: InsertAppointment, ctx: TxContext): Promise<DbAppointment> {
     const [row] = await qb(this.db, ctx)
       .insert(appointmentsTable)
-      .values({ ...data, createdBy: ctx.userId, updatedBy: ctx.userId })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), updatedBy: safeUuid(ctx.userId) })
       .returning();
     return row;
   }
@@ -66,7 +66,7 @@ export class AppointmentRepository {
   async update(id: string, data: Partial<InsertAppointment>, ctx: TxContext): Promise<DbAppointment | null> {
     const [row] = await qb(this.db, ctx)
       .update(appointmentsTable)
-      .set({ ...data, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ ...data, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(appointmentsTable.id, id), isNull(appointmentsTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -75,7 +75,7 @@ export class AppointmentRepository {
   async updateStatus(id: string, status: string, ctx: TxContext): Promise<DbAppointment | null> {
     const [row] = await qb(this.db, ctx)
       .update(appointmentsTable)
-      .set({ status: status as any, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ status: status as any, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(appointmentsTable.id, id), isNull(appointmentsTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -84,7 +84,7 @@ export class AppointmentRepository {
   async softDelete(id: string, ctx: TxContext): Promise<boolean> {
     const [row] = await qb(this.db, ctx)
       .update(appointmentsTable)
-      .set({ deletedAt: new Date(), updatedBy: ctx.userId })
+      .set({ deletedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(appointmentsTable.id, id), isNull(appointmentsTable.deletedAt)))
       .returning({ id: appointmentsTable.id });
     return !!row;

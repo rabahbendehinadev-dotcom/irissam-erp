@@ -12,7 +12,7 @@ import { eq, and, isNull, count } from "drizzle-orm";
 import {
   db as globalDb, occupancyBedsTable, type DbOccupancyBed, type InsertOccupancyBed,
 } from "@workspace/db";
-import { type TxContext, type QueryOptions, qb } from "./types";
+import { type TxContext, type QueryOptions, qb , safeUuid } from "./types";
 
 export type { DbOccupancyBed };
 
@@ -47,7 +47,7 @@ export class OccupancyBedRepository {
   async create(data: InsertOccupancyBed, ctx: TxContext): Promise<DbOccupancyBed> {
     const [row] = await qb(this.db, ctx)
       .insert(occupancyBedsTable)
-      .values({ ...data, createdBy: ctx.userId, updatedBy: ctx.userId })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), updatedBy: safeUuid(ctx.userId) })
       .returning();
     return row;
   }
@@ -66,7 +66,7 @@ export class OccupancyBedRepository {
         patientName: payload.patientName,
         encounterId: payload.encounterId,
         occupiedAt:  new Date(),
-        updatedBy:   ctx.userId,
+        updatedBy:   safeUuid(ctx.userId),
         updatedAt:   new Date(),
       })
       .where(and(eq(occupancyBedsTable.id, id), eq(occupancyBedsTable.status, "disponible")))
@@ -84,7 +84,7 @@ export class OccupancyBedRepository {
         patientName: null,
         encounterId: null,
         occupiedAt:  null,
-        updatedBy:   ctx.userId,
+        updatedBy:   safeUuid(ctx.userId),
         updatedAt:   new Date(),
       })
       .where(eq(occupancyBedsTable.id, id))

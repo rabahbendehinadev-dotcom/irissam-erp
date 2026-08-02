@@ -10,7 +10,7 @@ import { eq, and, isNull, desc, count, sql } from "drizzle-orm";
 import {
   db as globalDb, medicationsTable, type DbMedication, type InsertMedication,
 } from "@workspace/db";
-import { type TxContext, type QueryOptions, type PagedResult, paged, qb } from "./types";
+import { type TxContext, type QueryOptions, type PagedResult, paged, qb , safeUuid } from "./types";
 
 export type { DbMedication };
 
@@ -53,7 +53,7 @@ export class MedicationRepository {
   async create(data: InsertMedication, ctx: TxContext): Promise<DbMedication> {
     const [row] = await qb(this.db, ctx)
       .insert(medicationsTable)
-      .values({ ...data, createdBy: ctx.userId, updatedBy: ctx.userId })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), updatedBy: safeUuid(ctx.userId) })
       .returning();
     return row;
   }
@@ -61,7 +61,7 @@ export class MedicationRepository {
   async update(id: string, data: Partial<InsertMedication>, ctx: TxContext): Promise<DbMedication | null> {
     const [row] = await qb(this.db, ctx)
       .update(medicationsTable)
-      .set({ ...data, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ ...data, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(medicationsTable.id, id), isNull(medicationsTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -77,7 +77,7 @@ export class MedicationRepository {
       .set({
         quantity:  sql`${medicationsTable.quantity} - ${quantity}`,
         updatedAt: new Date(),
-        updatedBy: ctx.userId,
+        updatedBy: safeUuid(ctx.userId),
       })
       .where(and(
         eq(medicationsTable.id, id),
@@ -91,7 +91,7 @@ export class MedicationRepository {
   async softDelete(id: string, ctx: TxContext): Promise<boolean> {
     const [row] = await qb(this.db, ctx)
       .update(medicationsTable)
-      .set({ deletedAt: new Date(), deletedBy: ctx.userId })
+      .set({ deletedAt: new Date(), deletedBy: safeUuid(ctx.userId) })
       .where(and(eq(medicationsTable.id, id), isNull(medicationsTable.deletedAt)))
       .returning({ id: medicationsTable.id });
     return !!row;

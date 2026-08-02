@@ -11,6 +11,7 @@ import bloodBankRouter from "./blood-bank";
 import vehiclesRouter from "./vehicles";
 import medicationsRouter from "./medications";
 import consultationsRouter from "./consultations";
+import admissionsRouter from "./admissions";
 import { requireAuth } from "../middleware/requireAuth";
 
 const router: IRouter = Router();
@@ -30,5 +31,6 @@ router.use("/blood-bank", requireAuth, bloodBankRouter);
 router.use("/vehicles", requireAuth, vehiclesRouter);
 router.use("/medications", requireAuth, medicationsRouter);
 router.use("/consultations", requireAuth, consultationsRouter);
+router.use("/admissions", requireAuth, admissionsRouter);
 
 export default router;

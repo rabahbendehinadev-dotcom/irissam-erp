@@ -4,7 +4,7 @@
  */
 import { eq, ilike, or, and, isNull, isNotNull, desc, sql, count } from "drizzle-orm";
 import { db as globalDb, patientsTable, type DbPatient, type InsertPatient } from "@workspace/db";
-import { type TxContext, type QueryOptions, type PagedResult, paged, qb } from "./types";
+import { type TxContext, type QueryOptions, type PagedResult, paged, qb , safeUuid } from "./types";
 
 export type { DbPatient };
 
@@ -108,7 +108,7 @@ export class PatientRepository {
   async create(data: InsertPatient, ctx: TxContext): Promise<DbPatient> {
     const [row] = await qb(this.db, ctx)
       .insert(patientsTable)
-      .values({ ...data, createdBy: ctx.userId, updatedBy: ctx.userId })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), updatedBy: safeUuid(ctx.userId) })
       .returning();
     return row;
   }
@@ -116,7 +116,7 @@ export class PatientRepository {
   async update(id: string, data: Partial<InsertPatient>, ctx: TxContext): Promise<DbPatient | null> {
     const [row] = await qb(this.db, ctx)
       .update(patientsTable)
-      .set({ ...data, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ ...data, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(patientsTable.id, id), isNull(patientsTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -125,7 +125,7 @@ export class PatientRepository {
   async softDelete(id: string, ctx: TxContext): Promise<boolean> {
     const [row] = await qb(this.db, ctx)
       .update(patientsTable)
-      .set({ deletedAt: new Date(), deletedBy: ctx.userId })
+      .set({ deletedAt: new Date(), deletedBy: safeUuid(ctx.userId) })
       .where(and(eq(patientsTable.id, id), isNull(patientsTable.deletedAt)))
       .returning({ id: patientsTable.id });
     return !!row;
@@ -134,7 +134,7 @@ export class PatientRepository {
   async markPotentialDuplicate(id: string, flag: boolean, ctx: TxContext): Promise<void> {
     await qb(this.db, ctx)
       .update(patientsTable)
-      .set({ potentialDuplicate: flag, updatedBy: ctx.userId })
+      .set({ potentialDuplicate: flag, updatedBy: safeUuid(ctx.userId) })
       .where(eq(patientsTable.id, id));
   }
 }

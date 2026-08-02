@@ -70,6 +70,29 @@ async function seed() {
   console.log("🌱 Seeding IRISSAM Hospital ERP database...");
 
   // ──────────────────────────────────────────────────────────────────────────
+  // PRE-STEP: Truncate all tables in FK-safe order (CASCADE handles deps)
+  // ──────────────────────────────────────────────────────────────────────────
+  await pool.query(`
+    TRUNCATE TABLE
+      daily_stats, vehicles, beds,
+      alerts, blood_bank,
+      notifications, audit_logs, user_activity_logs, attachments,
+      invoice_items, payments, invoices,
+      prescriptions, imaging_orders, lab_orders,
+      appointments, consultations, medications, medication_lots,
+      or_slots, surgical_requests,
+      admission_timeline_events, admissions,
+      occupancy_beds, icu_admissions, icu_beds,
+      emergency_vitals, emergency_visits, emergency_rooms, ambulances,
+      patient_timeline_events, encounters,
+      patients,
+      user_sessions, users,
+      departments, floors, buildings, sites
+    CASCADE;
+  `);
+  console.log("🗑️  All tables cleared");
+
+  // ──────────────────────────────────────────────────────────────────────────
   // SECTION 1: Infrastructure
   // ──────────────────────────────────────────────────────────────────────────
 

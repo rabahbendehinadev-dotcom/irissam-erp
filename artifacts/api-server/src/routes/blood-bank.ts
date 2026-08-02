@@ -12,8 +12,8 @@ import { bloodBankTable } from "@workspace/db/schema";
 
 const router = Router();
 
-/** GET /blood-bank/summary */
-router.get("/summary", async (_req, res, next) => {
+/** GET /blood-bank  OR  /blood-bank/summary */
+router.get(["/", "/summary"], async (_req, res, next) => {
   try {
     const rows = await db.select().from(bloodBankTable);
 

@@ -11,7 +11,7 @@ import { eq, and, isNull, desc, count } from "drizzle-orm";
 import {
   db as globalDb, consultationsTable, type DbConsultation, type InsertConsultation,
 } from "@workspace/db";
-import { type TxContext, type QueryOptions, type PagedResult, paged, qb } from "./types";
+import { type TxContext, type QueryOptions, type PagedResult, paged, qb , safeUuid } from "./types";
 
 export type { DbConsultation };
 
@@ -56,7 +56,7 @@ export class ConsultationRepository {
   async create(data: InsertConsultation, ctx: TxContext): Promise<DbConsultation> {
     const [row] = await qb(this.db, ctx)
       .insert(consultationsTable)
-      .values({ ...data, createdBy: ctx.userId, updatedBy: ctx.userId })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), updatedBy: safeUuid(ctx.userId) })
       .returning();
     return row;
   }
@@ -64,7 +64,7 @@ export class ConsultationRepository {
   async update(id: string, data: Partial<InsertConsultation>, ctx: TxContext): Promise<DbConsultation | null> {
     const [row] = await qb(this.db, ctx)
       .update(consultationsTable)
-      .set({ ...data, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ ...data, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(consultationsTable.id, id), isNull(consultationsTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -81,7 +81,7 @@ export class ConsultationRepository {
   async softDelete(id: string, ctx: TxContext): Promise<boolean> {
     const [row] = await qb(this.db, ctx)
       .update(consultationsTable)
-      .set({ deletedAt: new Date(), updatedBy: ctx.userId })
+      .set({ deletedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(consultationsTable.id, id), isNull(consultationsTable.deletedAt)))
       .returning({ id: consultationsTable.id });
     return !!row;

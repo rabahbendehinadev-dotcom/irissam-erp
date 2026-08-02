@@ -5,7 +5,7 @@ import { eq, and, isNull, desc, count } from "drizzle-orm";
 import {
   db as globalDb, attachmentsTable, type DbAttachment, type InsertAttachment,
 } from "@workspace/db";
-import { type TxContext, type QueryOptions, type PagedResult, paged, qb } from "./types";
+import { type TxContext, type QueryOptions, type PagedResult, paged, qb , safeUuid } from "./types";
 
 export type { DbAttachment };
 
@@ -63,7 +63,7 @@ export class AttachmentRepository {
   async create(data: InsertAttachment, ctx: TxContext): Promise<DbAttachment> {
     const [row] = await qb(this.db, ctx)
       .insert(attachmentsTable)
-      .values({ ...data, createdBy: ctx.userId, createdByName: ctx.userName })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), createdByName: ctx.userName })
       .returning();
     return row;
   }
@@ -71,7 +71,7 @@ export class AttachmentRepository {
   async softDelete(id: string, ctx: TxContext): Promise<boolean> {
     const [row] = await qb(this.db, ctx)
       .update(attachmentsTable)
-      .set({ deletedAt: new Date(), deletedBy: ctx.userId })
+      .set({ deletedAt: new Date(), deletedBy: safeUuid(ctx.userId) })
       .where(and(eq(attachmentsTable.id, id), isNull(attachmentsTable.deletedAt)))
       .returning({ id: attachmentsTable.id });
     return !!row;

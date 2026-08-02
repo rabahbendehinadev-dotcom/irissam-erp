@@ -6,7 +6,7 @@ import { eq, and, isNull, desc, count, sql } from "drizzle-orm";
 import {
   db as globalDb, encountersTable, type DbEncounter, type InsertEncounter,
 } from "@workspace/db";
-import { type TxContext, type QueryOptions, type PagedResult, paged, qb } from "./types";
+import { type TxContext, type QueryOptions, type PagedResult, paged, qb , safeUuid } from "./types";
 
 export type { DbEncounter };
 
@@ -64,7 +64,7 @@ export class EncounterRepository {
   async create(data: InsertEncounter, ctx: TxContext): Promise<DbEncounter> {
     const [row] = await qb(this.db, ctx)
       .insert(encountersTable)
-      .values({ ...data, createdBy: ctx.userId, updatedBy: ctx.userId })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), updatedBy: safeUuid(ctx.userId) })
       .returning();
     return row;
   }
@@ -72,7 +72,7 @@ export class EncounterRepository {
   async update(id: string, data: Partial<InsertEncounter>, ctx: TxContext): Promise<DbEncounter | null> {
     const [row] = await qb(this.db, ctx)
       .update(encountersTable)
-      .set({ ...data, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ ...data, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(encountersTable.id, id), isNull(encountersTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -81,7 +81,7 @@ export class EncounterRepository {
   async close(id: string, reason: string, ctx: TxContext): Promise<DbEncounter | null> {
     const [row] = await qb(this.db, ctx)
       .update(encountersTable)
-      .set({ status: "closed", closedAt: new Date(), closeReason: reason, updatedBy: ctx.userId })
+      .set({ status: "closed", closedAt: new Date(), closeReason: reason, updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(encountersTable.id, id), isNull(encountersTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -96,7 +96,7 @@ export class EncounterRepository {
       .update(encountersTable)
       .set({
         linkedRecords: sql`jsonb_append(COALESCE(linked_records, '[]'::jsonb), ${JSON.stringify({ ...record, createdAt: new Date().toISOString() })}::jsonb)`,
-        updatedBy: ctx.userId,
+        updatedBy: safeUuid(ctx.userId),
       })
       .where(eq(encountersTable.id, id));
   }

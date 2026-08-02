@@ -16,7 +16,7 @@ import { eq, and, isNull, desc, count } from "drizzle-orm";
 import {
   db as globalDb, admissionsTable, type DbAdmission, type InsertAdmission,
 } from "@workspace/db";
-import { type TxContext, type QueryOptions, type PagedResult, paged, qb } from "./types";
+import { type TxContext, type QueryOptions, type PagedResult, paged, qb , safeUuid } from "./types";
 
 export type { DbAdmission };
 
@@ -80,7 +80,7 @@ export class AdmissionRepository {
   async create(data: InsertAdmission, ctx: TxContext): Promise<DbAdmission> {
     const [row] = await qb(this.db, ctx)
       .insert(admissionsTable)
-      .values({ ...data, createdBy: ctx.userId, updatedBy: ctx.userId })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), updatedBy: safeUuid(ctx.userId) })
       .returning();
     return row;
   }
@@ -88,7 +88,7 @@ export class AdmissionRepository {
   async update(id: string, data: Partial<InsertAdmission>, ctx: TxContext): Promise<DbAdmission | null> {
     const [row] = await qb(this.db, ctx)
       .update(admissionsTable)
-      .set({ ...data, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ ...data, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(admissionsTable.id, id), isNull(admissionsTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -104,7 +104,7 @@ export class AdmissionRepository {
         dischargeType:       payload.dischargeType as any,
         dischargeNotes:      payload.dischargeNotes,
         updatedAt:           new Date(),
-        updatedBy:           ctx.userId,
+        updatedBy:           safeUuid(ctx.userId),
       })
       .where(and(eq(admissionsTable.id, id), isNull(admissionsTable.deletedAt)))
       .returning();
@@ -114,7 +114,7 @@ export class AdmissionRepository {
   async softDelete(id: string, ctx: TxContext): Promise<boolean> {
     const [row] = await qb(this.db, ctx)
       .update(admissionsTable)
-      .set({ deletedAt: new Date(), deletedBy: ctx.userId })
+      .set({ deletedAt: new Date(), deletedBy: safeUuid(ctx.userId) })
       .where(and(eq(admissionsTable.id, id), isNull(admissionsTable.deletedAt)))
       .returning({ id: admissionsTable.id });
     return !!row;
