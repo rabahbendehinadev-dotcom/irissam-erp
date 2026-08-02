@@ -34,8 +34,13 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
-      setLocation('/');
+      const user = await login(email, password);
+      // Redirect to change-password on first login, dashboard otherwise
+      if (user?.forcePasswordChange) {
+        setLocation('/change-password');
+      } else {
+        setLocation('/');
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Identifiants invalides.';
       setError(msg);

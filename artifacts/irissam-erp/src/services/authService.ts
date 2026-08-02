@@ -16,9 +16,12 @@ export interface AuthServiceInterface {
 
 export const authService: AuthServiceInterface = {
   async login(credentials) {
+    // _skipRefresh: true — prevents the 401 interceptor from treating a wrong-password
+    // response as an expired session and triggering a spurious refresh + auth:logout
     const data = await apiClient.post<{ user: User; accessToken: string }>(
       '/auth/login',
       credentials,
+      { _skipRefresh: true },
     );
     return data;
   },
@@ -57,6 +60,8 @@ export const authService: AuthServiceInterface = {
   },
 
   async changePassword(currentPassword, newPassword) {
-    await apiClient.post('/auth/change-password', { currentPassword, newPassword });
+    // _skipRefresh: true — a wrong current-password returns 401; we must not treat
+    // that as an expired-token event and trigger a spurious refresh + auth:logout
+    await apiClient.post('/auth/change-password', { currentPassword, newPassword }, { _skipRefresh: true });
   },
 };

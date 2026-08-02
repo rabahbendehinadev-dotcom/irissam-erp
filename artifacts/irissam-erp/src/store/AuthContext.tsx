@@ -12,7 +12,8 @@ import { apiClient } from '@/services/api/client';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
 
 interface AuthContextType extends Session {
-  login: (email: string, password: string) => Promise<void>;
+  /** Resolves with the authenticated User. Throws on bad credentials. */
+  login: (email: string, password: string) => Promise<import('@/types').User>;
   logout: () => Promise<void>;
   /** true when the API was unreachable during auth bootstrap */
   networkError: boolean;
@@ -199,13 +200,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ── Login / Logout ──────────────────────────────────────────────────────────
 
   const login = useCallback(async (email: string, password: string) => {
-    setSession(s => ({ ...s, isLoading: true }));
+    // Do NOT set isLoading:true here — that would unmount the LoginPage and prevent
+    // the error message from appearing when credentials are wrong.
+    // The LoginPage manages its own local loading/spinner state.
     try {
       const { user, accessToken } = await authService.login({ email, password });
       applyToken(accessToken);
       setSession({ user, token: accessToken, isAuthenticated: true, isLoading: false });
+      return user;
     } catch (err: unknown) {
-      setSession(s => ({ ...s, isLoading: false }));
       const msg = err instanceof Error ? err.message : 'Identifiants invalides.';
       throw new Error(msg);
     }

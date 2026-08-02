@@ -28,6 +28,7 @@ const OperatingRoomPage = lazy(() => import('@/pages/OperatingRoom'));
 const PersonnelPage = lazy(() => import('@/pages/Personnel'));
 const AmbulancesPage = lazy(() => import('@/pages/Ambulances'));
 const DevTestRunnerPage = lazy(() => import('@/pages/DevTestRunner'));
+const ChangePasswordPage = lazy(() => import('@/pages/ChangePassword'));
 
 // ---------------------------------------------------------------------------
 // Loading skeleton shown while a lazy chunk is fetching
@@ -111,11 +112,13 @@ function AuthLoadingScreen() {
   return <FullPageSpinner />;
 }
 
-/** Wrapper that redirects unauthenticated users to /login */
+/** Wrapper that redirects unauthenticated users to /login.
+ *  If the user must change their password, redirects to /change-password first. */
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <AuthLoadingScreen />;
   if (!isAuthenticated) return <Redirect to="/login" />;
+  if (user?.forcePasswordChange) return <Redirect to="/change-password" />;
   return (
     <Suspense fallback={<LoadingSkeleton />}>
       <Component />
@@ -124,7 +127,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 }
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   return (
     <Switch>
@@ -133,10 +136,24 @@ function Router() {
         {isLoading ? (
           <AuthLoadingScreen />
         ) : isAuthenticated ? (
-          <Redirect to="/" />
+          // Authenticated but must change password first
+          user?.forcePasswordChange ? <Redirect to="/change-password" /> : <Redirect to="/" />
         ) : (
           <Suspense fallback={<FullPageSpinner />}>
             <LoginPage />
+          </Suspense>
+        )}
+      </Route>
+
+      {/* Change-password route — accessible only while authenticated (any forcePasswordChange state) */}
+      <Route path="/change-password">
+        {isLoading ? (
+          <AuthLoadingScreen />
+        ) : !isAuthenticated ? (
+          <Redirect to="/login" />
+        ) : (
+          <Suspense fallback={<FullPageSpinner />}>
+            <ChangePasswordPage />
           </Suspense>
         )}
       </Route>

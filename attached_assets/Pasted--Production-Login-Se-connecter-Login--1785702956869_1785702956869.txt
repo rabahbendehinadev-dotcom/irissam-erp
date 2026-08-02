@@ -1,0 +1,134 @@
+في Production، صفحة Login تظهر بشكل صحيح، لكن عند إدخال الحساب والضغط على Se connecter:
+
+Login → شاشة Chargement → رجوع تلقائي إلى /login.
+
+شخّص وأصلح Session Bootstrap بعد Login بدون تغيير التصميم.
+
+المطلوب:
+
+1. افحص فعليًا هذه الطلبات في Production:
+- POST /api/auth/login
+- GET /api/auth/me
+- POST /api/auth/refresh
+
+وسجل فقط:
+- Status code
+- error code
+- هل Set-Cookie موجود
+بدون تسجيل Token أو Password.
+
+2. Force Password Change
+
+الحساب admin@irissam.dz لديه force_password_change=true.
+
+إذا Login نجح وكان forcePasswordChange=true:
+- لا ترجعه إلى /login.
+- وجهه مباشرة إلى /change-password.
+- اسمح له بالوصول فقط إلى:
+  /change-password
+  /api/auth/me
+  /api/auth/change-password
+  /api/auth/logout
+
+إذا Backend يرجع:
+403 + code=PASSWORD_CHANGE_REQUIRED
+يجب أن يعالج Frontend هذا كحالة Authenticated تتطلب تغيير كلمة السر، وليس Session منتهية.
+
+3. Login Response
+
+تأكد أن POST /api/auth/login يعيد:
+
+{
+  user,
+  permissions,
+  forcePasswordChange,
+  accessToken أو session status
+}
+
+ويضع Refresh Cookie عبر Set-Cookie.
+
+4. Cookie Production
+
+راجع Refresh Cookie:
+
+- HttpOnly=true
+- Secure=true
+- SameSite=Lax أو Strict حسب نفس الدومين
+- Path=/
+- لا تضع Domain خاطئ
+- يجب أن تعمل على irissamhospital.com
+- credentials: include في كل طلب Auth
+
+5. Frontend AuthContext
+
+بعد نجاح Login:
+
+- احفظ user مباشرة.
+- إذا forcePasswordChange=true:
+  navigate('/change-password')
+- غير ذلك:
+  navigate('/dashboard')
+
+لا تنفذ logout عند 403 PASSWORD_CHANGE_REQUIRED.
+Logout التلقائي يكون فقط عند:
+- 401
+- refresh فشل فعليًا
+- session revoked
+
+6. Interceptor
+
+راجع Interceptor:
+- لا يعامل كل 403 كأنه Session منتهية.
+- 403 Permission Denied يبقى داخل الصفحة.
+- 403 PASSWORD_CHANGE_REQUIRED يوجه لتغيير كلمة السر.
+- Refresh يتم فقط عند 401.
+- محاولة Refresh واحدة فقط.
+
+7. Seed Production
+
+تحقق داخل Production DB من وجود:
+
+email = admin@irissam.dz
+account_status = active
+force_password_change = true
+password_hash موجود
+locked_until IS NULL
+failed_login_attempts = 0
+
+إذا المستخدم غير موجود، شغّل RBAC/Auth seed idempotent فقط.
+
+8. اختبارات القبول
+
+A:
+Login صحيح + forcePasswordChange=true
+→ /change-password
+→ لا يرجع إلى /login
+
+B:
+تغيير كلمة السر بنجاح
+→ forcePasswordChange=false
+→ Sessions القديمة revoked
+→ Login بالكلمة الجديدة
+→ Dashboard
+
+C:
+login=200
+→ Cookie موجودة في Browser
+→ /auth/me=200
+
+D:
+403 Permission Denied
+→ لا Logout
+
+E:
+401 حقيقي
+→ Refresh مرة واحدة
+→ إذا فشل يرجع Login
+
+في التقرير أعطني:
+- Status الفعلي لـ login/me/refresh قبل الإصلاح
+- السبب الحقيقي للرجوع إلى /login
+- هل Set-Cookie وصل للمتصفح
+- نتيجة الاختبارات A–E
+- صفر Loading Loop
+- صفر Redirect Loop
