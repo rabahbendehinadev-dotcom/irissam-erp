@@ -1,0 +1,253 @@
+ابدأ الآن تنفيذ Task #84 فقط: تطبيق Migrations قاعدة PostgreSQL والتحقق منها.
+
+مهم جدًا:
+- لا تغيّر أي Frontend.
+- لا تغيّر أي Component.
+- لا تضف Features جديدة.
+- لا تبدأ Task #85 الآن.
+- خذ Backup أو Snapshot قبل أي Migration إذا كانت قاعدة البيانات تحتوي على بيانات.
+- لا تحذف الجداول القديمة مباشرة.
+- نفّذ العملية بطريقة آمنة وقابلة للتراجع.
+
+==================================================
+1. التحقق قبل التطبيق
+==================================================
+
+قبل تنفيذ أي Migration:
+
+- تأكد من الاتصال الصحيح بقاعدة PostgreSQL.
+- اعرض اسم قاعدة البيانات والـSchema المستعمل.
+- تحقق من جدول migrations الحالي.
+- تحقق هل migrations التالية مطبقة أم لا:
+  - 001_clinical_schema.sql
+  - 002_seed_indexes.sql
+  - 003_schema_additions.sql
+- لا تعاود تطبيق Migration مطبقة سابقًا.
+- تحقق من وجود نسخة احتياطية أو نقطة رجوع.
+
+==================================================
+2. تطبيق Migrations
+==================================================
+
+طبّق بالترتيب:
+
+1. 001_clinical_schema.sql
+2. 002_seed_indexes.sql
+3. 003_schema_additions.sql
+
+يجب تطبيق كل Migration داخل Transaction مستقلة:
+
+BEGIN
+→ تنفيذ Migration
+→ Validation
+→ COMMIT
+
+وعند أي خطأ:
+
+ROLLBACK
+
+لا تترك قاعدة البيانات في حالة جزئية.
+
+==================================================
+3. التحقق من الجداول
+==================================================
+
+بعد التطبيق، تحقق من وجود جميع الجداول الأساسية، منها:
+
+- sites
+- buildings
+- floors
+- departments
+- services
+- users
+- user_sessions
+- patients
+- patient_timeline_events
+- encounters
+- emergency_rooms
+- emergency_visits
+- emergency_vitals
+- ambulances
+- occupancy_beds
+- icu_beds
+- icu_admissions
+- bed_states
+- admissions
+- admission_timeline_events
+- operating_rooms
+- surgical_requests
+- or_slots
+- lab_orders
+- imaging_orders
+- prescriptions
+- medications
+- medication_lots
+- consultations
+- appointments
+- invoices
+- invoice_items
+- payments
+- audit_logs
+- user_activity_logs
+- notifications
+- attachments
+- blood_bank
+- alerts
+
+==================================================
+4. التحقق من الحقول المهمة
+==================================================
+
+تحقق من:
+
+Patients:
+- id UUID
+- mrn unique not null
+- createdAt
+- updatedAt
+- deletedAt
+- version
+
+Encounters:
+- id UUID
+- encounterNumber unique not null
+- patientId foreign key
+- status
+- createdAt
+- updatedAt
+- deletedAt
+- version
+
+Attachments:
+- patientId
+- encounterId
+- module
+- entityId
+- fileName
+- mimeType
+- fileSize
+- storageProvider
+- storagePath
+- checksum
+- uploadedBy
+
+UserActivityLogs:
+- userId
+- action
+- module
+- patientId
+- encounterId
+- ipAddress
+- device
+- browser
+- createdAt
+
+==================================================
+5. التحقق من العلاقات والقيود
+==================================================
+
+تحقق أن:
+
+- Encounter مربوط بـPatient.
+- Admission مربوط بـEncounter وPatient.
+- EmergencyVisit مربوط بـEncounter.
+- LabOrder وImagingOrder وPrescription مربوطين بـEncounter وPatient.
+- Bed مربوط بـAdmission وEncounter عند الإشغال.
+- ICUAdmission مربوط بـEncounter.
+- SurgicalRequest مربوط بـEncounter.
+- Attachments قابلة للربط بأي Entity.
+- جميع Foreign Keys صحيحة.
+- جميع Unique Constraints تعمل.
+- Enums والحالات تقبل القيم الصحيحة فقط.
+
+==================================================
+6. التحقق من Indexes
+==================================================
+
+تحقق من وجود Indexes على:
+
+- patients.mrn
+- encounters.encounterNumber
+- patientId
+- encounterId
+- status
+- createdAt
+- module
+- siteId
+- buildingId
+- floorId
+- departmentId
+
+اعرض قائمة الـIndexes المهمة بعد التطبيق.
+
+==================================================
+7. تشغيل Seed
+==================================================
+
+بعد نجاح الـMigrations فقط:
+
+- شغّل Seed Data بالترتيب الصحيح للـForeign Keys.
+- لا تنشئ بيانات مكررة.
+- إذا كانت البيانات موجودة، استعمل Upsert أو Skip.
+- تحقق من إنشاء:
+  - Site
+  - Users
+  - Patients
+  - Encounters
+  - Admissions
+  - Beds
+  - Orders
+  - Consultations
+
+==================================================
+8. اختبارات Smoke Test
+==================================================
+
+بعد التطبيق نفّذ اختبارات مباشرة على PostgreSQL:
+
+1. إنشاء Patient مع MRN.
+2. رفض Patient بنفس MRN.
+3. إنشاء Encounter مربوط بالمريض.
+4. رفض Encounter بنفس encounterNumber.
+5. إنشاء Admission.
+6. تخصيص Bed.
+7. إنشاء LabOrder.
+8. إنشاء ImagingOrder.
+9. إنشاء Prescription.
+10. إنشاء AuditLog وUserActivityLog.
+11. إنشاء Attachment.
+
+بعد الاختبار احذف بيانات الاختبار فقط، ولا تحذف Seed Data.
+
+==================================================
+9. تشغيل السيرفر والـAPI
+==================================================
+
+بعد نجاح قاعدة البيانات:
+
+- شغّل api-server.
+- جرّب Health endpoint.
+- جرّب endpoint قراءة Patients.
+- جرّب endpoint قراءة Admissions.
+- جرّب endpoint إنشاء Patient تجريبي ثم حذفه أو أرشفته.
+- تأكد من عدم وجود Runtime SQL Errors.
+- تأكد من صفر أخطاء TypeScript وConsole.
+
+==================================================
+10. التقرير النهائي
+==================================================
+
+بعد الانتهاء أعطني تقريرًا واضحًا يحتوي على:
+
+- اسم قاعدة البيانات والـSchema.
+- Migrations التي تم تطبيقها.
+- Migrations التي تم تجاوزها لأنها مطبقة.
+- عدد الجداول الموجودة.
+- عدد الـIndexes.
+- نتائج Seed.
+- نتائج Smoke Tests.
+- أي أخطاء ظهرت وكيف تم إصلاحها.
+- هل جميع Routes تعمل الآن مع PostgreSQL.
+- ما الذي بقي قبل Task #85.
+
+لا تبدأ Task #85 حتى أعطيك الموافقة.
