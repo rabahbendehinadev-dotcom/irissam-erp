@@ -24,6 +24,7 @@ import { useAuth } from '@/store/AuthContext';
 import type { AuditCtx } from '@/types/repository';
 import { formatDate } from '@/utils/format';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
+import { PatientDrawer } from '@/components/shared/PatientDrawer';
 
 // ─── Discharge modal ─────────────────────────────────────────────────────────
 
@@ -218,12 +219,13 @@ export default function AdmissionsPage() {
   const [sortField, setSortField] = useState('admissionDate');
   const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('desc');
 
-  const [showForm,     setShowForm]     = useState(false);
-  const [editing,      setEditing]      = useState<Admission | null>(null);
-  const [detailing,    setDetailing]    = useState<Admission | null>(null);
-  const [discharging,  setDischarging]  = useState<Admission | null>(null);
-  const [transferring, setTransferring] = useState<Admission | null>(null);
-  const [cancelling,   setCancelling]   = useState<Admission | null>(null);
+  const [showForm,        setShowForm]        = useState(false);
+  const [editing,         setEditing]         = useState<Admission | null>(null);
+  const [detailing,       setDetailing]       = useState<Admission | null>(null);
+  const [discharging,     setDischarging]     = useState<Admission | null>(null);
+  const [transferring,    setTransferring]    = useState<Admission | null>(null);
+  const [cancelling,      setCancelling]      = useState<Admission | null>(null);
+  const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
 
   const handleSort = (field: string) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -320,6 +322,7 @@ export default function AdmissionsPage() {
           onDischarge={a => setDischarging(a)}
           onTransfer={a => setTransferring(a)}
           onCancel={a => setCancelling(a)}
+          onPatientClick={patientId => setDrawerPatientId(patientId)}
           canEdit={can('admissions.edit')}
           canDischarge={can('admissions.discharge')}
           canTransfer={can('admissions.transfer')}
@@ -373,6 +376,8 @@ export default function AdmissionsPage() {
       {detailing && (
         <AdmissionDetailPanel admission={detailing} onClose={() => setDetailing(null)} />
       )}
+
+      <PatientDrawer patientId={drawerPatientId} onClose={() => setDrawerPatientId(null)} />
 
       {discharging && (
         <DischargeModal

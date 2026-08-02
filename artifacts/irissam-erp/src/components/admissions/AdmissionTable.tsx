@@ -31,6 +31,7 @@ interface Props {
   onDischarge: (a: Admission) => void;
   onTransfer: (a: Admission) => void;
   onCancel: (a: Admission) => void;
+  onPatientClick?: (patientId: string) => void;
   canEdit: boolean;
   canDischarge: boolean;
   canTransfer: boolean;
@@ -43,6 +44,7 @@ interface Props {
 export function AdmissionTable({
   admissions, page, perPage,
   onView, onEdit, onDischarge, onTransfer, onCancel,
+  onPatientClick,
   canEdit, canDischarge, canTransfer, canCancel,
   sortField, sortDir, onSort,
 }: Props) {
@@ -106,7 +108,10 @@ export function AdmissionTable({
 
                 {/* Patient */}
                 <td className="px-3 py-3">
-                  <button onClick={() => onView(admission)} className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => onPatientClick ? onPatientClick(admission.patientId) : onView(admission)}
+                    className="flex items-center gap-2.5"
+                  >
                     <PatientAvatar name={admission.patientName} size="sm" />
                     <span className="text-sm font-medium text-gray-900 group-hover:text-blue-700 transition-colors">
                       {admission.patientName}
