@@ -1,0 +1,292 @@
+Task #109 — Intégration complète de la Facturation dans le Dossier Patient
+
+ممنوع إنشاء Module جديد.
+ممنوع تغيير Design System.
+ممنوع Placeholder.
+
+الهدف:
+إكمال التكامل بين Patient Detail وModule Facturation.
+
+====================================================
+1. Onglet Factures
+====================================================
+
+استبدل Placeholder الحالي بواجهة كاملة.
+
+أضف أعلى الصفحة:
+
+- Total facturé
+- Total payé
+- Reste à payer
+- Part Assurance
+- Part Patient
+- Nombre de factures
+
+كلها Cards صغيرة بنفس تصميم Dashboard.
+
+بعدها جدول:
+
+Colonnes:
+
+- N° Facture
+- Date
+- Encounter
+- Total
+- Assurance
+- Patient
+- Payé
+- Reste
+- Statut
+- Actions
+
+Actions:
+
+- Voir
+- Télécharger PDF
+- Paiement
+- Crédit Note
+- Annuler (permission)
+
+====================================================
+2. Détail Facture
+====================================================
+
+عند الضغط على الفاتورة:
+
+Slide-over professionnel.
+
+Sections:
+
+Informations générales
+
+Invoice Items
+
+Paiements
+
+Assurance
+
+Historique
+
+Audit
+
+Timeline
+
+Buttons:
+
+Télécharger PDF
+
+Imprimer
+
+Ajouter Paiement
+
+Créer Crédit Note
+
+====================================================
+3. Onglet Paiements
+====================================================
+
+إلغاء Placeholder.
+
+عرض جميع المدفوعات الخاصة بالمريض.
+
+Colonnes:
+
+Numéro
+
+Date
+
+Facture
+
+Méthode
+
+Montant
+
+Reçu
+
+Statut
+
+Actions
+
+Actions:
+
+Voir
+
+Télécharger Reçu PDF
+
+Rembourser (permission)
+
+====================================================
+4. Onglet Facturation
+====================================================
+
+هذا التبويب يكون Financial Summary.
+
+يعرض:
+
+Total facturé
+
+Total payé
+
+Reste
+
+Créances
+
+Assurance
+
+CNAS
+
+CASNOS
+
+Dernière facture
+
+Dernier paiement
+
+Graphique paiements mensuels
+
+Graphique facturation mensuelle
+
+Répartition par module:
+
+Consultation
+
+Laboratoire
+
+Imagerie
+
+Pharmacie
+
+Hospitalisation
+
+Bloc
+
+Réanimation
+
+====================================================
+5. Timeline
+====================================================
+
+داخل Timeline الخاصة بالمريض أضف:
+
+Facture créée
+
+Facture émise
+
+Paiement
+
+Paiement partiel
+
+Paiement complet
+
+Crédit Note
+
+Refund
+
+====================================================
+6. Search
+====================================================
+
+البحث داخل Factures وPaiements.
+
+Filtre:
+
+Date
+
+Statut
+
+Méthode
+
+Montant
+
+Assurance
+
+====================================================
+7. Backend
+====================================================
+
+أنشئ APIs:
+
+GET /patients/:id/invoices
+
+GET /patients/:id/payments
+
+GET /patients/:id/financial-summary
+
+GET /patients/:id/billing-timeline
+
+استعمل Aggregations SQL.
+
+====================================================
+8. Performance
+====================================================
+
+Pagination
+
+Lazy Loading
+
+React Query Cache
+
+Optimistic Updates
+
+====================================================
+9. Acceptance Tests
+====================================================
+
+TEST A
+
+فتح Patient
+
+→ Factures تظهر
+
+TEST B
+
+فتح Facture
+
+→ Detail كامل
+
+TEST C
+
+Paiement جديد
+
+→ يظهر مباشرة
+
+TEST D
+
+Financial Summary
+
+→ صحيح
+
+TEST E
+
+Timeline
+
+→ تحتوي جميع الأحداث المالية
+
+TEST F
+
+PDF
+
+→ يعمل
+
+TEST G
+
+0 Runtime Errors
+
+TEST H
+
+0 TypeScript Errors
+
+====================================================
+Rapport final
+====================================================
+
+أعطني:
+
+الملفات المعدلة
+
+الـAPIs الجديدة
+
+نتائج TEST A-H
+
+عدد الصفحات المكتملة
+
+عدد الـPlaceholders المتبقية داخل Patient Detail.

@@ -17,6 +17,9 @@ import { PatientVaccinationsTab } from '@/components/patients/PatientVaccination
 import { PatientConsentsTab } from '@/components/patients/PatientConsentsTab';
 import { PatientAllergyManager } from '@/components/patients/PatientAllergyManager';
 import { PatientMedicalHistoryTab } from '@/components/patients/PatientMedicalHistoryTab';
+import { PatientInvoicesTab } from '@/components/billing/PatientInvoicesTab';
+import { PatientPaymentsTab } from '@/components/billing/PatientPaymentsTab';
+import { PatientBillingTab } from '@/components/billing/PatientBillingTab';
 import { ConsultationTable } from '@/components/consultations/ConsultationTable';
 import { ConsultationForm } from '@/components/consultations/ConsultationForm';
 import { ConsultationStatusBadge } from '@/components/consultations/ConsultationStatusBadge';
@@ -138,7 +141,7 @@ function DernieresConsultations({ consultations, onOpen, onNew }: {
 
 const SOON_TABS = [
   'appointments', 'admissions', 'emergencies', 'hospitalizations',
-  'laboratory', 'imaging', 'prescriptions', 'invoices', 'billing', 'payments',
+  'laboratory', 'imaging', 'prescriptions',
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -478,6 +481,11 @@ export default function PatientDetailPage() {
 
         {/* ─── AUDIT (Feature 8: search + filter + export) ─── */}
         {activeTab === 'audit' && <PatientAuditLog />}
+
+        {/* ─── BILLING TABS ─── */}
+        {activeTab === 'invoices' && <PatientInvoicesTab patientId={patient.id} />}
+        {activeTab === 'payments' && <PatientPaymentsTab patientId={patient.id} />}
+        {activeTab === 'billing'  && <PatientBillingTab  patientId={patient.id} />}
 
         {/* ─── PLACEHOLDER TABS ─── */}
         {SOON_TABS.includes(activeTab) && (

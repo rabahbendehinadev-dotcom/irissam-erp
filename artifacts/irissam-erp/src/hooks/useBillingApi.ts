@@ -37,6 +37,7 @@ export interface Payment {
   notes?:         string;
   status:         string;
   collectorName?: string;
+  receiptNumber?: string;
   paidAt:         string;
   createdAt:      string;
 }
