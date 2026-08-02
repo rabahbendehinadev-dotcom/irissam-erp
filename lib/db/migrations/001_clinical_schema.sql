@@ -331,6 +331,26 @@ DO $$ BEGIN
              WHERE table_name='patients' AND column_name='id'
              AND data_type='integer') THEN
     ALTER TABLE patients RENAME TO patients_legacy;
+
+    -- Immediately rename any explicitly-named constraints that were kept from
+    -- the original table, so their names do not collide with constraints that
+    -- drizzle-kit or future migrations will create on the new `patients` table.
+    -- PostgreSQL requires constraint/index names to be unique per schema.
+    IF EXISTS (
+      SELECT 1 FROM pg_constraint c JOIN pg_class t ON c.conrelid = t.oid
+      WHERE c.conname = 'patients_file_number_unique' AND t.relname = 'patients_legacy'
+    ) THEN
+      ALTER TABLE patients_legacy
+        RENAME CONSTRAINT patients_file_number_unique TO patients_legacy_file_number_unique;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM pg_constraint c JOIN pg_class t ON c.conrelid = t.oid
+      WHERE c.conname = 'patients_pkey' AND t.relname = 'patients_legacy'
+    ) THEN
+      ALTER TABLE patients_legacy
+        RENAME CONSTRAINT patients_pkey TO patients_legacy_pkey;
+    END IF;
   END IF;
 END $$;
 
