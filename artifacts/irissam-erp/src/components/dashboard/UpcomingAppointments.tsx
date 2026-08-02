@@ -9,7 +9,11 @@ function fmtTime(isoStr: string): string {
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
-export function UpcomingAppointments() {
+interface UpcomingAppointmentsProps {
+  onPatientClick?: (patientId: string) => void;
+}
+
+export function UpcomingAppointments({ onPatientClick }: UpcomingAppointmentsProps) {
   const { t } = useLanguage();
   const { data: appointments, isLoading } = useGetUpcomingAppointments({ query: { refetchInterval: 30_000 } });
 
@@ -44,7 +48,16 @@ export function UpcomingAppointments() {
                     {fmtTime(apt.scheduledAt)}
                   </td>
                   <td className="p-3">
-                    <div className="text-xs font-bold text-gray-900">{apt.patientName}</div>
+                    {apt.patientId ? (
+                      <button
+                        onClick={() => onPatientClick?.(apt.patientId!)}
+                        className="text-xs font-bold text-gray-900 hover:text-blue-600 hover:underline text-left transition-colors"
+                      >
+                        {apt.patientName}
+                      </button>
+                    ) : (
+                      <div className="text-xs font-bold text-gray-900">{apt.patientName}</div>
+                    )}
                     <div className="text-[10px] text-gray-500">{apt.service}</div>
                   </td>
                   <td className="p-3 text-[11px] text-gray-600 w-24 truncate">

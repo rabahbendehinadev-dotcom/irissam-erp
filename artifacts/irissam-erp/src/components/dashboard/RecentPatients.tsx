@@ -16,7 +16,11 @@ function fmtTime(isoStr: string): string {
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
-export function RecentPatients() {
+interface RecentPatientsProps {
+  onPatientClick?: (patientId: string) => void;
+}
+
+export function RecentPatients({ onPatientClick }: RecentPatientsProps) {
   const { t } = useLanguage();
   const { data: patients, isLoading } = useGetRecentPatients({ query: { refetchInterval: 30_000 } });
 
@@ -53,7 +57,12 @@ export function RecentPatients() {
                         {patient.name.split(' ').map((n: string) => n[0]).join('')}
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-gray-900">{patient.name}</div>
+                        <button
+                          onClick={() => onPatientClick?.(`db-${patient.id}`)}
+                          className="text-xs font-bold text-gray-900 hover:text-blue-600 hover:underline text-left transition-colors"
+                        >
+                          {patient.name}
+                        </button>
                         <div className="text-[10px] text-gray-500">
                           {patient.age} {t("patients.recent.age")} • {t("patients.recent.file")}: {patient.fileNumber}
                         </div>

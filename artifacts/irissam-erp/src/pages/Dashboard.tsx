@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useLanguage } from "@/i18n";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatsCard } from "@/components/dashboard/StatsCard";
@@ -8,6 +9,7 @@ import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
 import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { UpcomingAppointments } from "@/components/dashboard/UpcomingAppointments";
 import { MiniWidgets } from "@/components/dashboard/MiniWidgets";
+import { PatientDrawer } from "@/components/shared/PatientDrawer";
 import { MOCK_DASHBOARD_STATS } from "@/mock";
 import { formatNumber } from "@/utils/format";
 import { useGetDashboardStats } from "@workspace/api-client-react";
@@ -22,6 +24,7 @@ function fmtN(n: number | undefined): string {
 export default function Dashboard() {
   const { t } = useLanguage();
   const { data: stats } = useGetDashboardStats({ query: { refetchInterval: 30_000 } });
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
   return (
     <DashboardLayout>
@@ -104,10 +107,10 @@ export default function Dashboard() {
             <AlertsPanel />
           </div>
           <div className="h-full">
-            <RecentPatients />
+            <RecentPatients onPatientClick={setSelectedPatientId} />
           </div>
           <div className="h-full">
-            <UpcomingAppointments />
+            <UpcomingAppointments onPatientClick={setSelectedPatientId} />
           </div>
         </div>
 
@@ -122,6 +125,10 @@ export default function Dashboard() {
         </div>
 
       </div>
+      <PatientDrawer
+        patientId={selectedPatientId}
+        onClose={() => setSelectedPatientId(null)}
+      />
     </DashboardLayout>
   );
 }

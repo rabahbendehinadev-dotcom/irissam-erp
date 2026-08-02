@@ -29,6 +29,7 @@ router.get("/upcoming", async (_req, res, next) => {
     res.json(
       appointments.map((a) => ({
         id: a.id,
+        patientId: a.patientId ? `db-${a.patientId}` : null,
         patientName: a.patientName,
         service: a.service,
         doctorName: a.doctorName,
