@@ -187,6 +187,7 @@ router.post("/", async (req: AuthenticatedRequest, res: Response, next: NextFunc
         bedNumber:            body.bedNumber,
         expectedDischargeDate: body.expectedDischargeDate,
         notes:                body.notes,
+        encounterId:          body.encounterId, // reuse from Urgences/Consultation
         siteId:               undefined,
       },
       actor(req),
@@ -233,18 +234,48 @@ router.patch("/:id", async (req: AuthenticatedRequest, res: Response, next: Next
   }
 });
 
+/** POST /admissions/:id/transfer */
+router.post("/:id/transfer", async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const id   = String(req.params.id);
+    const body = req.body as { newBedId?: string; notes?: string };
+    if (!body.newBedId) { res.status(400).json({ error: "newBedId requis" }); return; }
+
+    const updated = await admissionService.transferBed(id, body.newBedId, actor(req));
+    res.json(mapAdmission(updated));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /admissions/:id/cancel */
+router.post("/:id/cancel", async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    const [updated] = await db
+      .update(admissionsTable)
+      .set({ status: "cancelled", updatedAt: new Date(), updatedBy: req.auth?.userId ?? undefined })
+      .where(and(eq(admissionsTable.id, id), isNull(admissionsTable.deletedAt)))
+      .returning();
+    if (!updated) { res.status(404).json({ error: "Admission introuvable" }); return; }
+    res.json(mapAdmission(updated));
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** POST /admissions/:id/discharge */
 router.post("/:id/discharge", async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = String(req.params.id);
     const body = req.body as {
-      dischargeType?: "guerison" | "amelioration" | "stationnaire" | "transfert" | "deces" | "contre_avis_medical";
+      dischargeType?: "domicile" | "transfert_interne" | "transfert_externe" | "deces" | "fugue" | "contre_avis";
       dischargeNotes?: string;
     };
 
     const admission = await admissionService.discharge(
       id,
-      { dischargeType: body.dischargeType ?? "guerison", dischargeNotes: body.dischargeNotes },
+      { dischargeType: body.dischargeType ?? "domicile", dischargeNotes: body.dischargeNotes },
       actor(req),
     );
 

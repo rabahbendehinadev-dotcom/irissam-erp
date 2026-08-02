@@ -1,0 +1,282 @@
+لا تبدأ Task #85 الآن.
+
+نفّذ الآن مرحلة ربط الوحدات المتبقية بالـPostgreSQL API الحقيقي:
+
+- Admissions Frontend
+- Hospitalisation
+- Réanimation / ICU
+- Bloc opératoire
+- Notifications Realtime
+
+مهم جدًا:
+- لا تغيّر التصميم الحالي.
+- لا تنشئ Mock Data محلية جديدة.
+- لا تستخدم MockRepository في هذه الوحدات عند تفعيل PostgreSQL mode.
+- جميع العمليات يجب أن تحمل patientId وencounterId حقيقيين.
+- لا Reload كامل للصفحة.
+
+==================================================
+1. Admissions Frontend
+==================================================
+
+اربط صفحة Admissions بالـAPI:
+
+GET /api/admissions
+GET /api/admissions/:id
+POST /api/admissions
+POST /api/admissions/:id/transfer
+POST /api/admissions/:id/discharge
+POST /api/admissions/:id/cancel
+
+المطلوب:
+
+- حذف الاعتماد على AdmissionsContext المحلي في PostgreSQL mode.
+- عرض السجلات الحقيقية من قاعدة البيانات.
+- بعد أي Mutation:
+  - تحديث القائمة.
+  - تحديث Dashboard.
+  - تحديث Bed Occupancy.
+  - تحديث Patient Timeline.
+  - تحديث Encounter Timeline.
+- لا يتم إنشاء Encounter جديد إذا تم تمرير encounterId حقيقي من Urgences أو Consultation.
+
+==================================================
+2. Hospitalisation
+==================================================
+
+أنشئ أو أكمل APIs:
+
+GET /api/hospitalisation
+GET /api/hospitalisation/:id
+GET /api/beds
+GET /api/beds/available
+POST /api/beds/:id/assign
+POST /api/beds/:id/release
+POST /api/beds/:id/start-cleaning
+POST /api/beds/:id/complete-cleaning
+
+السلوك:
+
+- عند Admission يصبح السرير Occupied.
+- عند Transfer:
+  - تحرير السرير القديم.
+  - حجز السرير الجديد.
+  - العملية داخل Transaction واحدة.
+- عند Discharge:
+  - يتحول السرير إلى Cleaning.
+  - بعد Complete Cleaning يصبح Available.
+- منع تخصيص سرير Occupied أو Maintenance أو Out of service.
+
+==================================================
+3. Réanimation / ICU
+==================================================
+
+أنشئ أو أكمل:
+
+GET /api/icu/beds
+GET /api/icu/admissions
+GET /api/icu/admissions/:id
+POST /api/icu/admissions
+POST /api/icu/admissions/:id/transfer
+POST /api/icu/admissions/:id/discharge
+
+عند قرار Réanimation من Urgences:
+
+- استعمال نفس patientId وencounterId.
+- التحقق من وجود ICU bed متاح.
+- حجز السرير داخل Transaction.
+- إنشاء ICUAdmission.
+- تحديث حالة EmergencyVisit.
+- تحديث Timeline وAudit وNotifications.
+- إذا لا يوجد سرير:
+  - رفض العملية برسالة واضحة.
+  - عدم إنشاء سجل جزئي.
+
+==================================================
+4. Bloc opératoire
+==================================================
+
+أنشئ أو أكمل:
+
+GET /api/operating-rooms
+GET /api/surgical-requests
+GET /api/surgical-requests/:id
+POST /api/surgical-requests
+POST /api/surgical-requests/:id/schedule
+POST /api/surgical-requests/:id/start
+POST /api/surgical-requests/:id/complete
+POST /api/surgical-requests/:id/cancel
+
+عند قرار Bloc من Urgences:
+
+- استعمال نفس patientId وencounterId.
+- إنشاء SurgicalRequest حقيقي.
+- لا تحجز غرفة حتى اختيار الموعد والغرفة.
+- منع تعارض نفس الغرفة في نفس الفترة.
+- الحالات:
+  requested
+  scheduled
+  preparing
+  in_progress
+  completed
+  cleaning
+  cancelled
+- كل Transition تسجل Timeline وAudit.
+
+==================================================
+5. Frontend Repository
+==================================================
+
+حدّث ApiRepository ليطبق:
+
+- getAdmissions
+- getAdmissionById
+- admitPatient
+- transferAdmission
+- dischargeAdmission
+- getBeds
+- assignBed
+- releaseBed
+- startBedCleaning
+- completeBedCleaning
+- getICUBeds
+- createICUAdmission
+- transferICUAdmission
+- dischargeICUAdmission
+- getOperatingRooms
+- createSurgicalRequest
+- scheduleSurgicalRequest
+- startSurgery
+- completeSurgery
+
+في PostgreSQL mode:
+- ممنوع استعمال MockRepository لهذه العمليات.
+- استعمل Query Cache وتحديثه بعد كل Mutation.
+- أضف Loading / Error / Retry states.
+
+==================================================
+6. Notifications Realtime
+==================================================
+
+أنشئ نظام Realtime واحدًا باستعمال SSE أو WebSocket.
+
+Endpoints:
+
+GET /api/notifications
+PATCH /api/notifications/:id/read
+PATCH /api/notifications/read-all
+GET /api/notifications/stream
+
+الأحداث:
+
+- lab_result_ready
+- critical_lab_result
+- imaging_report_ready
+- prescription_dispensed
+- admission_created
+- bed_available
+- icu_full
+- icu_bed_reserved
+- surgical_request_created
+- operating_room_ready
+- ambulance_arrived
+- discharge_completed
+
+Frontend:
+
+- NotificationsContext يقرأ من API.
+- لا يستعمل إشعارات ثابتة.
+- عداد unread يتحدث مباشرة.
+- Toast يظهر مرة واحدة لكل Event.
+- إعادة الاتصال تلقائيًا إذا انقطع الاتصال.
+- منع تكرار نفس Notification.
+
+==================================================
+7. Timeline
+==================================================
+
+وسّع:
+
+GET /api/encounters/:id/timeline
+
+ليضم:
+
+- admission_created
+- bed_assigned
+- transfer
+- discharge
+- cleaning_started
+- cleaning_completed
+- icu_admission
+- icu_transfer
+- surgical_request
+- surgery_started
+- surgery_completed
+
+==================================================
+8. Transactions
+==================================================
+
+يجب استعمال PostgreSQL Transaction في:
+
+- Admission + Bed assignment
+- Transfer old bed → new bed
+- Discharge + Bed cleaning
+- ICU Admission + ICU bed reservation
+- Surgical scheduling + Operating room reservation
+
+أي فشل يؤدي إلى Rollback كامل.
+
+==================================================
+9. اختبارات القبول
+==================================================
+
+اختبار A:
+Urgences → Hospitalisation
+- نفس patientId
+- نفس encounterId
+- Admission في DB
+- Bed occupied
+- Timeline + Audit + Notification
+
+اختبار B:
+Hospitalisation → Transfer
+- السرير القديم يتحرر
+- السرير الجديد يصبح occupied
+- لا توجد حالة جزئية
+
+اختبار C:
+Discharge
+- Bed يصبح cleaning
+- Complete cleaning → available
+
+اختبار D:
+Urgences → ICU
+- سرير متاح: العملية تنجح
+- لا يوجد سرير: HTTP 409 ولا سجل جزئي
+
+اختبار E:
+Urgences → Bloc
+- SurgicalRequest يُنشأ
+- Schedule يمنع تعارض الغرفة
+- Start ثم Complete يحدثان الحالة
+
+اختبار F:
+Realtime Notifications
+- نتيجة تحليل حرجة تظهر فورًا
+- Admission تظهر فورًا
+- Bed available تظهر فورًا
+- لا Refresh
+
+في النهاية أعطني:
+
+- Routes الجديدة.
+- Services وRepositories المعدلة.
+- نتائج الاختبارات A–F.
+- قائمة الملفات التي مازالت تعتمد على MockRepository.
+- إثبات أن Admissions/ICU/Bloc تعمل على PostgreSQL.
+- حالة SSE أو WebSocket.
+- صفر أخطاء TypeScript وRuntime SQL.
+
+لا تبدأ Task #85.
+لا تبدأ Facturation.

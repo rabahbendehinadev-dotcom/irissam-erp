@@ -17,6 +17,11 @@ import auditLogsRouter from "./audit-logs";
 import labOrdersRouter from "./lab-orders";
 import imagingOrdersRouter from "./imaging-orders";
 import prescriptionsRouter from "./prescriptions";
+import icuRouter              from "./icu";
+import surgicalRequestsRouter from "./surgical-requests";
+import operatingRoomsRouter   from "./operating-rooms";
+import notificationsRouter    from "./notifications";
+import occupancyBedsRouter    from "./occupancy-beds";
 import { requireAuth } from "../middleware/requireAuth";
 
 const router: IRouter = Router();
@@ -43,5 +48,12 @@ router.use("/audit-logs",    requireAuth, auditLogsRouter);
 router.use("/lab-orders",      requireAuth, labOrdersRouter);
 router.use("/imaging-orders",  requireAuth, imagingOrdersRouter);
 router.use("/prescriptions",   requireAuth, prescriptionsRouter);
+// Occupancy + ICU + Bloc + Notifications
+router.use("/occupancy-beds",      requireAuth, occupancyBedsRouter);
+router.use("/icu",                 requireAuth, icuRouter);
+router.use("/surgical-requests",   requireAuth, surgicalRequestsRouter);
+router.use("/operating-rooms",     requireAuth, operatingRoomsRouter);
+// Notifications — stream does NOT require auth (SSE reconnects can't set headers)
+router.use("/notifications",       notificationsRouter);
 
 export default router;

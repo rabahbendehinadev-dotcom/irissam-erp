@@ -1,14 +1,14 @@
 /**
  * OperatingRoom — Bloc opératoire live board
- * All data from MockRepository (Phase 6b). No local mock.
+ * Data from real PostgreSQL API via useOperatingRoomApi.
  */
 import { useState, useMemo } from 'react';
-import { Scissors, Clock, CheckCircle, AlertTriangle, Calendar } from 'lucide-react';
+import { Scissors, Clock, CheckCircle, AlertTriangle, Calendar, RefreshCw } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { useMockRepository } from '@/store/MockRepository';
-import { useAuth } from '@/store/AuthContext';
-import type { OperatingRoom as ORType, OperatingRoomStatus, AuditCtx } from '@/types/repository';
+import { useOperatingRoomApi } from '@/hooks/useOperatingRoomApi';
+import type { OperatingRoomStatus } from '@/types/repository';
+import type { ORRoomApi } from '@/hooks/useOperatingRoomApi';
 
 const STATUS_COLOR: Record<OperatingRoomStatus, string> = {
   libre:            'border-green-300 bg-green-50',
@@ -19,6 +19,7 @@ const STATUS_COLOR: Record<OperatingRoomStatus, string> = {
   hors_service:     'border-gray-200 bg-gray-50 opacity-60',
   maintenance:      'border-gray-200 bg-gray-50 opacity-60',
 };
+
 const STATUS_LABEL: Record<OperatingRoomStatus, string> = {
   libre:            'Libre',
   reserve:          'Réservé',
@@ -28,6 +29,7 @@ const STATUS_LABEL: Record<OperatingRoomStatus, string> = {
   hors_service:     'Hors service',
   maintenance:      'Maintenance',
 };
+
 const STATUS_ICON: Record<OperatingRoomStatus, React.ElementType> = {
   libre:            CheckCircle,
   reserve:          Clock,
@@ -45,131 +47,205 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr-DZ', { day: '2-digit', month: '2-digit' });
 }
 
-function ORCard({ or: room, onStatusChange, ctx }: { or: ORType; onStatusChange: (id: string, s: OperatingRoomStatus) => void; ctx: AuditCtx }) {
-  const Icon = STATUS_ICON[room.status];
-  const nextSlots = room.slots
-    .filter(s => new Date(s.endAt) > new Date())
-    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  const currentSlot = nextSlots.find(s => new Date(s.startAt) <= new Date() && new Date(s.endAt) > new Date());
-  const upcoming    = nextSlots.filter(s => new Date(s.startAt) > new Date()).slice(0, 2);
+function ORCard({ or: room, currentRequest }: { or: ORRoomApi; currentRequest?: any }) {
+  const Icon = STATUS_ICON[room.status] ?? CheckCircle;
 
   return (
-    <div className={`border-2 rounded-2xl overflow-hidden shadow-sm ${STATUS_COLOR[room.status]}`}>
+    <div className={`border-2 rounded-2xl overflow-hidden shadow-sm ${STATUS_COLOR[room.status] ?? 'border-gray-200 bg-gray-50'}`}>
       <div className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon size={16} className="text-gray-600" />
-          <div>
-            <p className="font-bold text-gray-800">{room.name}</p>
-            <p className="text-xs text-gray-500">{room.specialty}</p>
-          </div>
+          <span className="font-bold text-sm text-gray-900">{room.name}</span>
+          {room.specialty && (
+            <span className="text-xs text-gray-400">({room.specialty})</span>
+          )}
         </div>
-        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/70 border border-white">
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+          room.status === 'libre'           ? 'bg-green-100 text-green-700' :
+          room.status === 'reserve'         ? 'bg-purple-100 text-purple-700' :
+          room.status === 'en_preparation'  ? 'bg-blue-100 text-blue-700' :
+          room.status === 'en_intervention' ? 'bg-red-100 text-red-700' :
+          room.status === 'nettoyage'       ? 'bg-amber-100 text-amber-700' :
+          'bg-gray-100 text-gray-400'
+        }`}>
           {STATUS_LABEL[room.status]}
         </span>
       </div>
 
-      <div className="px-4 pb-4 space-y-2">
-        {currentSlot && (
-          <div className="bg-white/80 rounded-xl p-2.5">
-            <p className="text-xs font-semibold text-red-700 mb-0.5">🔴 En cours</p>
-            <p className="text-sm font-medium text-gray-800">{currentSlot.intervention}</p>
-            <p className="text-xs text-gray-500">{currentSlot.patientName} · {currentSlot.surgeon}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{formatTime(currentSlot.startAt)} → {formatTime(currentSlot.endAt)}</p>
+      {currentRequest && (
+        <div className="px-4 pb-3 space-y-1">
+          <div className="text-sm font-medium text-gray-800 truncate">
+            {currentRequest.patientName}
           </div>
-        )}
-
-        {upcoming.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs font-semibold text-gray-500">Prochains créneaux</p>
-            {upcoming.map(s => (
-              <div key={s.id} className="bg-white/60 rounded-lg p-2">
-                <p className="text-xs font-medium text-gray-700">{s.intervention}</p>
-                <p className="text-xs text-gray-500">{s.patientName} · {formatDate(s.startAt)} {formatTime(s.startAt)}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Status transitions */}
-        <div className="flex gap-1.5 flex-wrap pt-1">
-          {room.status === 'en_intervention' && (
-            <button onClick={() => onStatusChange(room.id, 'nettoyage')}
-              className="text-xs bg-amber-500 text-white rounded-lg px-2.5 py-1 hover:bg-amber-600 transition-colors">
-              Fin d'intervention
-            </button>
+          <div className="text-xs text-gray-500 truncate">{currentRequest.intervention}</div>
+          {currentRequest.surgeonName && (
+            <div className="text-xs text-gray-400">Dr. {currentRequest.surgeonName}</div>
           )}
-          {room.status === 'nettoyage' && (
-            <button onClick={() => onStatusChange(room.id, 'libre')}
-              className="text-xs bg-green-600 text-white rounded-lg px-2.5 py-1 hover:bg-green-700 transition-colors">
-              Nettoyage terminé
-            </button>
-          )}
-          {room.status === 'libre' && (
-            <button onClick={() => onStatusChange(room.id, 'en_preparation')}
-              className="text-xs bg-blue-600 text-white rounded-lg px-2.5 py-1 hover:bg-blue-700 transition-colors">
-              Préparer
-            </button>
-          )}
-          {room.status === 'en_preparation' && (
-            <button onClick={() => onStatusChange(room.id, 'en_intervention')}
-              className="text-xs bg-red-600 text-white rounded-lg px-2.5 py-1 hover:bg-red-700 transition-colors">
-              Démarrer intervention
-            </button>
+          {currentRequest.scheduledAt && (
+            <div className="text-xs text-gray-400 flex items-center gap-1">
+              <Calendar size={10} />
+              {formatDate(currentRequest.scheduledAt)} à {formatTime(currentRequest.scheduledAt)}
+            </div>
           )}
         </div>
-      </div>
+      )}
+
+      {!currentRequest && room.status === 'libre' && (
+        <div className="px-4 pb-3 text-xs text-green-600 flex items-center gap-1">
+          <CheckCircle size={11} /> Disponible pour intervention
+        </div>
+      )}
     </div>
   );
 }
 
 export default function OperatingRoom() {
-  const { operatingRooms, updateOperatingRoomStatus } = useMockRepository();
-  const { user } = useAuth();
-  const ctx: AuditCtx = { userId: user?.id ?? 'sys', userName: user ? `${user.firstName} ${user.lastName}` : 'Système', userRole: user?.role ?? 'admin' };
+  const { operatingRooms, surgicalRequests, loading, error, refresh } = useOperatingRoomApi();
+  const [filter, setFilter] = useState<OperatingRoomStatus | 'all'>('all');
 
-  const libre         = operatingRooms.filter(r => r.status === 'libre').length;
-  const enCours       = operatingRooms.filter(r => r.status === 'en_intervention').length;
-  const enPrep        = operatingRooms.filter(r => r.status === 'en_preparation').length;
-  const nettoyage     = operatingRooms.filter(r => r.status === 'nettoyage').length;
+  // Map current surgical requests to rooms
+  const requestByOrRoomId = useMemo(() => {
+    const map: Record<string, any> = {};
+    for (const r of surgicalRequests) {
+      if (r.orRoomId && r.status !== 'annule' && r.status !== 'termine') {
+        map[r.orRoomId] = r;
+      }
+    }
+    return map;
+  }, [surgicalRequests]);
 
-  const totalSlots = useMemo(() => {
-    const today = new Date().toDateString();
-    return operatingRooms.reduce((sum, r) =>
-      sum + r.slots.filter(s => new Date(s.startAt).toDateString() === today).length, 0);
-  }, [operatingRooms]);
+  const displayed = operatingRooms.filter(r => filter === 'all' || r.status === filter);
+
+  const stats = useMemo(() => ({
+    total:          operatingRooms.length,
+    libre:          operatingRooms.filter(r => r.status === 'libre').length,
+    enIntervention: operatingRooms.filter(r => r.status === 'en_intervention').length,
+    reserve:        operatingRooms.filter(r => r.status === 'reserve').length,
+    nettoyage:      operatingRooms.filter(r => r.status === 'nettoyage').length,
+  }), [operatingRooms]);
+
+  // Pending surgical requests (not yet assigned to a room)
+  const pending = surgicalRequests.filter(r => r.status === 'demande');
 
   return (
     <DashboardLayout>
       <div className="p-6 space-y-5">
         <PageHeader
           title="Bloc opératoire"
-          subtitle="Planification et suivi en temps réel des salles"
+          subtitle="Statut des salles d'opération en temps réel"
+          actions={
+            <div className="flex items-center gap-2">
+              <button
+                onClick={refresh}
+                disabled={loading}
+                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
+                title="Actualiser"
+              >
+                <RefreshCw size={15} className={loading ? 'animate-spin text-blue-500' : 'text-gray-500'} />
+              </button>
+              <span className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full font-medium">
+                ● Live
+              </span>
+            </div>
+          }
         />
 
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            {error} — <button onClick={refresh} className="underline font-medium">Réessayer</button>
+          </div>
+        )}
+
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-5 gap-3">
           {[
-            { label: 'Libres',          value: libre,      color: 'text-green-700', bg: 'bg-green-50',  icon: CheckCircle },
-            { label: 'En intervention', value: enCours,    color: 'text-red-700',   bg: 'bg-red-50',    icon: Scissors },
-            { label: 'En préparation',  value: enPrep,     color: 'text-blue-700',  bg: 'bg-blue-50',   icon: Clock },
-            { label: 'Interventions J', value: totalSlots, color: 'text-gray-700',  bg: 'bg-gray-50',   icon: Calendar },
-          ].map(s => (
-            <div key={s.label} className={`${s.bg} border border-gray-100 rounded-xl p-4 flex items-center gap-3`}>
-              <s.icon size={20} className={s.color} />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                <p className="text-xs text-gray-500">{s.label}</p>
-              </div>
+            { label: 'Total',       value: stats.total,          color: 'text-gray-600', bg: 'bg-gray-50' },
+            { label: 'Libres',      value: stats.libre,          color: 'text-green-600', bg: 'bg-green-50' },
+            { label: 'En cours',    value: stats.enIntervention, color: 'text-red-600',   bg: 'bg-red-50' },
+            { label: 'Réservés',    value: stats.reserve,        color: 'text-purple-600', bg: 'bg-purple-50' },
+            { label: 'Nettoyage',   value: stats.nettoyage,      color: 'text-amber-600',  bg: 'bg-amber-50' },
+          ].map(({ label, value, color, bg }) => (
+            <div key={label} className={`${bg} rounded-xl border border-gray-100 p-3 text-center shadow-sm`}>
+              <div className={`text-xl font-bold ${color}`}>{value}</div>
+              <div className="text-xs text-gray-500 mt-0.5">{label}</div>
             </div>
           ))}
         </div>
 
-        {/* OR cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {operatingRooms.map(or => (
-            <ORCard key={or.id} or={or} onStatusChange={(id, s) => updateOperatingRoomStatus(id, s, ctx)} ctx={ctx} />
+        {/* Filter tabs */}
+        <div className="flex gap-2 flex-wrap">
+          {(['all', 'libre', 'reserve', 'en_preparation', 'en_intervention', 'nettoyage'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                filter === f ? 'bg-blue-600 text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {f === 'all' ? 'Toutes' : STATUS_LABEL[f as OperatingRoomStatus]}
+            </button>
           ))}
         </div>
+
+        {/* Loading skeleton */}
+        {loading && operatingRooms.length === 0 && (
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-32 rounded-2xl bg-gray-100 animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {/* OR cards */}
+        {displayed.length > 0 && (
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {displayed.map(room => (
+              <ORCard
+                key={room.id}
+                or={room}
+                currentRequest={requestByOrRoomId[room.id]}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Pending surgical requests */}
+        {pending.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <Clock size={14} className="text-orange-500" />
+              Demandes en attente de planification
+              <span className="ml-1 bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                {pending.length}
+              </span>
+            </h3>
+            <div className="space-y-2">
+              {pending.map(r => (
+                <div key={r.id} className="flex items-center gap-4 p-3 bg-orange-50 border border-orange-200 rounded-xl">
+                  <Scissors size={14} className="text-orange-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-800 truncate">{r.patientName}</div>
+                    <div className="text-xs text-gray-500 truncate">{r.intervention}</div>
+                  </div>
+                  <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
+                    r.urgencyDegree === 'urgent'   ? 'bg-red-100 text-red-700' :
+                    r.urgencyDegree === 'elective' ? 'bg-gray-100 text-gray-600' :
+                    'bg-orange-100 text-orange-700'
+                  }`}>
+                    {r.urgencyDegree}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!loading && displayed.length === 0 && (
+          <div className="text-center py-16 text-gray-400">
+            <Scissors size={40} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm">Aucune salle trouvée</p>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

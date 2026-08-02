@@ -8,3 +8,4 @@
 - [DAL Layer](dal-layer.md) — Task #70+83 done: repositories + services + all 12 routes wired; 0 TS errors
 - [Task 84 DB Migration](task84-db-migration.md) — migration bugs, enum values, safeUuid(), audit_logs columns, seed fix, missing admissions route
 - [Encounter Unification](encounter-unification.md) — NO fallback: encounterStatus blocks clinical ops; jsonb_append→||; full clinical API (lab/imaging/rx/timeline)
+- [Admissions/ICU/Bloc API](admissions-icu-bloc-api.md) — discharge_type enum values; encounterId reuse in admit(); separate operating-rooms router; SSE broadcast pattern

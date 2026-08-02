@@ -18,7 +18,7 @@ import type { Admission } from '@/types/admission';
 import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
-import { useAdmissions } from '@/store/AdmissionsContext';
+import { useAdmissionsApi } from '@/hooks/useAdmissionsApi';
 import { useMockRepository } from '@/store/MockRepository';
 import { useAuth } from '@/store/AuthContext';
 import type { AuditCtx } from '@/types/repository';
@@ -202,7 +202,7 @@ export default function AdmissionsPage() {
   const { can } = usePermission();
   const { log } = useAuditLog();
   const [, navigate] = useLocation();
-  const { admissions, discharge, transfer, cancel } = useAdmissions();
+  const { admissions, discharge, transfer, cancel, loading: admLoading } = useAdmissionsApi();
   const repo = useMockRepository();
   const { user } = useAuth();
 
@@ -283,9 +283,15 @@ export default function AdmissionsPage() {
           subtitle={t('adm.page.subtitle')}
           actions={
             <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1 text-xs px-2.5 py-1 bg-amber-100 text-amber-700 border border-amber-200 rounded-full font-medium">
-                <AlertTriangle size={11} /> {t('adm.page.demo')}
-              </span>
+              {admLoading ? (
+                <span className="flex items-center gap-1 text-xs px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-full font-medium animate-pulse">
+                  Chargement…
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-xs px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 rounded-full font-medium">
+                  ● Live
+                </span>
+              )}
               {can('admissions.export') && (
                 <button onClick={() => log('export', 'admissions')} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                   <Download size={14} /> {t('adm.export')}
@@ -382,10 +388,9 @@ export default function AdmissionsPage() {
       {discharging && (
         <DischargeModal
           admission={discharging}
-          onConfirm={(type, date, time, notes) => {
-            discharge(discharging.id, type, date, time, notes);
+          onConfirm={async (type, date, time, notes) => {
+            await discharge(discharging.id, type, date, time, notes).catch(() => {});
             log('archive', 'admission', discharging.id, `Sortie ${type}`);
-            // Task #63 — free bed via cleaning cycle on discharge
             if (discharging.bedId) {
               repo.startBedCleaning(discharging.bedId, repoCtx);
             }
@@ -398,10 +403,9 @@ export default function AdmissionsPage() {
       {transferring && (
         <TransferModal
           admission={transferring}
-          onConfirm={(to, date, notes) => {
-            transfer(transferring.id, to, date, notes);
+          onConfirm={async (to, date, notes) => {
+            await transfer(transferring.id, to, date, notes).catch(() => {});
             log('update', 'admission', transferring.id, `Transfert → ${to}`);
-            // Task #63 — free bed via cleaning cycle on transfer
             if (transferring.bedId) {
               repo.startBedCleaning(transferring.bedId, repoCtx);
             }
@@ -426,10 +430,9 @@ export default function AdmissionsPage() {
               <button onClick={() => setCancelling(null)} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
                 {t('adm.confirm.cancel.no')}
               </button>
-              <button onClick={() => {
-                cancel(cancelling.id);
+              <button onClick={async () => {
+                await cancel(cancelling.id).catch(() => {});
                 log('archive', 'admission', cancelling.id);
-                // Task #63 — skip cleaning on cancel; free bed immediately
                 if (cancelling.bedId) {
                   repo.freeBed(cancelling.bedId, repoCtx);
                 }

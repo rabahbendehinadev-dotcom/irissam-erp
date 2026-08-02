@@ -1,36 +1,41 @@
 /**
  * Resuscitation (ICU) — live ICU bed board
- * All data from MockRepository (Phase 6b). No local mock.
+ * Data from real PostgreSQL API via useICUApi hook.
  */
 import { useState } from 'react';
-import { Activity, CheckCircle, AlertTriangle, Clock, BedDouble } from 'lucide-react';
+import { Activity, CheckCircle, AlertTriangle, Clock, BedDouble, RefreshCw } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { useMockRepository } from '@/store/MockRepository';
-import { useAuth } from '@/store/AuthContext';
-import type { AuditCtx } from '@/types/repository';
+import { useICUApi } from '@/hooks/useICUApi';
 
 const STATUS_COLOR: Record<string, string> = {
-  disponible: 'border-green-300 bg-green-50 text-green-700',
-  occupe:     'border-red-300 bg-red-50 text-red-700',
-  reserve:    'border-purple-300 bg-purple-50 text-purple-700',
+  disponible:   'border-green-300 bg-green-50 text-green-700',
+  occupe:       'border-red-300 bg-red-50 text-red-700',
+  reserve:      'border-purple-300 bg-purple-50 text-purple-700',
+  nettoyage:    'border-amber-300 bg-amber-50 text-amber-700',
   hors_service: 'border-gray-200 bg-gray-50 text-gray-400 opacity-60',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  disponible:   'Disponible',
+  occupe:       'Occupé',
+  reserve:      'Réservé',
+  nettoyage:    'Nettoyage',
+  hors_service: 'Hors service',
 };
 
 const PRIORITY_COLOR: Record<string, string> = {
   P1: 'bg-red-100 text-red-700',
   P2: 'bg-orange-100 text-orange-700',
   P3: 'bg-yellow-100 text-yellow-700',
+  P4: 'bg-gray-100 text-gray-500',
 };
 
 export default function Resuscitation() {
-  const { icuBeds, getICUStats, freeICUBed } = useMockRepository();
-  const { user } = useAuth();
-  const ctx: AuditCtx = { userId: user?.id ?? 'sys', userName: user ? `${user.firstName} ${user.lastName}` : 'Système', userRole: user?.role ?? 'admin' };
-
+  const { icuBeds, loading, error, getICUStats, freeICUBed, refresh } = useICUApi();
   const [filter, setFilter] = useState<'all' | 'disponible' | 'occupe'>('all');
-  const stats = getICUStats();
 
+  const stats    = getICUStats();
   const displayed = icuBeds.filter(b => filter === 'all' || b.status === filter);
 
   // Group by unit
@@ -55,66 +60,117 @@ export default function Resuscitation() {
               <span className="text-sm font-semibold px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                 Occupation : {stats.occupancyRate}%
               </span>
+              <button
+                onClick={refresh}
+                disabled={loading}
+                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
+                title="Actualiser"
+              >
+                <RefreshCw size={15} className={loading ? 'animate-spin text-blue-500' : 'text-gray-500'} />
+              </button>
+              <span className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full font-medium">
+                ● Live
+              </span>
             </div>
           }
         />
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            {error} — <button onClick={refresh} className="underline font-medium">Réessayer</button>
+          </div>
+        )}
+
+        {/* Stats bar */}
+        <div className="grid grid-cols-4 gap-4">
           {[
-            { label: 'Total', value: stats.total,      color: 'text-gray-700',   bg: 'bg-gray-50',    icon: BedDouble },
-            { label: 'Disponibles', value: stats.disponible, color: 'text-green-700', bg: 'bg-green-50', icon: CheckCircle },
-            { label: 'Occupés',    value: stats.occupe,     color: 'text-red-700',   bg: 'bg-red-50',   icon: Activity },
-            { label: 'Réservés',   value: stats.reserve,    color: 'text-purple-700',bg: 'bg-purple-50',icon: Clock },
-          ].map(s => (
-            <div key={s.label} className={`${s.bg} border border-gray-100 rounded-xl p-4 flex items-center gap-3`}>
-              <s.icon size={20} className={s.color} />
+            { label: 'Total',       value: stats.total,      icon: BedDouble, color: 'text-gray-600' },
+            { label: 'Disponibles', value: stats.disponible, icon: CheckCircle, color: 'text-green-600' },
+            { label: 'Occupés',     value: stats.occupe,     icon: Activity,   color: 'text-red-600'  },
+            { label: 'Occupation',  value: `${stats.occupancyRate}%`, icon: Clock, color: 'text-blue-600' },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3 shadow-sm">
+              <Icon size={20} className={color} />
               <div>
-                <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                <p className="text-xs text-gray-500">{s.label}</p>
+                <div className="text-xl font-bold text-gray-900">{value}</div>
+                <div className="text-xs text-gray-500">{label}</div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Filter */}
+        {/* Filter tabs */}
         <div className="flex gap-2">
           {(['all', 'disponible', 'occupe'] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${filter === f ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                filter === f ? 'bg-blue-600 text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
               {f === 'all' ? 'Tous' : f === 'disponible' ? 'Disponibles' : 'Occupés'}
             </button>
           ))}
         </div>
 
-        {/* Units */}
-        {Object.entries(byUnit).map(([unit, unitBeds]) => (
-          <div key={unit} className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-bold text-gray-800">{unit}</h2>
-              <span className="text-xs text-gray-500">
-                {unitBeds.filter(b => b.status === 'disponible').length} / {unitBeds.length} disponibles
+        {/* Loading skeleton */}
+        {loading && icuBeds.length === 0 && (
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-40 rounded-2xl bg-gray-100 animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {/* Bed groups by unit */}
+        {Object.entries(byUnit).map(([unitName, beds]) => (
+          <div key={unitName} className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <BedDouble size={15} className="text-blue-500" /> {unitName}
+              <span className="ml-1 text-xs font-normal text-gray-400">
+                ({beds.filter(b => b.status === 'disponible').length} libre{beds.filter(b => b.status === 'disponible').length !== 1 ? 's' : ''} / {beds.length})
               </span>
-            </div>
-            <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {unitBeds.map(bed => (
-                <div key={bed.id} className={`border-2 rounded-xl p-3 ${STATUS_COLOR[bed.status] ?? ''}`}>
+            </h3>
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {beds.map(bed => (
+                <div
+                  key={bed.id}
+                  className={`border-2 rounded-2xl p-4 transition-shadow shadow-sm hover:shadow-md ${STATUS_COLOR[bed.status] ?? 'border-gray-200 bg-gray-50'}`}
+                >
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <Activity size={14} />
-                      <span className="text-sm font-bold">{bed.number}</span>
-                    </div>
-                    {bed.priority && (
-                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${PRIORITY_COLOR[bed.priority] ?? ''}`}>
-                        {bed.priority}
-                      </span>
-                    )}
+                    <span className="font-bold text-sm">Lit {bed.number}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      bed.status === 'disponible' ? 'bg-green-100 text-green-700' :
+                      bed.status === 'occupe'     ? 'bg-red-100 text-red-700'    :
+                      bed.status === 'reserve'    ? 'bg-purple-100 text-purple-700' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {STATUS_LABEL[bed.status] ?? bed.status}
+                    </span>
                   </div>
-                  {bed.patientName && <p className="text-xs font-medium truncate">{bed.patientName}</p>}
-                  <p className="text-xs mt-1">{bed.status === 'disponible' ? 'Disponible' : bed.status === 'occupe' ? 'Occupé' : bed.status === 'reserve' ? 'Réservé' : 'Hors service'}</p>
-                  {bed.status === 'occupe' && (
-                    <button onClick={() => freeICUBed(bed.id, ctx)}
-                      className="mt-2 w-full text-xs bg-green-600 text-white rounded-lg py-1 hover:bg-green-700 transition-colors">
+
+                  {bed.patientName && (
+                    <div className="mt-2 space-y-1">
+                      <div className="text-sm font-medium text-gray-800 truncate">{bed.patientName}</div>
+                      {bed.priority && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${PRIORITY_COLOR[bed.priority] ?? 'bg-gray-100 text-gray-500'}`}>
+                          {bed.priority}
+                        </span>
+                      )}
+                      {bed.occupiedAt && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          Depuis {new Date(bed.occupiedAt).toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {bed.status === 'occupe' && bed.icuAdmissionId && (
+                    <button
+                      onClick={() => freeICUBed(bed.id)}
+                      className="mt-3 w-full text-xs py-1.5 rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors font-medium"
+                    >
                       Libérer
                     </button>
                   )}
@@ -123,6 +179,13 @@ export default function Resuscitation() {
             </div>
           </div>
         ))}
+
+        {!loading && displayed.length === 0 && (
+          <div className="text-center py-16 text-gray-400">
+            <BedDouble size={40} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm">Aucun lit trouvé</p>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

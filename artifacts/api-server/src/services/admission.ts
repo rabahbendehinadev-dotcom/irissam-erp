@@ -56,6 +56,9 @@ export interface AdmitInput {
   notes?:              string;
   expectedDischargeDate?: string;
 
+  // Optional — reuse an existing encounter (e.g. from Urgences)
+  encounterId?: string;
+
   // Bed assignment
   bedId:        string;
   bedNumber?:   string;
@@ -79,19 +82,29 @@ export class AdmissionService {
     return db.transaction(async (tx) => {
       const ctx: TxContext = { ...actor, tx };
 
-      // 1. Create encounter
-      const encounter = await encounterService.create({
-        patientId:       input.patientId,
-        patientName:     input.patientName,
-        patientMrn:      input.patientMpiId,
-        type:            "admission",
-        status:          "open",
-        chiefComplaint:  input.motif,
-        sourceModule:    "admissions",
-        primaryDoctorId:   input.doctorId,
-        primaryDoctorName: input.doctorName,
-        siteId:          input.siteId,
-      }, actor, ctx);
+      // 1. Reuse existing encounter or create a new one
+      let encounter: { id: string };
+      if (input.encounterId) {
+        // Use the provided encounter ID (e.g. patient arrived from Urgences)
+        const existing = await repos.encounter.findById(input.encounterId, ctx);
+        if (!existing) {
+          throw new Error(`Encounter ${input.encounterId} introuvable`);
+        }
+        encounter = existing;
+      } else {
+        encounter = await encounterService.create({
+          patientId:       input.patientId,
+          patientName:     input.patientName,
+          patientMrn:      input.patientMpiId,
+          type:            "admission",
+          status:          "open",
+          chiefComplaint:  input.motif,
+          sourceModule:    "admissions",
+          primaryDoctorId:   input.doctorId,
+          primaryDoctorName: input.doctorName,
+          siteId:          input.siteId,
+        }, actor, ctx);
+      }
 
       // 2. Occupy bed (fails if not "disponible")
       const bed = await repos.occupancyBed.occupy(input.bedId, {

@@ -17,6 +17,9 @@ export * from "./medication";
 export * from "./auditLog";
 export * from "./userActivityLog";
 export * from "./attachment";
+export * from "./icuAdmission";
+export * from "./surgicalRequest";
+export * from "./notification";
 
 // ── Singleton instances (shared across services) ──────────────────────────────
 import { PatientRepository }         from "./patient";
@@ -32,6 +35,9 @@ import { MedicationRepository }       from "./medication";
 import { AuditLogRepository }         from "./auditLog";
 import { UserActivityLogRepository }  from "./userActivityLog";
 import { AttachmentRepository }       from "./attachment";
+import { IcuAdmissionRepository }     from "./icuAdmission";
+import { SurgicalRequestRepository }  from "./surgicalRequest";
+import { NotificationRepository }     from "./notification";
 
 export const repos = {
   patient:          new PatientRepository(),
@@ -47,4 +53,7 @@ export const repos = {
   auditLog:         new AuditLogRepository(),
   userActivityLog:  new UserActivityLogRepository(),
   attachment:       new AttachmentRepository(),
+  icuAdmission:     new IcuAdmissionRepository(),
+  surgicalRequest:  new SurgicalRequestRepository(),
+  notification:     new NotificationRepository(),
 } as const;
