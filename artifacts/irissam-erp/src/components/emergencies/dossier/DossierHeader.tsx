@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import {
   ArrowLeft, Printer, Save, CheckCircle2, Clock, User, Stethoscope,
-  Pause, Play, X, FileDown, AlertCircle, Wifi, WifiOff,
+  Pause, Play, X, FileDown, AlertCircle, Wifi, WifiOff, ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmergencyPriorityBadge, PRIORITY_CFG } from '@/components/emergencies/EmergencyPriorityBadge';
 import { useEmergencyDossier } from '@/contexts/EmergencyDossierContext';
 import { usePermission } from '@/hooks/usePermission';
+import type { EmergencyPriority } from '@/types/emergency';
 
 // ─── Status label map ─────────────────────────────────────────────────────────
 
@@ -37,13 +38,171 @@ function fmt(iso: string) {
   return new Date(iso).toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' });
 }
 
+// ─── Triage Priority Selector ─────────────────────────────────────────────────
+
+const PRIORITY_LABELS: Record<EmergencyPriority, { label: string; sub: string; cls: string }> = {
+  P1: { label: 'P1 — Immédiat',      sub: 'Pronostic vital en jeu',          cls: 'border-red-300 bg-red-50 text-red-800 hover:bg-red-100' },
+  P2: { label: 'P2 — Très urgent',   sub: 'Dégradation rapide prévisible',   cls: 'border-orange-300 bg-orange-50 text-orange-800 hover:bg-orange-100' },
+  P3: { label: 'P3 — Urgent',        sub: 'Peut attendre 30–60 min',         cls: 'border-yellow-300 bg-yellow-50 text-yellow-800 hover:bg-yellow-100' },
+  P4: { label: 'P4 — Standard',      sub: 'Peut attendre > 2 heures',        cls: 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100' },
+  P5: { label: 'P5 — Non urgent',    sub: 'Consultation différable',         cls: 'border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100' },
+};
+
+type TriageStep = 'pick' | 'confirm';
+
+function TriageChangeOverlay({
+  currentPriority,
+  onClose,
+  onConfirm,
+}: {
+  currentPriority: EmergencyPriority;
+  onClose: () => void;
+  onConfirm: (p: EmergencyPriority) => void;
+}) {
+  const [step, setStep] = useState<TriageStep>('pick');
+  const [selected, setSelected] = useState<EmergencyPriority | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handlePick = (p: EmergencyPriority) => {
+    if (p === currentPriority) { onClose(); return; }
+    setSelected(p);
+    setStep('confirm');
+  };
+
+  const handleConfirm = async () => {
+    if (!selected) return;
+    setSaving(true);
+    await onConfirm(selected);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    /* Backdrop */
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-sm mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
+          <div>
+            <h3 className="font-bold text-gray-900 text-sm">
+              {step === 'pick' ? 'Changer la priorité de triage' : 'Confirmer le changement'}
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Priorité actuelle :&nbsp;
+              <strong className="text-gray-800">{PRIORITY_LABELS[currentPriority]?.label ?? currentPriority}</strong>
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Pick step */}
+        {step === 'pick' && (
+          <div className="p-4 space-y-2">
+            {(['P1','P2','P3','P4','P5'] as EmergencyPriority[]).map(p => (
+              <button
+                key={p}
+                onClick={() => handlePick(p)}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors',
+                  p === currentPriority
+                    ? 'opacity-50 cursor-default ' + PRIORITY_LABELS[p].cls
+                    : PRIORITY_LABELS[p].cls,
+                )}
+                disabled={p === currentPriority}
+              >
+                <EmergencyPriorityBadge priority={p} size="sm" showLabel="short" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold">{PRIORITY_LABELS[p].label}</p>
+                  <p className="text-[10px] opacity-70">{PRIORITY_LABELS[p].sub}</p>
+                </div>
+                {p === currentPriority && (
+                  <span className="ml-auto text-[10px] font-bold opacity-60">ACTUEL</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Confirm step */}
+        {step === 'confirm' && selected && (
+          <div className="p-5 space-y-4">
+            <div className="flex items-center justify-center gap-4">
+              <div className="flex flex-col items-center">
+                <EmergencyPriorityBadge priority={currentPriority} size="md" showLabel="both" />
+                <span className="text-[10px] text-gray-400 mt-1">Actuel</span>
+              </div>
+              <span className="text-gray-300 text-2xl font-light">→</span>
+              <div className="flex flex-col items-center">
+                <EmergencyPriorityBadge priority={selected} size="md" showLabel="both" />
+                <span className="text-[10px] text-gray-400 mt-1">Nouveau</span>
+              </div>
+            </div>
+
+            {(selected === 'P1' || (PRIORITY_CFG[selected]?.targetMin ?? 30) < (PRIORITY_CFG[currentPriority]?.targetMin ?? 30)) && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700">
+                <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
+                <p className="text-xs font-medium">
+                  Escalade vers une priorité plus haute. Assurez-vous d'avoir réévalué le patient.
+                </p>
+              </div>
+            )}
+
+            <p className="text-xs text-gray-600 text-center">
+              Ce changement sera enregistré dans le dossier et mis à jour dans la liste des urgences.
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setStep('pick'); setSelected(null); }}
+                disabled={saving}
+                className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Retour
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={saving}
+                className={cn(
+                  'flex-1 px-4 py-2 text-sm rounded-xl font-semibold text-white transition-colors disabled:opacity-50',
+                  selected === 'P1' ? 'bg-red-600 hover:bg-red-700' :
+                  selected === 'P2' ? 'bg-orange-500 hover:bg-orange-600' :
+                  selected === 'P3' ? 'bg-yellow-500 hover:bg-yellow-600' :
+                  'bg-green-600 hover:bg-green-700',
+                )}
+              >
+                {saving ? 'Enregistrement…' : 'Confirmer'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function DossierHeader() {
-  const { dossier, patient, saveState, lastSaved, startCare, suspendCare, closeFile, triggerSave, appendAudit } = useEmergencyDossier();
+  const { dossier, patient, saveState, lastSaved, startCare, suspendCare, closeFile, triggerSave, appendAudit, updateTriagePriority } = useEmergencyDossier();
   const { can } = usePermission();
   const [, setLocation] = useLocation();
   const [waitStr, setWaitStr] = useState('');
+  // Local priority display — tracks the confirmed value after in-page triage changes
+  const [displayPriority, setDisplayPriority] = useState<EmergencyPriority | null>(null);
+  const [showTriageOverlay, setShowTriageOverlay] = useState(false);
+
+  // Sync display priority when patient loads
+  useEffect(() => {
+    if (patient?.priority) setDisplayPriority(patient.priority);
+  }, [patient?.priority]);
 
   useEffect(() => {
     if (!patient) return;
@@ -55,7 +214,7 @@ export function DossierHeader() {
 
   if (!patient) return null;
 
-  const pCfg = PRIORITY_CFG[patient.priority];
+  const effectivePriority = displayPriority ?? patient.priority;
   const statusCfg = WORKFLOW_LABELS[dossier.workflowStatus] ?? { label: dossier.workflowStatus, cls: 'bg-gray-100 text-gray-600' };
   const isClosed = dossier.workflowStatus === 'cloture';
   const careActive = ['en_prise_en_charge', 'en_soins', 'en_observation'].includes(dossier.workflowStatus);
@@ -63,6 +222,12 @@ export function DossierHeader() {
   const canClose = can('emergencies.close');
   const canPrint = can('emergencies.print');
   const canExport = can('emergencies.export');
+  const canTriage = can('emergencies.triage') || can('emergencies.start_care');
+
+  const handleTriageConfirm = async (newPriority: EmergencyPriority) => {
+    setDisplayPriority(newPriority);
+    await updateTriagePriority(newPriority);
+  };
 
   return (
     <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm print:hidden">
@@ -75,7 +240,19 @@ export function DossierHeader() {
           <ArrowLeft size={13} />Urgences
         </button>
 
-        <EmergencyPriorityBadge priority={patient.priority} size="md" showLabel="both" />
+        {/* Priority badge + triage change button */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <EmergencyPriorityBadge priority={effectivePriority} size="md" showLabel="both" />
+          {canTriage && !isClosed && (
+            <button
+              onClick={() => setShowTriageOverlay(true)}
+              title="Changer la priorité de triage"
+              className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-blue-600 border border-gray-200 hover:border-blue-300 rounded-lg px-1.5 py-1 transition-colors"
+            >
+              <ChevronDown size={11} />
+            </button>
+          )}
+        </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
@@ -214,7 +391,19 @@ export function DossierHeader() {
         <div className="flex items-center gap-2 px-4 pb-2 text-[11px] text-gray-600 border-t border-gray-50 pt-1">
           <AlertCircle size={10} className="text-gray-400 flex-shrink-0" />
           <span className="truncate">{patient.chiefComplaint}</span>
+          {patient.triageNotes && (
+            <span className="text-gray-400 ml-2 truncate hidden sm:inline">· {patient.triageNotes}</span>
+          )}
         </div>
+      )}
+
+      {/* Triage change overlay */}
+      {showTriageOverlay && (
+        <TriageChangeOverlay
+          currentPriority={effectivePriority}
+          onClose={() => setShowTriageOverlay(false)}
+          onConfirm={handleTriageConfirm}
+        />
       )}
     </div>
   );

@@ -162,19 +162,54 @@ interface ApiPatient {
   mpiId?: string;
 }
 
-function apiPatientToEmergency(p: ApiPatient): EmergencyPatient {
+interface ApiVisit {
+  visitId: string;
+  patientId: string;
+  encounterId: string;
+  priority: string;
+  status: string;
+  chiefComplaint: string;
+  mechanism?: string | null;
+  triageNotes?: string | null;
+  byAmbulance: boolean;
+  isMinor: boolean;
+  tags: string[];
+  arrivalTime: string;
+  assignedDoctorName?: string | null;
+  assignedNurseName?: string | null;
+  assignedRoomName?: string | null;
+}
+
+function buildEmergencyPatient(p: ApiPatient, v: ApiVisit | null): EmergencyPatient {
   return {
-    id:              p.id,
-    mrn:             p.mrn ?? p.mpiId ?? p.id,
-    firstName:       p.firstName,
-    lastName:        p.lastName,
-    dateOfBirth:     p.dateOfBirth ?? '',
-    gender:          (p.gender as 'M' | 'F' | 'other') ?? 'other',
-    bloodType:       p.bloodType ?? '',
-    allergies:       p.allergies ?? [],
-    chronicDiseases: p.chronicDiseases ?? [],
-    phone:           p.phone ?? '',
-    mpiId:           p.mpiId ?? p.id,
+    id:               v?.visitId ?? p.id,
+    visitId:          v?.visitId,
+    patientId:        p.id,
+    mpiId:            p.mpiId ?? p.mrn ?? p.id,
+    firstName:        p.firstName,
+    lastName:         p.lastName,
+    dateOfBirth:      p.dateOfBirth ?? '',
+    gender:           (p.gender === 'F' ? 'F' : 'M') as 'M' | 'F',
+    bloodType:        p.bloodType ?? '',
+    allergies:        p.allergies ?? [],
+    chronicDiseases:  p.chronicDiseases ?? [],
+    phone:            p.phone ?? '',
+    age:              p.dateOfBirth
+      ? Math.floor((Date.now() - new Date(p.dateOfBirth).getTime()) / (365.25 * 24 * 3600 * 1000))
+      : 0,
+    // Visit fields (may fall back to safe defaults if no active visit)
+    priority:         (v?.priority as EmergencyPatient['priority']) ?? 'P3',
+    status:           (v?.status as EmergencyPatient['status']) ?? 'en_soins',
+    arrivalTime:      v?.arrivalTime ?? new Date().toISOString(),
+    chiefComplaint:   v?.chiefComplaint ?? '',
+    mechanism:        v?.mechanism ?? undefined,
+    triageNotes:      v?.triageNotes ?? undefined,
+    byAmbulance:      v?.byAmbulance ?? false,
+    isMinor:          v?.isMinor ?? false,
+    tags:             v?.tags ?? [],
+    assignedDoctor:   v?.assignedDoctorName ?? undefined,
+    assignedNurse:    v?.assignedNurseName  ?? undefined,
+    assignedRoom:     v?.assignedRoomName   ?? undefined,
   };
 }
 
@@ -185,6 +220,7 @@ export default function EmergencyPatientDetail() {
   const patientId = params?.id ?? '';
 
   const [patient, setPatient] = useState<EmergencyPatient | null>(null);
+  const [visitId, setVisitId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState<number | null>(null);
 
@@ -192,8 +228,24 @@ export default function EmergencyPatientDetail() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient.get<ApiPatient>(`/patients/${patientId}`);
-      setPatient(apiPatientToEmergency(data));
+      // Load patient demographics and active emergency visit in parallel
+      const [patientData, visitData] = await Promise.allSettled([
+        apiClient.get<ApiPatient>(`/patients/${patientId}`),
+        apiClient.get<ApiVisit>(`/emergencies/visits/by-patient/${patientId}`),
+      ]);
+
+      if (patientData.status === 'rejected') {
+        const status = (patientData.reason as { status?: number })?.status ?? 500;
+        setError(status);
+        return;
+      }
+
+      const apiPatient = patientData.value;
+      const apiVisit   = visitData.status === 'fulfilled' ? visitData.value : null;
+
+      const merged = buildEmergencyPatient(apiPatient, apiVisit);
+      setPatient(merged);
+      setVisitId(apiVisit?.visitId);
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status ?? 500;
       setError(status);
@@ -203,7 +255,7 @@ export default function EmergencyPatientDetail() {
   };
 
   useEffect(() => {
-    if (patientId) loadPatient();
+    if (patientId) void loadPatient();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId]);
 
@@ -211,7 +263,7 @@ export default function EmergencyPatientDetail() {
   if (error)   return <PatientError status={error} onRetry={loadPatient} />;
 
   return (
-    <EmergencyDossierProvider patientId={patientId} patient={patient}>
+    <EmergencyDossierProvider patientId={patientId} visitId={visitId} patient={patient}>
       <DossierPage />
     </EmergencyDossierProvider>
   );

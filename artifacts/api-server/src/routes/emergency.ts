@@ -1,12 +1,15 @@
 /**
  * /emergencies routes — backed by emergency_visits, emergency_rooms, ambulances tables.
  *
- * GET /emergencies/patients  — active emergency visits with patient demographics + latest vitals
- * GET /emergencies/rooms     — emergency room list with occupancy
- * GET /emergencies/ambulances — ambulance fleet with current status
+ * GET  /emergencies/patients                     — active emergency visits with patient demographics + latest vitals
+ * GET  /emergencies/visits/by-patient/:patientId — active visit for a patient (for dossier page)
+ * PATCH /emergencies/visits/:visitId             — update priority, status, triageNotes
+ * POST  /emergencies/vitals                      — record a new vitals reading for a visit
+ * GET  /emergencies/rooms                        — emergency room list with occupancy
+ * GET  /emergencies/ambulances                   — ambulance fleet with current status
  */
 import { Router } from "express";
-import { isNull, and, desc, inArray, sql } from "drizzle-orm";
+import { isNull, and, desc, inArray, sql, eq, isNotNull } from "drizzle-orm";
 import {
   db,
   emergencyVisitsTable,
@@ -15,8 +18,17 @@ import {
   ambulancesTable,
   patientsTable,
 } from "@workspace/db";
+import { requirePermission } from "../middleware/requirePermission";
 
 const router = Router();
+
+// ─── Allowed enum values (mirrors the DB enums) ───────────────────────────────
+
+const ALLOWED_PRIORITIES = new Set(["P1","P2","P3","P4","P5","non_classe"]);
+const ALLOWED_STATUSES   = new Set([
+  "attente_triage","en_triage","attente_soins","en_soins",
+  "observation","hospitalise","sorti","transfere","decede",
+]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -198,5 +210,218 @@ router.get("/ambulances", async (_req, res, next) => {
     next(err);
   }
 });
+
+// ─── GET /emergencies/visits/by-patient/:patientId ───────────────────────────
+// Returns the most-recent open emergency visit for a patient (used by the dossier page).
+// Requires emergencies.view — the same permission needed to open the urgences board.
+
+router.get(
+  "/visits/by-patient/:patientId",
+  requirePermission("emergencies.view"),
+  async (req, res, next) => {
+    try {
+      const { patientId } = req.params as { patientId: string };
+
+      const rows = await db
+        .select()
+        .from(emergencyVisitsTable)
+        .where(
+          and(
+            eq(emergencyVisitsTable.patientId, patientId),
+            isNull(emergencyVisitsTable.deletedAt),
+            isNull(emergencyVisitsTable.closedAt),
+          )
+        )
+        .orderBy(desc(emergencyVisitsTable.arrivalTime))
+        .limit(1);
+
+      if (!rows[0]) {
+        res.status(404).json({ error: "No active emergency visit found for this patient" });
+        return;
+      }
+
+      const v = rows[0];
+      res.json({
+        visitId:          v.id,
+        patientId:        v.patientId,
+        encounterId:      v.encounterId,
+        priority:         v.priority === "non_classe" ? "P5" : v.priority,
+        status:           v.status,
+        chiefComplaint:   v.chiefComplaint,
+        mechanism:        v.mechanism ?? null,
+        triageNotes:      v.triageNotes ?? null,
+        byAmbulance:      v.byAmbulance,
+        isMinor:          v.isMinor,
+        tags:             v.tags ?? [],
+        arrivalTime:      v.arrivalTime.toISOString(),
+        assignedDoctorName: v.assignedDoctorName ?? null,
+        assignedNurseName:  v.assignedNurseName  ?? null,
+        assignedRoomName:   v.assignedRoomName   ?? null,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── PATCH /emergencies/visits/:visitId ──────────────────────────────────────
+// Allows triage nurses / doctors to update priority, status, triage notes, or
+// assigned room.  Requires emergencies.triage — the dedicated triage permission.
+// Refuses updates to closed or deleted visits (returns 409).
+
+router.patch(
+  "/visits/:visitId",
+  requirePermission("emergencies.triage"),
+  async (req, res, next) => {
+    try {
+      const { visitId } = req.params as { visitId: string };
+      const { priority, status, triageNotes, assignedRoomName } = req.body as {
+        priority?: string;
+        status?: string;
+        triageNotes?: string;
+        assignedRoomName?: string;
+      };
+
+      // Validate enum values before touching the DB
+      if (priority !== undefined && !ALLOWED_PRIORITIES.has(priority)) {
+        res.status(400).json({ error: `Invalid priority value: ${priority}` });
+        return;
+      }
+      if (status !== undefined && !ALLOWED_STATUSES.has(status)) {
+        res.status(400).json({ error: `Invalid status value: ${status}` });
+        return;
+      }
+
+      // Fetch the visit first — reject if not found, deleted, or already closed
+      const existing = await db
+        .select({ id: emergencyVisitsTable.id, closedAt: emergencyVisitsTable.closedAt })
+        .from(emergencyVisitsTable)
+        .where(
+          and(
+            eq(emergencyVisitsTable.id, visitId),
+            isNull(emergencyVisitsTable.deletedAt),
+          )
+        )
+        .limit(1);
+
+      if (!existing[0]) {
+        res.status(404).json({ error: "Emergency visit not found" });
+        return;
+      }
+      if (existing[0].closedAt !== null) {
+        res.status(409).json({ error: "Cannot update a closed emergency visit" });
+        return;
+      }
+
+      // Build update object — only touch provided fields
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
+      if (priority         !== undefined) updates.priority         = priority;
+      if (status           !== undefined) updates.status           = status;
+      if (triageNotes      !== undefined) updates.triageNotes      = triageNotes;
+      if (assignedRoomName !== undefined) updates.assignedRoomName = assignedRoomName;
+
+      const rows = await db
+        .update(emergencyVisitsTable)
+        .set(updates)
+        .where(eq(emergencyVisitsTable.id, visitId))
+        .returning({
+          id:       emergencyVisitsTable.id,
+          priority: emergencyVisitsTable.priority,
+          status:   emergencyVisitsTable.status,
+        });
+
+      res.json(rows[0]);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── POST /emergencies/vitals ─────────────────────────────────────────────────
+// Records a new vitals reading for an open visit.
+// Requires emergencies.update — same permission as general dossier updates.
+// encounterId is derived server-side from the visit row (not trusted from the caller)
+// to prevent mismatched clinical lineage.
+
+router.post(
+  "/vitals",
+  requirePermission("emergencies.update"),
+  async (req, res, next) => {
+    try {
+      const {
+        visitId,
+        heartRate, bloodPressure, spo2, temperature, respiratoryRate,
+        gcs, painLevel, glucose, notes,
+      } = req.body as {
+        visitId:          string;
+        heartRate?:       number;
+        bloodPressure?:   string;
+        spo2?:            number;
+        temperature?:     number;
+        respiratoryRate?: number;
+        gcs?:             number;
+        painLevel?:       number;
+        glucose?:         number;
+        notes?:           string;
+      };
+
+      if (!visitId) {
+        res.status(400).json({ error: "visitId is required" });
+        return;
+      }
+
+      // Resolve the canonical encounterId from the visit — reject unknown/closed visits
+      const visitRow = await db
+        .select({
+          encounterId: emergencyVisitsTable.encounterId,
+          closedAt:    emergencyVisitsTable.closedAt,
+        })
+        .from(emergencyVisitsTable)
+        .where(
+          and(
+            eq(emergencyVisitsTable.id, visitId),
+            isNull(emergencyVisitsTable.deletedAt),
+            isNotNull(emergencyVisitsTable.encounterId),
+          )
+        )
+        .limit(1);
+
+      if (!visitRow[0]) {
+        res.status(404).json({ error: "Emergency visit not found or has no linked encounter" });
+        return;
+      }
+      if (visitRow[0].closedAt !== null) {
+        res.status(409).json({ error: "Cannot record vitals for a closed emergency visit" });
+        return;
+      }
+
+      const encounterId = visitRow[0].encounterId;
+
+      const inserted = await db
+        .insert(emergencyVitalsTable)
+        .values({
+          visitId,
+          encounterId,
+          heartRate:       heartRate       ?? null,
+          bloodPressure:   bloodPressure   ?? null,
+          spo2:            spo2            ?? null,
+          temperature:     temperature     ?? null,
+          respiratoryRate: respiratoryRate ?? null,
+          gcs:             gcs             ?? null,
+          painLevel:       painLevel       ?? null,
+          glucose:         glucose         ?? null,
+          notes:           notes           ?? null,
+        })
+        .returning({
+          id:         emergencyVitalsTable.id,
+          recordedAt: emergencyVitalsTable.recordedAt,
+        });
+
+      res.status(201).json(inserted[0]);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 export default router;

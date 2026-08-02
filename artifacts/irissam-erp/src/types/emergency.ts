@@ -56,6 +56,14 @@ export interface EmergencyPatient {
   allergies?: string[];      // known drug / substance allergies
   /** Real DB patient UUID — present when loaded from the API, absent for mock records. */
   patientId?: string;
+  /** Real DB emergency visit UUID — present when loaded from the API. */
+  visitId?: string;
+  /** ISO 8601 date-of-birth — used for demographics display in the dossier. */
+  dateOfBirth?: string;
+  /** Known chronic diseases. */
+  chronicDiseases?: string[];
+  /** Phone number. */
+  phone?: string;
 }
 
 export interface EmergencyRoom {

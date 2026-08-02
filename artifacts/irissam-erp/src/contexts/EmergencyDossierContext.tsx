@@ -29,6 +29,8 @@ export type EncounterStatus = 'loading' | 'ready' | 'error';
 interface EmergencyDossierContextType {
   dossier: EmergencyDossier;
   patient: EmergencyPatient | null;
+  /** The DB visit UUID — available after loading from /emergencies/visits/by-patient/:id */
+  visitId: string | undefined;
   saveState: SaveState;
   lastSaved: string | null;
   /** Whether the real PostgreSQL encounter is available. Clinical actions are blocked until 'ready'. */
@@ -39,6 +41,8 @@ interface EmergencyDossierContextType {
   startCare: () => void;
   suspendCare: () => void;
   closeFile: () => void;
+  // Triage priority change — persists to DB via PATCH /emergencies/visits/:visitId
+  updateTriagePriority: (priority: EmergencyPatient['priority']) => Promise<void>;
   // Clinical text
   updateClinicalText: (
     field: 'chiefComplaint' | 'illnessHistory' | 'clinicalExamination',
@@ -80,10 +84,13 @@ const EmergencyDossierContext = createContext<EmergencyDossierContextType | unde
 
 export function EmergencyDossierProvider({
   patientId,
+  visitId: propVisitId,
   patient: propPatient,
   children,
 }: {
   patientId: string;
+  /** Real DB emergency visit UUID — if provided, triage/vitals APIs use it. */
+  visitId?: string;
   /** Pass the EmergencyPatient from the waiting-room list so DossierHeader can show real patient info. */
   patient?: EmergencyPatient | null;
   children: React.ReactNode;
@@ -244,7 +251,21 @@ export function EmergencyDossierProvider({
     };
     setDossier(d => ({ ...d, vitalReadings: [...d.vitalReadings, r] }));
     pushAudit({ action: 'Constantes enregistrées', category: 'clinical', details: `FC ${r.hr}, SpO₂ ${r.spo2}%` });
-  }, [who, pushAudit]);
+    // Persist to PostgreSQL — server derives encounterId from visitId
+    if (propVisitId) {
+      apiClient.post('/emergencies/vitals', {
+        visitId:         propVisitId,
+        heartRate:       r.hr,
+        bloodPressure:   r.bp || undefined,
+        spo2:            r.spo2,
+        temperature:     r.temp,
+        respiratoryRate: r.rr,
+        gcs:             r.gcs,
+        painLevel:       r.painLevel,
+        glucose:         r.glucose,
+      }).catch((err: Error) => console.error('[EmergencyDossier] vitals API failed:', err));
+    }
+  }, [who, propVisitId, pushAudit]);
 
   const addGlasgowReading = useCallback((breakdown: Omit<GlasgowBreakdown, 'recordedAt'>) => {
     const g: GlasgowBreakdown = {
@@ -622,11 +643,28 @@ export function EmergencyDossierProvider({
     pushAudit(entry);
   }, [pushAudit]);
 
+  // ── Triage priority change — persists via PATCH /emergencies/visits/:visitId ─
+  const updateTriagePriority = useCallback(async (priority: EmergencyPatient['priority']) => {
+    // Optimistic local update (patient is read-only prop; update reflected via dossier audit)
+    pushAudit({ action: `Priorité modifiée → ${priority}`, category: 'admin', details: `Changement de triage par ${who}` });
+
+    // Persist to DB if we have a real visitId
+    if (propVisitId) {
+      try {
+        await apiClient.patch(`/emergencies/visits/${propVisitId}`, { priority });
+      } catch (err) {
+        console.error('[EmergencyDossier] triage priority update failed:', err);
+        toast({ title: 'Erreur réseau', description: 'La priorité a été mise à jour localement mais n\'a pas pu être sauvegardée.', variant: 'destructive' });
+      }
+    }
+  }, [propVisitId, who, pushAudit, toast]);
+
   return (
     <EmergencyDossierContext.Provider value={{
-      dossier, patient, saveState, lastSaved,
+      dossier, patient, visitId: propVisitId, saveState, lastSaved,
       encounterStatus, retryEncounter,
       transitionStatus, startCare, suspendCare, closeFile,
+      updateTriagePriority,
       updateClinicalText, updateFullExam,
       addVitalReading, addGlasgowReading, updateAbcde,
       addLabRequest, updateLabStatus,
