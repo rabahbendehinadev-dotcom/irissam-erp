@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageWrapper } from "@/components/shared/PageWrapper";
@@ -85,6 +86,9 @@ export default function Appointments() {
   const { data: apiAppointments, isLoading, isError, refetch } = useGetAppointmentsList({} as any);
   const createMutation = useCreateAppointment();
   const updateStatusMutation = useUpdateAppointmentStatus();
+
+  // ── Auto-refresh every 30 s ────────────────────────────────────────────────
+  const { lastUpdatedLabel } = useAutoRefresh({ refetch, data: apiAppointments });
 
   // Merge fresh API data into the store whenever it arrives (preserves local overrides)
   useEffect(() => {
@@ -194,6 +198,11 @@ export default function Appointments() {
               {isError && !isLoading && (
                 <span className="flex items-center gap-1 text-xs px-2.5 py-1 bg-amber-100 text-amber-700 border border-amber-200 rounded-full">
                   <AlertTriangle size={11} /> Données hors ligne
+                </span>
+              )}
+              {!isLoading && !isError && lastUpdatedLabel && (
+                <span className="text-xs text-gray-400 px-2 py-1 bg-gray-50 border border-gray-200 rounded-full whitespace-nowrap">
+                  {lastUpdatedLabel}
                 </span>
               )}
               <button

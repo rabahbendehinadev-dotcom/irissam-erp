@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { Plus, RefreshCw, Download, Stethoscope, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -41,6 +42,9 @@ export default function ConsultationsPage() {
   const { data: apiConsultations, isLoading, isError, refetch } = useGetConsultationsList({} as any);
   const createMutation = useCreateConsultation();
   const updateStatusMutation = useUpdateConsultationStatus();
+
+  // ── Auto-refresh every 30 s ────────────────────────────────────────────────
+  const { lastUpdatedLabel } = useAutoRefresh({ refetch, data: apiConsultations });
 
   // Fall back to mock data if API unavailable, then apply nurse vitals overlay
   const consultations = useMemo((): Consultation[] => {
@@ -202,6 +206,11 @@ export default function ConsultationsPage() {
                 {isError && !isLoading && (
                   <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
                     Données hors ligne
+                  </span>
+                )}
+                {!isLoading && !isError && lastUpdatedLabel && (
+                  <span className="ml-2 text-xs text-gray-400 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
+                    {lastUpdatedLabel}
                   </span>
                 )}
               </p>

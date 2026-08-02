@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { toast } from "@/hooks/use-toast";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -49,6 +50,9 @@ export default function Alerts() {
   const { data: apiAlerts, isLoading, isError, refetch } = useGetAlerts({} as any);
   const markReadMutation = useMarkAlertRead();
   const markAllReadMutation = useMarkAllAlertsRead();
+
+  // ── Auto-refresh every 30 s ────────────────────────────────────────────────
+  const { lastUpdatedLabel } = useAutoRefresh({ refetch, data: apiAlerts });
 
   // Local optimistic state for isRead (synced with API on refetch)
   const [localReadIds, setLocalReadIds] = useState<Set<string>>(new Set());
@@ -150,6 +154,11 @@ export default function Alerts() {
                 >
                   <AlertTriangle size={11} /> Données hors ligne — Réessayer
                 </button>
+              )}
+              {!isLoading && !isError && lastUpdatedLabel && (
+                <span className="text-xs text-gray-400 px-2 py-1 bg-gray-50 border border-gray-200 rounded-full whitespace-nowrap">
+                  {lastUpdatedLabel}
+                </span>
               )}
               {unreadCount > 0 && !isLoading && (
                 <button
