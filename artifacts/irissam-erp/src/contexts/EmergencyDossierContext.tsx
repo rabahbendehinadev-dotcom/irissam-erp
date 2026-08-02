@@ -1,11 +1,16 @@
 import {
   createContext, useContext, useState, useEffect, useCallback, useRef,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/store/AuthContext';
 import type { EmergencyPatient } from '@/types/emergency';
 import { useToast } from '@/hooks/use-toast';
 import { getMockDossier } from '@/mock/emergencyDossier';
 import { apiClient } from '@/services/api/client';
+import {
+  getGetBedsSummaryQueryKey,
+  getGetBedsByServiceQueryKey,
+} from '@workspace/api-client-react';
 import {
   validateLabOrder, validateImagingOrder,
   validateHospitalization, validateBloc, validateICU,
@@ -71,7 +76,8 @@ interface EmergencyDossierContextType {
   addObservationReading: (reading: Omit<VitalReading, 'timestamp'>) => void;
   // Decision
   updateDecision: (updates: Partial<FinalDecision>) => void;
-  confirmDecision: () => void;
+  /** Async: awaits the admission API call; throws on failure so callers can show an error. */
+  confirmDecision: () => Promise<void>;
   // Manual save
   triggerSave: () => void;
   // Audit
@@ -97,6 +103,7 @@ export function EmergencyDossierProvider({
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [dossier, setDossier] = useState<EmergencyDossier>(() => getMockDossier(patientId));
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -521,7 +528,7 @@ export function EmergencyDossierProvider({
     setDossier(d => ({ ...d, finalDecision: { ...d.finalDecision, ...updates } }));
   }, []);
 
-  const confirmDecision = useCallback(() => {
+  const confirmDecision = useCallback(async () => {
     const d = dossier;
     const decision = d.finalDecision.decision;
     if (!decision) return;
@@ -530,12 +537,21 @@ export function EmergencyDossierProvider({
     if (decision === 'hospitalisation') {
       const v = validateHospitalization({ ward: d.finalDecision.ward });
       if (!v.valid) { toast({ title: 'Hospitalisation refusée', description: v.error, variant: 'destructive' }); return; }
+      // Require a real bed to be selected so the admission can reserve it
+      if (!d.finalDecision.bedId) {
+        toast({ title: 'Lit requis', description: 'Veuillez sélectionner un lit disponible avant de confirmer.', variant: 'destructive' });
+        return;
+      }
     } else if (decision === 'bloc') {
       const v = validateBloc({ surgeon: d.finalDecision.surgeon, intervention: d.finalDecision.intervention });
       if (!v.valid) { toast({ title: 'Demande bloc refusée', description: v.error, variant: 'destructive' }); return; }
     } else if (decision === 'reanimation') {
       const v = validateICU({ icuBed: d.finalDecision.icuBed, icuMotif: d.finalDecision.icuMotif });
       if (!v.valid) { toast({ title: 'Admission réa refusée', description: v.error, variant: 'destructive' }); return; }
+      if (!d.finalDecision.icuBedId) {
+        toast({ title: 'Lit de réa requis', description: 'Veuillez sélectionner un lit de réanimation disponible.', variant: 'destructive' });
+        return;
+      }
     } else if (decision === 'transfert') {
       const v = validateTransfer({ destEtablissement: d.finalDecision.destEtablissement });
       if (!v.valid) { toast({ title: 'Transfert refusé', description: v.error, variant: 'destructive' }); return; }
@@ -544,6 +560,101 @@ export function EmergencyDossierProvider({
     const now = new Date().toISOString();
     const patientName = patient ? `${patient.lastName} ${patient.firstName}` : patientId;
 
+    // ── Cross-module actions via real PostgreSQL API (BLOCKING — no fire-and-forget) ─
+    try {
+      if (decision === 'domicile') {
+        if (realEncounterId) {
+          await apiClient.patch(`/encounters/${realEncounterId}/status`, { status: 'closed', reason: 'Retour à domicile' });
+        }
+
+      } else if (decision === 'hospitalisation') {
+        // Reserve the bed and create the admission record atomically
+        await apiClient.post('/admissions', {
+          patientId,
+          encounterId: realEncounterId,
+          patientName,
+          patientMpiId: patient?.mpiId,
+          type: 'hospitalisation',
+          serviceName: d.finalDecision.ward ?? 'À déterminer',
+          doctorId: whoId,
+          doctorName: who,
+          motif: d.chiefComplaint,
+          bedId: d.finalDecision.bedId,
+          bedNumber: d.finalDecision.bedPlaceholder,
+          notes: d.finalDecision.medicalSummary ?? '',
+          admissionDate: now.split('T')[0],
+          admissionTime: now.split('T')[1].slice(0, 5),
+          priority: 'urgent',
+        });
+        // Immediately refresh beds widget
+        queryClient.invalidateQueries({ queryKey: getGetBedsSummaryQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetBedsByServiceQueryKey() });
+        toast({ title: 'Patient hospitalisé', description: `Dossier d'admission créé — lit ${d.finalDecision.bedPlaceholder ?? d.finalDecision.bedId}` });
+
+      } else if (decision === 'bloc') {
+        await apiClient.post('/surgical-requests', {
+          patientId,
+          encounterId: realEncounterId,
+          patientName,
+          intervention: d.finalDecision.intervention ?? 'À déterminer',
+          surgeonName: d.finalDecision.surgeon,
+          urgencyDegree: d.finalDecision.urgencyDegree ?? 'urgent',
+          sourceModule: 'urgences',
+        });
+
+      } else if (decision === 'reanimation') {
+        // ICU admission
+        await apiClient.post('/icu/admissions', {
+          patientId,
+          encounterId: realEncounterId,
+          patientName,
+          motif: d.finalDecision.icuMotif ?? d.chiefComplaint,
+          priority: d.finalDecision.icuPriority ?? 'P1',
+          icuBed: d.finalDecision.icuBed,
+        });
+        // Standard admission record so Hospitalisations sees it (also reserves the bed)
+        await apiClient.post('/admissions', {
+          patientId,
+          encounterId: realEncounterId,
+          patientName,
+          patientMpiId: patient?.mpiId,
+          type: 'hospitalisation',
+          serviceName: 'Réanimation',
+          doctorId: whoId,
+          doctorName: who,
+          motif: d.finalDecision.icuMotif ?? d.chiefComplaint,
+          bedId: d.finalDecision.icuBedId,
+          bedNumber: d.finalDecision.icuBed,
+          admissionDate: now.split('T')[0],
+          admissionTime: now.split('T')[1].slice(0, 5),
+          priority: 'critique',
+        });
+        queryClient.invalidateQueries({ queryKey: getGetBedsSummaryQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetBedsByServiceQueryKey() });
+        toast({ title: 'Admission réanimation enregistrée', description: `Lit ${d.finalDecision.icuBed ?? d.finalDecision.icuBedId} réservé` });
+
+      } else if (decision === 'transfert') {
+        if (realEncounterId) {
+          await apiClient.patch(`/encounters/${realEncounterId}/status`, { status: 'closed', reason: `Transfert → ${d.finalDecision.destEtablissement ?? 'autre établissement'}` });
+        }
+
+      } else if (decision === 'deces') {
+        if (realEncounterId) {
+          await apiClient.patch(`/encounters/${realEncounterId}/status`, { status: 'closed', reason: 'Décès' });
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erreur réseau';
+      toast({
+        title: 'Décision non enregistrée',
+        description: message,
+        variant: 'destructive',
+      });
+      // Abort: do NOT advance dossier workflow — the API failed
+      return;
+    }
+
+    // ── Only reached on success ────────────────────────────────────────────
     setDossier(prev => ({
       ...prev,
       finalDecision: {
@@ -553,67 +664,6 @@ export function EmergencyDossierProvider({
         decidedAt: now,
       },
     }));
-
-    // ── Cross-module actions via real PostgreSQL API ────────────────────────
-    if (decision === 'domicile') {
-      // Close the encounter in the DB
-      if (realEncounterId) {
-        apiClient.patch(`/encounters/${realEncounterId}/status`, { status: 'closed', reason: 'Retour à domicile' })
-          .catch((err: Error) => console.error('[EmergencyDossier] encounter close failed:', err));
-      }
-
-    } else if (decision === 'hospitalisation') {
-      // Create a real admission record linked to this encounter
-      apiClient.post('/admissions', {
-        patientId,
-        encounterId: realEncounterId,
-        patientName,
-        type: 'urgence',
-        serviceName: d.finalDecision.ward ?? 'À déterminer',
-        doctorId: whoId,
-        doctorName: who,
-        motif: d.chiefComplaint,
-        notes: d.finalDecision.medicalSummary ?? '',
-        admissionDate: now.split('T')[0],
-        admissionTime: now.split('T')[1].slice(0, 5),
-        priority: 'urgent',
-      }).catch((err: Error) => console.error('[EmergencyDossier] admission create failed:', err));
-
-    } else if (decision === 'bloc') {
-      // Create a surgical request in the real DB
-      apiClient.post('/surgical-requests', {
-        patientId,
-        encounterId: realEncounterId,
-        patientName,
-        intervention: d.finalDecision.intervention ?? 'À déterminer',
-        surgeonName: d.finalDecision.surgeon,
-        urgencyDegree: d.finalDecision.urgencyDegree ?? 'urgent',
-        sourceModule: 'urgences',
-      }).catch((err: Error) => console.error('[EmergencyDossier] surgical request failed:', err));
-
-    } else if (decision === 'reanimation') {
-      // Create an ICU admission in the real DB
-      apiClient.post('/icu/admissions', {
-        patientId,
-        encounterId: realEncounterId,
-        patientName,
-        motif: d.finalDecision.icuMotif ?? d.chiefComplaint,
-        priority: d.finalDecision.icuPriority ?? 'P1',
-        icuBed: d.finalDecision.icuBed,
-      }).catch((err: Error) => console.error('[EmergencyDossier] ICU admission failed:', err));
-
-    } else if (decision === 'transfert') {
-      if (realEncounterId) {
-        apiClient.patch(`/encounters/${realEncounterId}/status`, { status: 'closed', reason: `Transfert → ${d.finalDecision.destEtablissement ?? 'autre établissement'}` })
-          .catch((err: Error) => console.error('[EmergencyDossier] encounter close failed:', err));
-      }
-
-    } else if (decision === 'deces') {
-      if (realEncounterId) {
-        apiClient.patch(`/encounters/${realEncounterId}/status`, { status: 'closed', reason: 'Décès' })
-          .catch((err: Error) => console.error('[EmergencyDossier] encounter close failed:', err));
-      }
-    }
 
     // Auto-transition dossier workflow
     const statusMap: Partial<Record<NonNullable<typeof decision>, EmergencyWorkflowStatus>> = {
@@ -627,7 +677,7 @@ export function EmergencyDossierProvider({
     const nextStatus = statusMap[decision];
     if (nextStatus) transitionStatus(nextStatus, `Décision: ${decision}`);
     pushAudit({ action: 'Décision finale', category: 'decision', details: decision });
-  }, [dossier, who, whoId, whoRole, patientId, patient, realEncounterId, transitionStatus, pushAudit, toast]);
+  }, [dossier, who, whoId, whoRole, patientId, patient, realEncounterId, transitionStatus, pushAudit, toast, queryClient]);
 
   // ── Manual save & audit ───────────────────────────────────────────────────
   const triggerSave = useCallback(() => {

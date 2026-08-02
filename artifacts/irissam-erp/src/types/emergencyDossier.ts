@@ -232,12 +232,14 @@ export interface FinalDecision {
   // Hospitalisation
   ward?: string;
   doctorName?: string;
-  bedPlaceholder?: string;
+  bedId?: string;       // UUID of the occupancy_beds row (required to reserve the bed)
+  bedPlaceholder?: string; // display label (number) for the selected bed
   medicalSummary?: string;
   // Réanimation
   icuMotif?: string;
   icuPriority?: string;
-  icuBed?: string;
+  icuBedId?: string;    // UUID of the occupancy_beds row (type=soins_intensifs)
+  icuBed?: string;      // display label for the selected ICU bed
   icuTeamNotified?: boolean;
   // Bloc
   intervention?: string;

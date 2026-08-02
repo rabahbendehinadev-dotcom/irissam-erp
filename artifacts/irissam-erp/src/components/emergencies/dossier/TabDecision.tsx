@@ -1,11 +1,85 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Home, Building2, Heart, Scissors, ArrowRightLeft, Eye, Moon, CheckCircle2, AlertTriangle,
+  Home, Building2, Heart, Scissors, ArrowRightLeft, Eye, Moon, CheckCircle2, AlertTriangle, Bed,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEmergencyDossier } from '@/contexts/EmergencyDossierContext';
 import { usePermission } from '@/hooks/usePermission';
+import { apiClient } from '@/services/api/client';
 import type { FinalDecisionType, FinalDecision } from '@/types/emergencyDossier';
+
+// ─── BedSelector ──────────────────────────────────────────────────────────────
+
+interface AvailableBed {
+  id: string;
+  number: string;
+  roomNumber: string | null;
+  floorLabel: string | null;
+  buildingName: string | null;
+  type: string;
+}
+
+function BedSelector({
+  label,
+  bedType,
+  selectedBedId,
+  onSelect,
+  accentClass,
+}: {
+  label: string;
+  bedType: 'standard' | 'soins_intensifs';
+  selectedBedId: string | undefined;
+  onSelect: (bedId: string, bedNumber: string) => void;
+  accentClass: string;
+}) {
+  const [beds, setBeds] = useState<AvailableBed[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    apiClient.get<AvailableBed[]>(`/occupancy-beds/available?type=${bedType}`)
+      .then(data => { if (!cancelled) { setBeds(Array.isArray(data) ? data : []); } })
+      .catch(() => { if (!cancelled) setBeds([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [bedType]);
+
+  return (
+    <div>
+      <label className={cn('text-[10px] font-bold text-gray-500 uppercase mb-1 block flex items-center gap-1')}>
+        <Bed size={10} /> {label} <span className="text-red-500">*</span>
+      </label>
+      {loading ? (
+        <div className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-400">
+          Chargement des lits disponibles…
+        </div>
+      ) : beds.length === 0 ? (
+        <div className="w-full text-sm border border-amber-200 rounded-lg px-3 py-2 bg-amber-50 text-amber-700">
+          ⚠ Aucun lit disponible actuellement
+        </div>
+      ) : (
+        <select
+          value={selectedBedId ?? ''}
+          onChange={e => {
+            const bed = beds.find(b => b.id === e.target.value);
+            if (bed) onSelect(bed.id, bed.number);
+          }}
+          className={cn('w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none', accentClass)}
+        >
+          <option value="">Sélectionner un lit…</option>
+          {beds.map(b => (
+            <option key={b.id} value={b.id}>
+              {b.number}
+              {b.roomNumber ? ` — Chambre ${b.roomNumber}` : ''}
+              {b.floorLabel ? ` — ${b.floorLabel}` : ''}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
 
 // ─── Decision options ─────────────────────────────────────────────────────────
 
@@ -71,6 +145,15 @@ function FormHospitalisation({ d, u }: { d: FinalDecision; u: (p: Partial<FinalD
         <input value={d.doctorName ?? ''} onChange={e => u({ doctorName: e.target.value })} placeholder="Nom du médecin" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
       </div>
       <div className="sm:col-span-2">
+        <BedSelector
+          label="Lit d'hospitalisation"
+          bedType="standard"
+          selectedBedId={d.bedId}
+          onSelect={(bedId, bedNumber) => u({ bedId, bedPlaceholder: bedNumber })}
+          accentClass="focus:ring-2 focus:ring-blue-400"
+        />
+      </div>
+      <div className="sm:col-span-2">
         <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Résumé pour le service</label>
         <textarea rows={4} value={d.medicalSummary ?? ''} onChange={e => u({ medicalSummary: e.target.value })} placeholder="Motif d'admission, diagnostic, traitement en cours, éléments critiques…" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
       </div>
@@ -92,9 +175,14 @@ function FormReanimation({ d, u }: { d: FinalDecision; u: (p: Partial<FinalDecis
           <option>P1 — Immédiat</option><option>P2 — Urgent</option><option>P3 — Semi-urgent</option>
         </select>
       </div>
-      <div>
-        <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Lit de réa</label>
-        <input value={d.icuBed ?? ''} onChange={e => u({ icuBed: e.target.value })} placeholder="N° lit ou 'À confirmer'" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400" />
+      <div className="sm:col-span-2">
+        <BedSelector
+          label="Lit de réanimation"
+          bedType="soins_intensifs"
+          selectedBedId={d.icuBedId}
+          onSelect={(bedId, bedNumber) => u({ icuBedId: bedId, icuBed: bedNumber })}
+          accentClass="focus:ring-2 focus:ring-red-400"
+        />
       </div>
       <div className="flex items-center gap-2 mt-4">
         <input type="checkbox" id="teamNotif" checked={!!d.icuTeamNotified} onChange={e => u({ icuTeamNotified: e.target.checked })} className="rounded" />
@@ -192,6 +280,16 @@ export function TabDecision() {
   const d = dossier.finalDecision;
   const canDecide = can('emergencies.decide');
   const isConfirmed = !!d.decidedAt;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleConfirm = async () => {
+    setIsSubmitting(true);
+    try {
+      await confirmDecision();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const formMap: Partial<Record<NonNullable<FinalDecisionType>, React.FC<{ d: FinalDecision; u: (p: Partial<FinalDecision>) => void }>>> = {
     domicile: FormDomicile,
@@ -283,10 +381,14 @@ export function TabDecision() {
             Confirmer la décision <strong>{DECISIONS.find(o=>o.key===d.decision)?.label}</strong> — cette action enregistre la décision finale et transition le statut du dossier.
           </p>
           <button
-            onClick={confirmDecision}
-            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold rounded-xl px-5 py-2.5 transition-colors flex-shrink-0"
+            onClick={handleConfirm}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl px-5 py-2.5 transition-colors flex-shrink-0"
           >
-            <CheckCircle2 size={15} />Confirmer
+            {isSubmitting
+              ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />En cours…</>
+              : <><CheckCircle2 size={15} />Confirmer</>
+            }
           </button>
         </div>
       )}
