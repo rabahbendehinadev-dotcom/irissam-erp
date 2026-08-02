@@ -52,7 +52,7 @@ export default function PatientsPage() {
   const rawPatients = useMemo((): Patient[] => {
     if (isLoading) return [];
     if (isError) return MOCK_PATIENTS;
-    return (apiPatients as unknown as Patient[]) ?? [];
+    return Array.isArray(apiPatients) ? apiPatients as unknown as Patient[] : [];
   }, [apiPatients, isLoading, isError]);
 
   const handleSort = (field: string) => {

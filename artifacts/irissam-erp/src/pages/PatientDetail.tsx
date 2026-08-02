@@ -163,7 +163,7 @@ export default function PatientDetailPage() {
     if (!patientId) return null;
     const mock = MOCK_PATIENTS.find(p => p.id === patientId);
     if (mock) return mock;
-    const api = (apiPatients ?? []).find(
+    const api = (Array.isArray(apiPatients) ? apiPatients : []).find(
       p => (p as unknown as Record<string, unknown>).id === patientId,
     );
     if (!api) return null;

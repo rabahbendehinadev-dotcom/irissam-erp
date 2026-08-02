@@ -51,7 +51,7 @@ export default function ConsultationsPage() {
     let base: Consultation[];
     if (isLoading) return [];
     if (isError) base = MOCK_CONSULTATIONS as Consultation[];
-    else base = (apiConsultations as unknown as Consultation[]) ?? [];
+    else base = Array.isArray(apiConsultations) ? (apiConsultations as unknown as Consultation[]) : [];
 
     // Merge nurse-entered vitals: overlay takes precedence over API/mock value
     const overlayKeys = Object.keys(vitalsOverlay);

@@ -101,7 +101,7 @@ export default function Appointments() {
   const rawAppointments = useMemo((): Appointment[] => {
     if (isLoading) return [];
     // Store always has data (seeded from mock); reflects both API and local overrides
-    return storeAppointments;
+    return Array.isArray(storeAppointments) ? storeAppointments : [];
   }, [isLoading, storeAppointments]);
 
   const departments = useMemo(() => {

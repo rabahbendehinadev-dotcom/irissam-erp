@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { PageErrorBoundary } from '@/components/shared/PageErrorBoundary';
 import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
 import { AppProvider } from '@/store/AppProvider';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -120,9 +121,11 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   if (!isAuthenticated) return <Redirect to="/login" />;
   if (user?.forcePasswordChange) return <Redirect to="/change-password" />;
   return (
-    <Suspense fallback={<LoadingSkeleton />}>
-      <Component />
-    </Suspense>
+    <PageErrorBoundary>
+      <Suspense fallback={<LoadingSkeleton />}>
+        <Component />
+      </Suspense>
+    </PageErrorBoundary>
   );
 }
 

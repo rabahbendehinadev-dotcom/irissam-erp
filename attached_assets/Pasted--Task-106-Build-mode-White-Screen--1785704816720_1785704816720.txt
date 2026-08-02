@@ -1,0 +1,239 @@
+نفّذ Task #106 كاملة في Build mode الآن.
+
+الهدف:
+منع أي White Screen نهائيًا، وتثبيت كل صفحات الـFrontend بعد الانتقال من Mock Data إلى PostgreSQL API.
+
+مهم جدًا:
+- لا تغيّر التصميم الحالي.
+- لا تغيّر الـUX إلا لإضافة Loading / Empty / Error states.
+- لا تضف Features جديدة.
+- لا تبدأ Facturation أو أي Module جديد.
+- أصلح فقط الاستقرار، الـguards، الـmappers، والـError Boundaries.
+
+==================================================
+1. PageErrorBoundary مشترك
+==================================================
+
+أنشئ Component مشترك:
+
+src/components/shared/PageErrorBoundary.tsx
+
+المطلوب:
+- يلتقط أي Runtime Error داخل الصفحة.
+- يعرض:
+  "Une erreur est survenue lors du chargement de cette page."
+- زر Réessayer.
+- زر Retour au tableau de bord.
+- يسجل:
+  route
+  error name
+  error message
+  component stack
+- بدون تسجيل بيانات طبية حساسة أو Tokens.
+
+استعمله حول جميع الصفحات الرئيسية.
+
+==================================================
+2. إصلاح Dashboard
+==================================================
+
+أصلح الـ4 imports/exports المكسورة:
+
+- useGetAlerts
+- useGetAdmissionsChart
+- useGetConsultationsChart
+- useGetServicesChart
+
+راجع package أو generated api-client-react وتأكد أن:
+- الأسماء صحيحة.
+- الـhooks موجودة فعلًا.
+- أو استبدلها بالـhooks الصحيحة الموجودة.
+- لا تترك أي import غير موجود.
+- Dashboard يفتح حتى لو فشل Widget واحد.
+
+لف كل Widget حساس بـWidget-level fallback حتى لا يطيح Dashboard كامل.
+
+==================================================
+3. Array Guards
+==================================================
+
+أضف Array.isArray() وحماية القيم في:
+
+- Patients
+- PatientDetail
+- Admissions
+- AdmissionDetail
+- Appointments
+- Emergencies
+- Hospitalization
+- OperatingRoom
+- Resuscitation
+- Laboratory
+- Imaging
+- Pharmacy
+
+أمثلة إلزامية:
+
+const items = Array.isArray(response?.data) ? response.data : [];
+
+const selected = items.find(...) ?? null;
+
+ممنوع استعمال:
+- .map
+- .filter
+- .reduce
+- .find
+
+على قيمة غير مؤكدة.
+
+==================================================
+4. Loading / Empty / Error States
+==================================================
+
+أكمل الحالات الناقصة خصوصًا في:
+
+- Dashboard
+- Consultations
+- Hospitalization
+- Laboratory
+- Imaging
+
+كل صفحة لازم تحتوي:
+- Loading State
+- Empty State
+- Error State
+- Retry button
+
+لا تعرض شاشة فارغة أبدًا.
+
+==================================================
+5. API Normalization
+==================================================
+
+راجع كل الـenums والقيم القادمة من الـAPI.
+
+أنشئ Mappers واضحة بين Backend وFrontend بدل استعمال القيم مباشرة.
+
+راجع خصوصًا:
+- status
+- severity
+- category
+- priority
+- admission status
+- bed status
+- ICU status
+- OR status
+- lab status
+- imaging status
+- prescription status
+
+أي قيمة غير معروفة:
+- تستعمل fallback آمن.
+- لا تسبب crash.
+- تظهر Badge "Inconnu" أو قيمة neutral.
+
+==================================================
+6. Direct Route Refresh
+==================================================
+
+اختبر فتح كل Route مباشرة ثم Refresh:
+
+- /dashboard
+- /patients
+- /admissions
+- /consultations
+- /appointments
+- /emergencies
+- /hospitalization
+- /operating-room
+- /resuscitation
+- /laboratory
+- /imaging
+- /pharmacy
+- /alerts
+
+يجب:
+- ألا تظهر شاشة بيضاء.
+- ألا يحدث Redirect loop.
+- ألا يوجد Runtime Error.
+
+==================================================
+7. Smoke Tests
+==================================================
+
+اختبر 15 Endpoint على الأقل:
+
+- /api/dashboard/stats
+- /api/alerts
+- /api/patients
+- /api/admissions
+- /api/consultations
+- /api/appointments
+- /api/occupancy-beds
+- /api/icu/beds
+- /api/operating-rooms
+- /api/surgical-requests
+- /api/lab-orders
+- /api/imaging-orders
+- /api/prescriptions
+- /api/notifications
+- /api/auth/me
+
+لكل Endpoint:
+- status code
+- response shape
+- هل data Array أم Object
+- هل توجد null values
+- هل الـFrontend mapper يتعامل معها
+
+==================================================
+8. اختبارات القبول
+==================================================
+
+TEST A:
+كل Route تفتح بلا White Screen.
+
+TEST B:
+API ترجع null بدل Array
+→ الصفحة تعرض Empty State، لا crash.
+
+TEST C:
+API ترجع 500
+→ Error State + Réessayer.
+
+TEST D:
+قيمة enum غير معروفة
+→ Badge neutral، لا crash.
+
+TEST E:
+Widget واحد في Dashboard يفشل
+→ Dashboard يبقى ظاهر.
+
+TEST F:
+Refresh مباشر لكل Route
+→ الصفحة تشتغل.
+
+TEST G:
+Console
+→ صفر Runtime Errors.
+
+TEST H:
+TypeScript
+→ صفر أخطاء جديدة.
+
+==================================================
+التقرير النهائي
+==================================================
+
+أعطني:
+
+- عدد الصفحات المغلفة بـPageErrorBoundary.
+- عدد الـguards المضافة.
+- الـ4 hooks التي تم تصحيحها وكيف.
+- الصفحات التي أضيف لها Loading/Empty/Error.
+- قيم enums غير المتوافقة التي تم توحيدها.
+- نتائج Smoke Tests.
+- نتائج TEST A–H.
+- عدد White Screens المتبقية.
+- عدد Runtime Errors المتبقية.
+- صفر TypeScript errors جديدة.

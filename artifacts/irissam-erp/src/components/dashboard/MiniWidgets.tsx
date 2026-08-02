@@ -194,7 +194,7 @@ export function MiniWidgets() {
         </div>
         <div className="flex-1 flex flex-col justify-center gap-1.5 overflow-hidden">
           {lowStock ? (
-            lowStock.items.length === 0 ? (
+            !Array.isArray(lowStock.items) || lowStock.items.length === 0 ? (
               <p className="text-[10px] text-gray-400 text-center">{t("widget.stock.all_ok")}</p>
             ) : (
               lowStock.items.map((item) => (

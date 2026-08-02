@@ -32,9 +32,10 @@ const PRIORITY_COLOR: Record<string, string> = {
 };
 
 export default function Resuscitation() {
-  const { icuBeds, loading, error, getICUStats, freeICUBed, refresh } = useICUApi();
+  const { icuBeds: rawIcuBeds, loading, error, getICUStats, freeICUBed, refresh } = useICUApi();
   const [filter, setFilter] = useState<'all' | 'disponible' | 'occupe'>('all');
 
+  const icuBeds = Array.isArray(rawIcuBeds) ? rawIcuBeds : [];
   const stats    = getICUStats();
   const displayed = icuBeds.filter(b => filter === 'all' || b.status === filter);
 

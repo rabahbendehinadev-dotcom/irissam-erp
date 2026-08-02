@@ -100,8 +100,11 @@ function ORCard({ or: room, currentRequest }: { or: ORRoomApi; currentRequest?: 
 }
 
 export default function OperatingRoom() {
-  const { operatingRooms, surgicalRequests, loading, error, refresh } = useOperatingRoomApi();
+  const { operatingRooms: rawORooms, surgicalRequests: rawSurgReqs, loading, error, refresh } = useOperatingRoomApi();
   const [filter, setFilter] = useState<OperatingRoomStatus | 'all'>('all');
+
+  const operatingRooms  = Array.isArray(rawORooms)   ? rawORooms   : [];
+  const surgicalRequests = Array.isArray(rawSurgReqs) ? rawSurgReqs : [];
 
   // Map current surgical requests to rooms
   const requestByOrRoomId = useMemo(() => {

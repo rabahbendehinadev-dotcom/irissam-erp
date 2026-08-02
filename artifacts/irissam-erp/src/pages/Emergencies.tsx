@@ -877,11 +877,16 @@ export default function EmergenciesPage() {
 
   // Live emergency data from API
   const {
-    patients, rooms, ambulances, todayStats, loading: emLoading, error: emError, refresh: emRefresh,
+    patients: rawPatients, rooms: rawRooms, ambulances: rawAmbulances,
+    todayStats, loading: emLoading, error: emError, refresh: emRefresh,
   } = useEmergencyData();
 
   // Staff data still served from in-memory store pending a staff API
   const { erDoctors: doctors, erNurses: nurses } = useMockRepository();
+
+  const patients   = Array.isArray(rawPatients)   ? rawPatients   : [];
+  const rooms      = Array.isArray(rawRooms)      ? rawRooms      : [];
+  const ambulances = Array.isArray(rawAmbulances) ? rawAmbulances : [];
 
   const active = patients.filter(p => !['sorti', 'transfere', 'decede'].includes(p.status));
 
