@@ -1,0 +1,332 @@
+ممتاز، الأساس تاع **Facturation** راهو تبنى مليح. دك ما نروحوش لموديول آخر. نخدمو بالترتيب هذا:
+
+1. منع **الفوترة المزدوجة**.
+2. استيراد الخدمات الطبية تلقائيًا إلى الفاتورة.
+3. إنشاء PDF للفواتير والوصولات.
+
+أهم واحدة الآن هي **منع Double Facturation**، لأنها Business Logic حساسة. ابعث له هذا البرومبت:
+
+```text
+لا تبدأ أي Module جديد.
+
+أكمل الآن Module Facturation بالترتيب التالي:
+
+1. منع الفوترة المزدوجة.
+2. استيراد Billable Events تلقائيًا.
+3. الطباعة وPDF.
+
+مهم جدًا:
+- لا تغيّر التصميم الحالي.
+- لا تستعمل Mock Data.
+- استعمل PostgreSQL والـService Layer الحاليين.
+- كل العمليات المالية يجب أن تكون Transactional.
+- طبّق Permissions وAudit.
+
+==================================================
+1. منع الفوترة المزدوجة
+==================================================
+
+كل Billable Event يجب أن يحتوي على:
+
+- id
+- patientId
+- encounterId
+- sourceModule
+- sourceEntityId
+- serviceCode
+- description
+- quantity
+- unitPrice
+- status
+- billedInvoiceItemId اختياري
+- billedAt اختياري
+- createdAt
+
+أنشئ Unique Constraint يمنع إدخال نفس المصدر مرتين:
+
+UNIQUE(sourceModule, sourceEntityId)
+
+داخل invoice_items، أو داخل جدول billable_events حسب Architecture الحالية.
+
+عند إضافة خدمة إلى Facture:
+
+- تحقق أنها لم تُفوتر من قبل.
+- احجزها داخل نفس Transaction.
+- اربطها بـinvoiceItemId.
+- إذا فشلت العملية، اعمل Rollback.
+- إذا سبق فوترتها، أرجع HTTP 409 برسالة واضحة.
+
+لا تعتمد على تعطيل الزر في Frontend فقط.
+
+==================================================
+2. استيراد الخدمات الطبية تلقائيًا
+==================================================
+
+وسع:
+
+GET /api/encounters/:id/billable-events
+
+ليجمع الخدمات من PostgreSQL:
+
+- Consultation terminée
+- Lab Order validé
+- Imaging Order interprété
+- Prescription délivrée
+- Admission / Hospitalisation
+- ICU stay
+- Surgical procedure
+- Consommables
+- Bed charges
+
+كل Event يعرض:
+
+- sourceModule
+- sourceEntityId
+- date
+- description
+- serviceCode
+- quantity
+- unitPrice
+- total
+- billingStatus:
+  - unbilled
+  - reserved
+  - billed
+  - cancelled
+
+في InvoiceWizard:
+
+- جلب Billable Events تلقائيًا بعد اختيار Encounter.
+- تحديد الخدمات المراد فوترةها.
+- تعطيل الأحداث التي فوترت سابقًا.
+- إظهار رقم الفاتورة السابقة عند الضغط عليها.
+- زر “Tout sélectionner” للخدمات غير المفوترة فقط.
+
+==================================================
+3. كتالوج الأسعار
+==================================================
+
+أنشئ أو أكمل:
+
+service_catalog
+service_prices
+
+الحقول:
+
+- serviceCode
+- name
+- category
+- sourceModule
+- defaultPrice
+- currency
+- siteId
+- validFrom
+- validTo
+- active
+- createdAt
+- updatedAt
+
+الفئات:
+
+- Consultation
+- Laboratoire
+- Imagerie
+- Pharmacie
+- Hospitalisation
+- Réanimation
+- Bloc opératoire
+- Consommable
+- Ambulance
+- Autre
+
+سعر الخدمة يجب أن يؤخذ من الكتالوج، وليس من Frontend.
+
+إذا لم يوجد سعر:
+
+- لا تنشئ Invoice Item بصفر بصمت.
+- اعرض “Tarif non configuré”.
+- يتطلب Permission خاصة لإدخال سعر يدوي.
+
+==================================================
+4. الحسابات المالية
+==================================================
+
+جميع الحسابات تتم في Backend باستعمال Decimal/Numeric، وليس float JavaScript.
+
+احسب:
+
+- subtotal
+- discountAmount
+- taxAmount
+- totalAmount
+- patientShare
+- insurerShare
+- paidAmount
+- remainingAmount
+
+Frontend يعرض النتائج فقط.
+
+أضف Validation تمنع:
+
+- مبلغ سلبي.
+- خصم أكبر من قيمة السطر.
+- Payment أكبر من remainingAmount إلا إذا كان النظام يدعم Avance.
+- إصدار فاتورة بدون أي سطر.
+- إصدار فاتورة فيها Tarif non configuré.
+
+==================================================
+5. إصدار الفاتورة
+==================================================
+
+عند Issue Invoice داخل Transaction:
+
+1. تحقق من جميع Items.
+2. تحقق من عدم الفوترة المزدوجة.
+3. احسب المجاميع في Backend.
+4. ولّد Invoice Number آمنًا.
+5. اربط Billable Events بالفاتورة.
+6. غيّر الحالة إلى issued.
+7. أنشئ Audit.
+8. أنشئ Timeline Event.
+9. أرسل Notification للمحاسبة أو الاستقبال.
+
+لا يمكن تعديل Invoice Item بعد الإصدار إلا عبر:
+
+- Cancel
+- Credit Note
+- Corrective Invoice
+
+==================================================
+6. الدفع
+==================================================
+
+عند تسجيل Payment:
+
+- استخدم Transaction.
+- اقفل Invoice Row لمنع دفعين متزامنين.
+- احسب remainingAmount من DB.
+- امنع تجاوز المبلغ.
+- أنشئ Payment Number.
+- أنشئ Receipt Number.
+- حدّث حالة الفاتورة:
+  - issued
+  - partially_paid
+  - paid
+- سجل Audit وTimeline.
+
+اختبر محاولتين للدفع في نفس الوقت.
+
+==================================================
+7. PDF والطباعة
+==================================================
+
+أنشئ:
+
+GET /api/invoices/:id/pdf
+GET /api/payments/:id/receipt-pdf
+GET /api/patients/:id/account-statement-pdf
+
+الـPDF يحتوي على:
+
+- شعار واسم IRISSAM HOSPITAL
+- عنوان ومعلومات المؤسسة
+- رقم الفاتورة
+- التاريخ
+- بيانات المريض
+- MRN
+- Encounter Number
+- قائمة الخدمات
+- الكمية
+- السعر
+- الخصم
+- Part patient
+- Part assurance
+- المدفوع
+- الباقي
+- طريقة الدفع
+- QR Code أو Barcode للفاتورة
+- مكان التوقيع والختم
+
+دعم:
+- Français
+- العربية RTL
+- English
+
+لا تجعل PDF تعتمد على Screenshot للصفحة.
+
+==================================================
+8. الصلاحيات
+==================================================
+
+أضف أو تحقق من:
+
+- billing.manual_price
+- billing.view_previous_invoice
+- billing.issue
+- billing.cancel
+- billing.create_credit_note
+- payments.create
+- payments.refund
+- billing.print
+
+كل Endpoint محمي في Backend.
+
+==================================================
+9. اختبارات القبول
+==================================================
+
+TEST A:
+نفس LabOrder يضاف إلى فاتورتين
+→ الثانية HTTP 409.
+
+TEST B:
+Encounter فيه Consultation + Lab + Imaging
+→ تظهر تلقائيًا في Wizard.
+
+TEST C:
+Event سبق فوترته
+→ Disabled ويظهر رقم الفاتورة.
+
+TEST D:
+Service بدون Tarif
+→ لا يمكن إصدار الفاتورة.
+
+TEST E:
+Paiement جزئي
+→ remainingAmount صحيح.
+
+TEST F:
+محاولتا دفع متزامنتان
+→ لا يحدث Overpayment.
+
+TEST G:
+Credit Note
+→ لا تحذف الفاتورة الأصلية.
+
+TEST H:
+Invoice PDF وReceipt PDF
+→ يعملان باللغات الثلاث.
+
+TEST I:
+Audit وTimeline
+→ جميع العمليات مسجلة.
+
+==================================================
+التقرير النهائي
+==================================================
+
+أعطني:
+
+- الجداول أو القيود الجديدة.
+- طريقة منع Double Billing.
+- مصادر Billable Events.
+- طريقة حساب الأسعار والمجاميع.
+- Routes PDF.
+- نتائج TEST A–I.
+- صفر TypeScript Errors.
+- صفر Runtime SQL Errors.
+
+لا تبدأ RH أو BI أو أي Module آخر.
+```
+
+بعد ما يكمل، صورلي **Wizard الفاتورة** بعد اختيار Encounter، وصفحة التفاصيل، ونافذة الدفع، ونسخة PDF.

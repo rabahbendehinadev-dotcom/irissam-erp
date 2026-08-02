@@ -24,14 +24,16 @@ export interface RequestOptions {
 }
 
 class ApiClient {
-  private baseUrl: string;
+  private _baseUrl: string;
   private authToken: string | null = null;
   /** Registered by AuthContext on mount. Returns the new accessToken or null on failure. */
   private onUnauthorized: (() => Promise<string | null>) | null = null;
 
   constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
+    this._baseUrl = baseUrl;
   }
+
+  get baseUrl(): string { return this._baseUrl; }
 
   setAuthToken(token: string | null) {
     this.authToken = token;
@@ -55,7 +57,7 @@ class ApiClient {
   async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const { method = 'GET', body, headers, signal, _skipRefresh } = options;
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+    const response = await fetch(`${this._baseUrl}${endpoint}`, {
       method,
       headers: this.buildHeaders(headers),
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -68,7 +70,7 @@ class ApiClient {
       const newToken = await this.onUnauthorized();
       if (newToken) {
         // Retry with new token
-        const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {
+        const retryResponse = await fetch(`${this._baseUrl}${endpoint}`, {
           method,
           headers: this.buildHeaders(headers),
           body: body !== undefined ? JSON.stringify(body) : undefined,

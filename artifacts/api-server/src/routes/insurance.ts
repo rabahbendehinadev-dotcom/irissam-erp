@@ -12,10 +12,11 @@ import { pool } from "@workspace/db";
 import { auditService } from "../services/audit";
 import { requirePermission } from "../middleware/requirePermission";
 import type { AuthenticatedRequest } from "../middleware/requireAuth";
+import type { ActorCtx } from "../repositories/types";
 
 const router = Router();
 
-function actor(req: AuthenticatedRequest) {
+function actor(req: AuthenticatedRequest): ActorCtx {
   return { userId: req.auth?.userId ?? "system", userName: req.auth?.userId ?? "system", userRole: req.auth?.role ?? "guest" };
 }
 
@@ -54,12 +55,10 @@ router.post("/policies", requirePermission("insurance.create_claim"), async (req
        body.coverageType, body.coveragePercent ?? 80, body.ceilingAmount ?? null,
        body.validFrom ?? null, body.validUntil ?? null, body.notes ?? null, a.userId],
     );
-    await auditService.log({
-      userId: a.userId, userName: a.userId, userRole: a.userRole,
-      action: "create", module: "billing",
-      description: `Police assurance créée: ${pol.policy_number} (${pol.insurer_name})`,
-      patientId: body.patientId, resourceId: pol.id, resourceType: "InsurancePolicy",
-    });
+    await auditService.log(
+      { action: "create", module: "system", resourceId: pol.id as string, resourceType: "InsurancePolicy", patientId: body.patientId },
+      a,
+    );
     res.status(201).json(pol);
   } catch (err) { next(err); }
 });
@@ -109,12 +108,10 @@ router.post("/claims", requirePermission("insurance.create_claim"), async (req: 
       [numRow.num, body.invoiceId, body.patientId, body.policyId ?? null,
        body.insurerName, body.amountRequested, body.notes ?? null, a.userId],
     );
-    await auditService.log({
-      userId: a.userId, userName: a.userId, userRole: a.userRole,
-      action: "create", module: "billing",
-      description: `Dossier assurance ${numRow.num}: ${body.amountRequested} DZD auprès de ${body.insurerName}`,
-      patientId: body.patientId, resourceId: body.invoiceId, resourceType: "InsuranceClaim",
-    });
+    await auditService.log(
+      { action: "create", module: "system", resourceId: body.invoiceId, resourceType: "InsuranceClaim", patientId: body.patientId },
+      a,
+    );
     res.status(201).json(claim);
   } catch (err) { next(err); }
 });
@@ -173,12 +170,10 @@ router.patch("/claims/:id/status", async (req: AuthenticatedRequest, res, next) 
       );
     }
 
-    await auditService.log({
-      userId: a.userId, userName: a.userId, userRole: a.userRole,
-      action: "update", module: "billing",
-      description: `Dossier assurance ${claim.claim_number} → ${body.status}`,
-      resourceId: claim.invoice_id as string, resourceType: "InsuranceClaim",
-    });
+    await auditService.log(
+      { action: "update", module: "system", resourceId: claim.invoice_id as string, resourceType: "InsuranceClaim" },
+      a,
+    );
 
     res.json(claim);
   } catch (err) { next(err); }

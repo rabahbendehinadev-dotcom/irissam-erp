@@ -14,4 +14,4 @@
 - [Auth Bootstrap Bugs](auth-bootstrap-bugs.md) — two production bugs: UUID crash on /auth/me + refresh deadlock; fixes: UUID guard + _skipRefresh:true
 - [Auth login loop](auth-login-loop.md) — login form showed loading→blank instead of error; fix: remove isLoading:true from login(), add _skipRefresh:true to login+changePassword
 - [Frontend Stability](frontend-stability.md) — PageErrorBoundary + WidgetErrorBoundary pattern; Array.isArray guards on 8 pages; api-client-react dist rebuild rule; 14 pre-existing TS errors in MockRepository/EmergencyPatientDetail
-- [Billing Module](billing-module.md) — Phase 1 facturation: DB mig 008, 3 route files, useBillingApi hook, Facturation page + InvoiceWizard + PaymentModal; apiClient returns T directly (no ok/data)
+- [Billing Module](billing-module.md) — Phase 1+2: mig 008+009, 5 routes, PDF (pdfkit external in build.mjs!), double-billing guards, service catalog, billable-events UNION, PDF buttons wired

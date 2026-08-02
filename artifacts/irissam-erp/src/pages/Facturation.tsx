@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Plus, Search, RefreshCw, Eye, CreditCard, CheckCircle, XCircle,
   Printer, FileText, AlertTriangle, Filter, X, TrendingUp, Banknote,
-  ClipboardList, Building2, Clock,
+  ClipboardList, Building2, Download,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { InvoiceWizard } from "@/components/billing/InvoiceWizard";
@@ -387,12 +387,18 @@ export default function Facturation() {
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">Paiements</h3>
                   <div className="space-y-1.5">
                     {selected.payments.map((pay: Payment) => (
-                      <div key={pay.id} className="flex justify-between text-sm bg-green-50 rounded-lg px-3 py-2">
-                        <div>
+                      <div key={pay.id} className="flex items-center justify-between text-sm bg-green-50 rounded-lg px-3 py-2 gap-2">
+                        <div className="min-w-0 flex-1">
                           <div className="font-medium">{pay.paymentNumber}</div>
                           <div className="text-xs text-gray-500">{pay.method} · {fmtDate(pay.paidAt)}</div>
                         </div>
-                        <div className="font-semibold text-green-700">{fmt(pay.amount)} DZD</div>
+                        <div className="font-semibold text-green-700 whitespace-nowrap">{fmt(pay.amount)} DZD</div>
+                        <button
+                          onClick={() => billing.openReceiptPdf(pay.id)}
+                          title="Reçu PDF"
+                          className="p-1.5 rounded hover:bg-green-200 text-green-700 shrink-0">
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -420,10 +426,18 @@ export default function Facturation() {
                   <XCircle className="w-4 h-4" /> Annuler
                 </button>
               )}
-              <button onClick={() => window.print()}
-                className="flex items-center gap-1.5 border border-gray-300 text-gray-600 hover:bg-gray-100 rounded-lg px-3 py-2 text-sm font-medium ml-auto">
-                <Printer className="w-4 h-4" /> Imprimer
-              </button>
+              <div className="ml-auto flex gap-2">
+                {["issued","partially_paid","paid"].includes(selected.status) && (
+                  <button onClick={() => billing.openInvoicePdf(selected.id)}
+                    className="flex items-center gap-1.5 border border-gray-300 text-gray-600 hover:bg-gray-100 rounded-lg px-3 py-2 text-sm font-medium">
+                    <Download className="w-4 h-4" /> PDF facture
+                  </button>
+                )}
+                <button onClick={() => window.print()}
+                  className="flex items-center gap-1.5 border border-gray-300 text-gray-600 hover:bg-gray-100 rounded-lg px-3 py-2 text-sm font-medium">
+                  <Printer className="w-4 h-4" /> Imprimer
+                </button>
+              </div>
             </div>
           </div>
         </div>

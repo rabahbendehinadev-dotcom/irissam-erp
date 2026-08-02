@@ -128,6 +128,17 @@ export interface CreatePaymentInput {
   notes?:     string;
 }
 
+export interface ServiceCatalogEntry {
+  id:            string;
+  serviceCode:   string;
+  name:          string;
+  sourceModule:  string;
+  defaultPrice:  number;
+  currency:      string;
+  isActive:      boolean;
+  description?:  string;
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useBillingApi() {
@@ -269,11 +280,35 @@ export function useBillingApi() {
     } finally { setLoading(false); }
   }, []);
 
+  const getServiceCatalog = useCallback(async (params: {
+    module?: string; search?: string; activeOnly?: boolean;
+  } = {}): Promise<ServiceCatalogEntry[]> => {
+    const qs = new URLSearchParams();
+    if (params.module)  qs.set("module",     params.module);
+    if (params.search)  qs.set("search",     params.search);
+    if (params.activeOnly !== undefined) qs.set("activeOnly", String(params.activeOnly));
+    const data = await apiClient.get<ServiceCatalogEntry[]>(`/service-catalog?${qs.toString()}`);
+    return Array.isArray(data) ? data : [];
+  }, []);
+
+  /** Open invoice PDF in a new browser tab */
+  const openInvoicePdf = useCallback((invoiceId: string) => {
+    const base = apiClient.baseUrl ?? "";
+    window.open(`${base}/invoices/${invoiceId}/pdf`, "_blank", "noopener");
+  }, []);
+
+  /** Open payment receipt PDF in a new browser tab */
+  const openReceiptPdf = useCallback((paymentId: string) => {
+    const base = apiClient.baseUrl ?? "";
+    window.open(`${base}/payments/${paymentId}/receipt-pdf`, "_blank", "noopener");
+  }, []);
+
   return {
     loading, error, clearError,
     getStats, listInvoices, getInvoice,
     createInvoice, updateInvoice, issueInvoice, cancelInvoice, createCreditNote,
     createPayment, listPayments,
     createClaim, listClaims, listPolicies, createPolicy, updateClaimStatus,
+    getServiceCatalog, openInvoicePdf, openReceiptPdf,
   };
 }
