@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useRoute } from 'wouter';
-import { getAllConsultations } from '@/mock/consultations';
+import { getAllConsultations, getNurseVitals } from '@/mock/consultations';
 import { ConsultationWorkspace } from '@/components/consultations/ConsultationWorkspace';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import type { Consultation, ConsultationStatus } from '@/types/consultation';
 import { useGetConsultationsList } from '@workspace/api-client-react';
 import { useAppointmentStore } from '@/store/AppointmentStore';
+
+/** Merge nurse-entered vitals overlay into a consultation object (non-destructive). */
+function withNurseVitals(c: Consultation): Consultation {
+  const nurseVitals = getNurseVitals(c.id);
+  return nurseVitals ? { ...c, vitalSigns: nurseVitals } : c;
+}
 
 // The workspace page renders inside DashboardLayout (sidebar present).
 // ConsultationWorkspace owns its own sticky header and tab bar.
@@ -14,7 +20,7 @@ export default function ConsultationWorkspacePage() {
   const [, params] = useRoute('/consultations/:id');
   const id = params?.id;
 
-  // 1. Check mock data (c-* IDs)
+  // 1. Check mock data (c-* IDs) — merge nurse vitals overlay immediately
   const mockMatch = getAllConsultations().find(c => c.id === id);
 
   // 2. Fetch API list (cached from Consultations page visit) for db-* IDs
@@ -22,15 +28,16 @@ export default function ConsultationWorkspacePage() {
   const { data: apiConsultations } = useGetConsultationsList({} as any);
 
   const [consultation, setConsultation] = useState<Consultation | undefined>(
-    mockMatch as Consultation | undefined
+    mockMatch ? withNurseVitals(mockMatch as Consultation) : undefined
   );
 
   // Hydrate from API data when available (handles db-* IDs navigated to from API-backed list)
+  // Merge nurse vitals overlay so doctors see pre-filled vitals entered by nurses.
   useEffect(() => {
     if (consultation) return; // already resolved from mock
     if (!id || !apiConsultations) return;
     const apiMatch = (apiConsultations as unknown as Consultation[]).find(c => c.id === id);
-    if (apiMatch) setConsultation(apiMatch);
+    if (apiMatch) setConsultation(withNurseVitals(apiMatch));
   }, [id, apiConsultations, consultation]);
 
   // ── Appointment sync — must be called unconditionally (Rules of Hooks) ─────

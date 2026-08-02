@@ -211,6 +211,28 @@ export function getAllConsultations(): Consultation[] {
   return [...SESSION_CONSULTATIONS, ...MOCK_CONSULTATIONS];
 }
 
+// ─── Nurse vitals overlay (persists within the browser session) ───────────────
+
+const NURSE_VITALS_OVERLAY: Map<string, VitalSigns> = new Map();
+
+/**
+ * Save nurse-entered vitals for a consultation.
+ * Also patches the in-memory mock arrays so any component that calls
+ * getAllConsultations() will immediately see the merged data.
+ */
+export function setNurseVitals(consultationId: string, v: VitalSigns): void {
+  NURSE_VITALS_OVERLAY.set(consultationId, v);
+  const mi = MOCK_CONSULTATIONS.findIndex(c => c.id === consultationId);
+  if (mi !== -1) MOCK_CONSULTATIONS[mi] = { ...MOCK_CONSULTATIONS[mi], vitalSigns: v };
+  const si = SESSION_CONSULTATIONS.findIndex(c => c.id === consultationId);
+  if (si !== -1) SESSION_CONSULTATIONS[si] = { ...SESSION_CONSULTATIONS[si], vitalSigns: v };
+}
+
+/** Retrieve nurse-entered vitals for a consultation, if any. */
+export function getNurseVitals(consultationId: string): VitalSigns | undefined {
+  return NURSE_VITALS_OVERLAY.get(consultationId);
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function getTodayConsultations(): Consultation[] {

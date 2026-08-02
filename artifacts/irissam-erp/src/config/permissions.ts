@@ -35,6 +35,7 @@ export type Permission =
   | 'consultations.edit_completed' | 'consultations.create_prescription'
   | 'consultations.request_lab' | 'consultations.request_imaging'
   | 'consultations.create_certificate' | 'consultations.view_audit'
+  | 'consultations.vitals_entry'
   // Operating room
   | 'operating_room.view' | 'operating_room.schedule'
   // Laboratory
@@ -89,6 +90,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'consultations.edit_completed', 'consultations.create_prescription',
     'consultations.request_lab', 'consultations.request_imaging',
     'consultations.create_certificate', 'consultations.view_audit',
+    'consultations.vitals_entry',
     'operating_room.view', 'operating_room.schedule',
     'laboratory.view', 'laboratory.create', 'laboratory.validate',
     'imaging.view', 'imaging.request',
@@ -131,6 +133,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'consultations.view', 'consultations.create', 'consultations.edit',
     'consultations.start', 'consultations.complete', 'consultations.cancel',
     'consultations.print', 'consultations.view_sensitive',
+    'consultations.vitals_entry',
     'consultations.create_prescription', 'consultations.request_lab',
     'consultations.request_imaging', 'consultations.create_certificate',
     'operating_room.view',
@@ -145,7 +148,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'appointments.view',
     'admissions.view',
     'emergencies.view',
-    'consultations.view',
+    'consultations.view', 'consultations.vitals_entry',
     'operating_room.view',
     'laboratory.view',
     'imaging.view',
