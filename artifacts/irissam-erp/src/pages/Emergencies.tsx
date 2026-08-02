@@ -219,7 +219,6 @@ function PatientExpandedCard({ patient, isDark, onClose }: {
   const bloodType = BLOOD_TYPES[patient.id] ?? '?';
   const allergies = PATIENT_ALLERGIES[patient.id] ?? [];
   const v = patient.vitals;
-  const [, setLocation] = useLocation();
   const { startCare: repoStartCare } = useMockRepository();
   const { user } = useAuth();
 
@@ -413,7 +412,6 @@ function PatientRow({ patient, tick, isDark }: { patient: EmergencyPatient; tick
   const statusCfg = STATUS_CFG[patient.status];
   const elapsed = elapsedMs(patient.arrivalTime);
   const target = cfg.targetMin;
-  const [, setLocation] = useLocation();
   const { startCare: repoStartCare } = useMockRepository();
   const { user } = useAuth();
 
