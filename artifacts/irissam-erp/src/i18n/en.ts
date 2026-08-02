@@ -567,6 +567,7 @@ export default {
   "appointments.status.cancelled": "Cancelled",
   "appointments.status.completed": "Completed",
   "appointments.status.no_show": "No show",
+  "appointments.status.in_progress": "In progress",
   "appointments.form.title.new": "New appointment",
   "appointments.form.title.edit": "Edit appointment",
   "appointments.form.patient": "Patient",

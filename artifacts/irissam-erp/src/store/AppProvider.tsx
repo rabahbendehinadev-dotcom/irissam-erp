@@ -8,6 +8,7 @@ import { ThemeProvider } from './ThemeContext';
 import { NotificationsProvider } from './NotificationsContext';
 import { AdmissionsProvider } from './AdmissionsContext';
 import { MockRepositoryProvider } from './MockRepository';
+import { AppointmentStoreProvider } from './AppointmentStore';
 import { QUERY_STALE_TIME, QUERY_CACHE_TIME } from '@/config/constants';
 
 const queryClient = new QueryClient({
@@ -30,12 +31,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             <SiteProvider>
               <NotificationsProvider>
                 <AdmissionsProvider>
-                  <MockRepositoryProvider>
-                    <TooltipProvider>
-                      {children}
-                      <Toaster />
-                    </TooltipProvider>
-                  </MockRepositoryProvider>
+                  <AppointmentStoreProvider>
+                    <MockRepositoryProvider>
+                      <TooltipProvider>
+                        {children}
+                        <Toaster />
+                      </TooltipProvider>
+                    </MockRepositoryProvider>
+                  </AppointmentStoreProvider>
                 </AdmissionsProvider>
               </NotificationsProvider>
             </SiteProvider>

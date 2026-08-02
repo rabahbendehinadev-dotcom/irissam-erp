@@ -567,6 +567,7 @@ export default {
   "appointments.status.cancelled": "Annulé",
   "appointments.status.completed": "Terminé",
   "appointments.status.no_show": "Absent",
+  "appointments.status.in_progress": "En cours",
   "appointments.form.title.new": "Nouveau rendez-vous",
   "appointments.form.title.edit": "Modifier le rendez-vous",
   "appointments.form.patient": "Patient",

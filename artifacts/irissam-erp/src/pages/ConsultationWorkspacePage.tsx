@@ -5,6 +5,7 @@ import { ConsultationWorkspace } from '@/components/consultations/ConsultationWo
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import type { Consultation, ConsultationStatus } from '@/types/consultation';
 import { useGetConsultationsList } from '@workspace/api-client-react';
+import { useAppointmentStore } from '@/store/AppointmentStore';
 
 // The workspace page renders inside DashboardLayout (sidebar present).
 // ConsultationWorkspace owns its own sticky header and tab bar.
@@ -32,6 +33,36 @@ export default function ConsultationWorkspacePage() {
     if (apiMatch) setConsultation(apiMatch);
   }, [id, apiConsultations, consultation]);
 
+  // ── Appointment sync — must be called unconditionally (Rules of Hooks) ─────
+  const { syncFromConsultation } = useAppointmentStore();
+
+  const handleChange = (updated: Consultation) => {
+    setConsultation(updated);
+  };
+
+  const handleStatusChange = (status: ConsultationStatus) => {
+    const appointmentId = consultation?.appointmentId;
+
+    setConsultation(prev => prev ? {
+      ...prev,
+      status,
+      startedAt: status === 'en_cours' && !prev.startedAt ? new Date().toISOString() : prev.startedAt,
+      endedAt:   status === 'terminee' ? new Date().toISOString() : prev.endedAt,
+      duration:  status === 'terminee' && prev.startedAt
+        ? Math.round((Date.now() - new Date(prev.startedAt).getTime()) / 60000)
+        : prev.duration,
+      syncStatus: 'pending',
+      updatedAt: new Date().toISOString(),
+    } : prev);
+
+    // Sync appointment after consultation state update.
+    // The workspace operates on mock/local data so there is no API call to fail here;
+    // the sync is the authoritative write for this flow.
+    if (appointmentId) {
+      syncFromConsultation(appointmentId, status);
+    }
+  };
+
   if (!consultation) {
     return (
       <DashboardLayout>
@@ -48,24 +79,6 @@ export default function ConsultationWorkspacePage() {
       </DashboardLayout>
     );
   }
-
-  const handleChange = (updated: Consultation) => {
-    setConsultation(updated);
-  };
-
-  const handleStatusChange = (status: ConsultationStatus) => {
-    setConsultation(prev => prev ? {
-      ...prev,
-      status,
-      startedAt: status === 'en_cours' && !prev.startedAt ? new Date().toISOString() : prev.startedAt,
-      endedAt:   status === 'terminee' ? new Date().toISOString() : prev.endedAt,
-      duration:  status === 'terminee' && prev.startedAt
-        ? Math.round((Date.now() - new Date(prev.startedAt).getTime()) / 60000)
-        : prev.duration,
-      syncStatus: 'pending',
-      updatedAt: new Date().toISOString(),
-    } : prev);
-  };
 
   return (
     <DashboardLayout noPadding>

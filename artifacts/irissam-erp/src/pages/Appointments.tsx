@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageWrapper } from "@/components/shared/PageWrapper";
@@ -6,7 +6,6 @@ import { PatientAvatar } from "@/components/shared/PatientAvatar";
 import { PatientDrawer } from "@/components/shared/PatientDrawer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useLanguage } from "@/i18n";
-import { MOCK_APPOINTMENTS } from "@/mock";
 import { formatDate, formatTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import {
@@ -19,23 +18,26 @@ import {
   useCreateAppointment,
   useUpdateAppointmentStatus,
 } from "@workspace/api-client-react";
+import { useAppointmentStore } from "@/store/AppointmentStore";
 
 type BadgeVariant = "success" | "warning" | "danger" | "info" | "neutral";
 
 const STATUS_VARIANT: Record<AppointmentStatus, BadgeVariant> = {
-  confirmed: "success",
-  pending: "warning",
-  cancelled: "danger",
-  completed: "info",
-  no_show: "neutral",
+  confirmed:   "success",
+  pending:     "warning",
+  cancelled:   "danger",
+  completed:   "info",
+  no_show:     "neutral",
+  in_progress: "info",
 };
 
 const STATUS_LABEL_KEY: Record<AppointmentStatus, string> = {
-  confirmed: "appointments.status.confirmed",
-  pending: "appointments.status.pending",
-  cancelled: "appointments.status.cancelled",
-  completed: "appointments.status.completed",
-  no_show: "appointments.status.no_show",
+  confirmed:   "appointments.status.confirmed",
+  pending:     "appointments.status.pending",
+  cancelled:   "appointments.status.cancelled",
+  completed:   "appointments.status.completed",
+  no_show:     "appointments.status.no_show",
+  in_progress: "appointments.status.in_progress",
 };
 
 function buildWeekDays(date: Date): Date[] {
@@ -73,18 +75,28 @@ export default function Appointments() {
     notes: string;
   } | null>(null);
 
+  // ── Appointment store (shared state, updated by Consultations page) ────────
+  const { appointments: storeAppointments, mergeApiAppointments } = useAppointmentStore();
+
   // ── API hooks ──────────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: apiAppointments, isLoading, isError, refetch } = useGetAppointmentsList({} as any);
   const createMutation = useCreateAppointment();
   const updateStatusMutation = useUpdateAppointmentStatus();
 
-  // Fall back to mock data if API unavailable
+  // Merge fresh API data into the store whenever it arrives (preserves local overrides)
+  useEffect(() => {
+    if (!isLoading && !isError && apiAppointments) {
+      mergeApiAppointments(apiAppointments as unknown as Appointment[]);
+    }
+  }, [apiAppointments, isLoading, isError, mergeApiAppointments]);
+
+  // Use store as the single source of truth; fall through to empty while loading
   const rawAppointments = useMemo((): Appointment[] => {
     if (isLoading) return [];
-    if (isError) return MOCK_APPOINTMENTS;
-    return (apiAppointments as unknown as Appointment[]) ?? [];
-  }, [apiAppointments, isLoading, isError]);
+    // Store always has data (seeded from mock); reflects both API and local overrides
+    return storeAppointments;
+  }, [isLoading, storeAppointments]);
 
   const departments = useMemo(() => {
     const map = new Map<string, string>();
@@ -234,7 +246,7 @@ export default function Appointments() {
             className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[160px]"
           >
             <option value="all">{t("appointments.filter.all_status" as any)}</option>
-            {(["confirmed", "pending", "cancelled", "completed", "no_show"] as AppointmentStatus[]).map((s) => (
+            {(["confirmed", "in_progress", "pending", "cancelled", "completed", "no_show"] as AppointmentStatus[]).map((s) => (
               <option key={s} value={s}>{t(STATUS_LABEL_KEY[s] as any)}</option>
             ))}
           </select>
@@ -391,10 +403,11 @@ export default function Appointments() {
                           }}
                           className={cn(
                             "text-xs px-1.5 py-1 rounded-md border truncate w-full text-left hover:opacity-80 transition-opacity",
-                            a.status === "confirmed" ? "bg-green-50 border-green-200 text-green-800" :
-                            a.status === "pending" ? "bg-yellow-50 border-yellow-200 text-yellow-800" :
-                            a.status === "cancelled" ? "bg-red-50 border-red-200 text-red-700 line-through" :
-                            a.status === "completed" ? "bg-blue-50 border-blue-200 text-blue-800" :
+                            a.status === "confirmed"   ? "bg-green-50 border-green-200 text-green-800" :
+                            a.status === "in_progress" ? "bg-blue-100 border-blue-400 text-blue-900 font-semibold" :
+                            a.status === "pending"     ? "bg-yellow-50 border-yellow-200 text-yellow-800" :
+                            a.status === "cancelled"   ? "bg-red-50 border-red-200 text-red-700 line-through" :
+                            a.status === "completed"   ? "bg-blue-50 border-blue-200 text-blue-800" :
                             "bg-gray-50 border-gray-200 text-gray-600"
                           )}
                         >

@@ -14,11 +14,15 @@ import {
   useCreateConsultation,
   useUpdateConsultationStatus,
 } from '@workspace/api-client-react';
+import { useAppointmentStore } from '@/store/AppointmentStore';
 
 export default function ConsultationsPage() {
   const [filters, setFilters] = useState<ConsultationFiltersState>(DEFAULT_FILTERS);
   const [showForm, setShowForm] = useState(false);
   const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
+
+  // ── Appointment sync ───────────────────────────────────────────────────────
+  const { syncFromConsultation, updateAppointmentStatus, appointments: storeAppointments } = useAppointmentStore();
 
   // ── API hooks ──────────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,12 +63,26 @@ export default function ConsultationsPage() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleStatusChange = async (id: string, status: ConsultationStatus) => {
+    // Find the consultation to get its appointmentId before the async call
+    const consultation = consultations.find(c => c.id === id || c.id === id.replace(/^db-/, ''));
+    const appointmentId = consultation?.appointmentId;
+    const previousAppointmentStatus = appointmentId
+      ? storeAppointments.find(a => a.id === appointmentId)?.status
+      : undefined;
+
     const rawId = id.replace(/^db-/, '');
     try {
       await updateStatusMutation.mutateAsync({ id: rawId, data: { status } });
+      // Sync appointment only after the consultation mutation succeeds
+      if (appointmentId) {
+        syncFromConsultation(appointmentId, status);
+      }
       refetch();
     } catch {
-      // Ignore — refetch will restore correct state
+      // Mutation failed — roll back appointment status if we had changed it
+      if (appointmentId && previousAppointmentStatus) {
+        updateAppointmentStatus(appointmentId, previousAppointmentStatus);
+      }
       refetch();
     }
   };

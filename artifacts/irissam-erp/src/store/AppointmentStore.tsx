@@ -1,0 +1,150 @@
+/**
+ * AppointmentStore — Shared in-memory appointment state
+ *
+ * Acts as the single source of truth for appointment status during a session.
+ * Both the Appointments page (display) and Consultations page (trigger) consume this context.
+ * When a consultation starts/ends/is cancelled, the linked appointment is synced immediately.
+ *
+ * Design invariant:
+ *   Status overrides are stored in a separate `pendingOverrides` map keyed by appointment ID.
+ *   This ensures an override survives even when the appointment record hasn't been loaded yet
+ *   from the API.  Every time appointments are merged, overrides are applied on top.
+ *
+ * PostgreSQL migration path:
+ *   Replace `syncFromConsultation` with `await apiClient.patch('/appointments/:id', { status })`.
+ */
+
+import { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { MOCK_APPOINTMENTS } from '@/mock';
+import type { Appointment, AppointmentStatus } from '@/types';
+import type { ConsultationStatus } from '@/types/consultation';
+
+// ─── Consultation → Appointment status mapping ────────────────────────────────
+
+const CONSULTATION_TO_APPOINTMENT_STATUS: Partial<Record<ConsultationStatus, AppointmentStatus>> = {
+  en_cours:       'in_progress',
+  terminee:       'completed',
+  annulee:        'cancelled',
+  patient_absent: 'no_show',
+};
+
+// ─── Context contract ─────────────────────────────────────────────────────────
+
+export interface AppointmentStoreContextType {
+  /** Current appointment list with all overrides applied */
+  appointments: Appointment[];
+
+  /**
+   * Sync the appointment linked to a consultation when the consultation status changes.
+   * Works even when the appointment has not yet been loaded from the API —
+   * the override is stored and applied the next time the record appears.
+   */
+  syncFromConsultation: (appointmentId: string | undefined, consultationStatus: ConsultationStatus) => void;
+
+  /** Directly update a single appointment's status (e.g. rollback on mutation failure). */
+  updateAppointmentStatus: (appointmentId: string, status: AppointmentStatus) => void;
+
+  /** Merge a fresh list from the API into the store, applying any pending overrides. */
+  mergeApiAppointments: (apiList: Appointment[]) => void;
+}
+
+const AppointmentStoreContext = createContext<AppointmentStoreContextType | null>(null);
+
+// ─── Helper: apply pending overrides to an appointment list ──────────────────
+
+function applyOverrides(list: Appointment[], overrides: Map<string, AppointmentStatus>): Appointment[] {
+  if (overrides.size === 0) return list;
+  return list.map(a => {
+    const override = overrides.get(a.id);
+    return override !== undefined ? { ...a, status: override } : a;
+  });
+}
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
+
+export function AppointmentStoreProvider({ children }: { children: React.ReactNode }) {
+  // Separate override map: appointment ID → desired status
+  // Using a ref so mutations inside callbacks always see the latest map without
+  // triggering re-renders themselves; the setAppointments call triggers the render.
+  const pendingOverrides = useRef<Map<string, AppointmentStatus>>(new Map());
+
+  const [appointments, setAppointments] = useState<Appointment[]>(() =>
+    // Seed from mock; real API data is merged later via mergeApiAppointments
+    MOCK_APPOINTMENTS.map(a => ({ ...a }))
+  );
+
+  const syncFromConsultation = useCallback(
+    (appointmentId: string | undefined, consultationStatus: ConsultationStatus) => {
+      if (!appointmentId) return;
+      const mapped = CONSULTATION_TO_APPOINTMENT_STATUS[consultationStatus];
+      if (!mapped) return;
+
+      // Always record the override regardless of whether the appointment is in store yet
+      pendingOverrides.current.set(appointmentId, mapped);
+
+      setAppointments(prev => {
+        const found = prev.some(a => a.id === appointmentId);
+        if (found) {
+          // Appointment already in store — update in place
+          return prev.map(a => a.id === appointmentId ? { ...a, status: mapped } : a);
+        }
+        // Not yet in store — will be applied when API data arrives via mergeApiAppointments
+        return prev;
+      });
+    },
+    []
+  );
+
+  const updateAppointmentStatus = useCallback(
+    (appointmentId: string, status: AppointmentStatus) => {
+      pendingOverrides.current.set(appointmentId, status);
+      setAppointments(prev =>
+        prev.map(a => (a.id === appointmentId ? { ...a, status } : a))
+      );
+    },
+    []
+  );
+
+  const mergeApiAppointments = useCallback(
+    (apiList: Appointment[]) => {
+      setAppointments(prev => {
+        const currentById = new Map(prev.map(a => [a.id, a]));
+        const overrides = pendingOverrides.current;
+
+        const merged: Appointment[] = apiList.map(a => {
+          const override = overrides.get(a.id);
+          if (override !== undefined) {
+            // We have a pending override for this appointment — honour it
+            return { ...a, status: override };
+          }
+          // No override — use whatever we already have in the store (may be mock-seeded)
+          return currentById.get(a.id) ?? a;
+        });
+
+        // Retain mock-only appointments not present in the API list
+        prev.forEach(a => {
+          if (!apiList.some(api => api.id === a.id)) merged.push(a);
+        });
+
+        return applyOverrides(merged, overrides);
+      });
+    },
+    []
+  );
+
+  return (
+    <AppointmentStoreContext.Provider
+      value={{ appointments, syncFromConsultation, updateAppointmentStatus, mergeApiAppointments }}
+    >
+      {children}
+    </AppointmentStoreContext.Provider>
+  );
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useAppointmentStore(): AppointmentStoreContextType {
+  const ctx = useContext(AppointmentStoreContext);
+  if (!ctx) throw new Error('useAppointmentStore must be used inside AppointmentStoreProvider');
+  return ctx;
+}

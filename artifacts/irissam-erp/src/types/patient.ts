@@ -3,7 +3,7 @@ export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
 export type PatientStatus = 'active' | 'inactive' | 'archived' | 'deceased';
 export type SyncStatus = 'synced' | 'pending' | 'conflict' | 'error';
 // AdmissionStatus moved to ./admission
-export type AppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'no_show';
+export type AppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'no_show' | 'in_progress';
 export type MaritalStatus = 'celibataire' | 'marie' | 'divorce' | 'veuf';
 export type IdDocumentType = 'cni' | 'passeport' | 'permis' | 'autre';
 export type InsuranceType = 'cnas' | 'casnos' | 'mutuelle' | 'militaire' | 'gratuite' | 'payant';

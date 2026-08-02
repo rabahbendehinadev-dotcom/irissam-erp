@@ -567,6 +567,7 @@ export default {
   "appointments.status.cancelled": "ملغى",
   "appointments.status.completed": "منتهي",
   "appointments.status.no_show": "لم يحضر",
+  "appointments.status.in_progress": "قيد التنفيذ",
   "appointments.form.title.new": "موعد جديد",
   "appointments.form.title.edit": "تعديل الموعد",
   "appointments.form.patient": "المريض",
