@@ -1,9 +1,56 @@
+/**
+ * /appointments routes — backed by AppointmentService.
+ *
+ * Schema alignment (appointmentsTable):
+ *  - departmentName: text not null (replaces `service` + `patientFirstName/LastName`)
+ *  - patientName: text not null (single field; split on read for firstName/lastName)
+ *  - id: UUID (not integer)
+ *  - scheduledAt: timestamp with timezone
+ */
 import { Router } from "express";
-import { db } from "@workspace/db";
-import { appointmentsTable } from "@workspace/db/schema";
-import { asc, gte, lt, and, ne, desc } from "drizzle-orm";
+import { appointmentService } from "../services/appointment";
+import type { AuthenticatedRequest } from "../middleware/requireAuth";
+import type { ActorCtx } from "../repositories/types";
+import type { DbAppointment } from "../repositories/appointment";
 
 const router = Router();
+
+function actor(req: AuthenticatedRequest): ActorCtx {
+  return {
+    userId:   req.auth?.userId ?? "system",
+    userName: req.auth?.userId ?? "system",
+    userRole: req.auth?.role   ?? "guest",
+  };
+}
+
+function mapAppointment(a: DbAppointment) {
+  const parts = a.patientName.split(" ");
+  const firstName = parts[0] ?? "";
+  const lastName  = parts.slice(1).join(" ") || firstName;
+  const deptName  = a.departmentName;
+
+  return {
+    id:          a.id,
+    patientId:   a.patientId ?? `apt-${a.id}`,
+    patient: {
+      id:        a.patientId ?? `apt-${a.id}`,
+      firstName,
+      lastName,
+    },
+    patientName: a.patientName,
+    doctorId:    a.doctorId ?? "system",
+    doctorName:  a.doctorName,
+    departmentId:   deptName,
+    departmentName: deptName,
+    service:        deptName,       // legacy alias kept for frontend widgets
+    scheduledAt: a.scheduledAt.toISOString(),
+    duration:    a.duration,
+    status:      a.status,
+    type:        a.type,
+    notes:       a.notes ?? undefined,
+    cancelledReason: a.cancelledReason ?? undefined,
+  };
+}
 
 /** GET /appointments/upcoming — dashboard widget (today, non-cancelled, limit 5) */
 router.get("/upcoming", async (_req, res, next) => {
@@ -13,61 +60,46 @@ router.get("/upcoming", async (_req, res, next) => {
     const end = new Date();
     end.setHours(23, 59, 59, 999);
 
-    const appointments = await db
-      .select()
-      .from(appointmentsTable)
-      .where(
-        and(
-          gte(appointmentsTable.scheduledAt, start),
-          lt(appointmentsTable.scheduledAt, end),
-          ne(appointmentsTable.status, "cancelled"),
-        ),
-      )
-      .orderBy(asc(appointmentsTable.scheduledAt))
-      .limit(5);
+    const result = await appointmentService.upcoming(start, end, 5);
 
     res.json(
-      appointments.map((a) => ({
-        id: a.id,
-        patientId: a.patientId ? `db-${a.patientId}` : null,
-        patientName: a.patientName,
-        service: a.service,
-        doctorName: a.doctorName,
-        scheduledAt: a.scheduledAt.toISOString(),
-        status: a.status,
-      })),
+      result.data
+        .filter((a) => a.status !== "cancelled")
+        .map((a) => ({
+          id:          a.id,
+          patientId:   a.patientId ?? `apt-${a.id}`,
+          patientName: a.patientName,
+          service:     a.departmentName,
+          doctorName:  a.doctorName,
+          scheduledAt: a.scheduledAt.toISOString(),
+          status:      a.status,
+        })),
     );
   } catch (err) {
     next(err);
   }
 });
 
-/** GET /appointments — full appointment list for the Appointments page */
+/** GET /appointments — full appointment list */
 router.get("/", async (req, res, next) => {
   try {
-    const { search, status, departmentId } = req.query as Record<string, string | undefined>;
+    const { search, status, departmentId } =
+      req.query as Record<string, string | undefined>;
 
-    let rows = await db
-      .select()
-      .from(appointmentsTable)
-      .orderBy(asc(appointmentsTable.scheduledAt));
+    const result = await appointmentService.list({ limit: 200 });
+    let rows = result.data;
 
-    // Apply filters in memory
     if (search) {
       const q = search.toLowerCase();
-      rows = rows.filter((a) => {
-        const name = `${a.patientFirstName ?? ""} ${a.patientLastName ?? a.patientName} ${a.doctorName}`.toLowerCase();
-        return name.includes(q);
-      });
+      rows = rows.filter((a) =>
+        `${a.patientName} ${a.doctorName} ${a.departmentName}`.toLowerCase().includes(q),
+      );
     }
     if (status && status !== "all") {
       rows = rows.filter((a) => a.status === status);
     }
     if (departmentId && departmentId !== "all") {
-      rows = rows.filter((a) => {
-        const dept = a.departmentName ?? a.service;
-        return dept === departmentId;
-      });
+      rows = rows.filter((a) => a.departmentName === departmentId);
     }
 
     res.json(rows.map(mapAppointment));
@@ -77,18 +109,20 @@ router.get("/", async (req, res, next) => {
 });
 
 /** POST /appointments — create a new appointment */
-router.post("/", async (req, res, next) => {
+router.post("/", async (req: AuthenticatedRequest, res, next) => {
   try {
     const body = req.body as {
       patientName?: string;
       patientFirstName?: string;
       patientLastName?: string;
+      patientId?: string;
       doctorName?: string;
       departmentName?: string;
       scheduledAt?: string;
       duration?: number;
       notes?: string;
       status?: string;
+      type?: string;
     };
 
     if (!body.doctorName || !body.scheduledAt) {
@@ -96,21 +130,22 @@ router.post("/", async (req, res, next) => {
       return;
     }
 
-    const patientName = body.patientName ??
-      `${body.patientFirstName ?? ""} ${body.patientLastName ?? ""}`.trim();
+    const patientName =
+      body.patientName ??
+      (`${body.patientFirstName ?? ""} ${body.patientLastName ?? ""}`.trim() || "Patient inconnu");
 
-    const [created] = await db.insert(appointmentsTable).values({
+    const created = await appointmentService.create({
+      patientId:      body.patientId ?? null,
       patientName,
-      patientFirstName: body.patientFirstName ?? null,
-      patientLastName: body.patientLastName ?? null,
-      doctorName: body.doctorName,
-      service: body.departmentName ?? "Médecine générale",
-      departmentName: body.departmentName ?? null,
-      scheduledAt: new Date(body.scheduledAt),
-      duration: body.duration ?? 30,
-      notes: body.notes ?? null,
-      status: (body.status as string) ?? "pending",
-    }).returning();
+      patientMpi:     null,
+      doctorName:     body.doctorName,
+      departmentName: body.departmentName ?? "Médecine générale",
+      scheduledAt:    new Date(body.scheduledAt),
+      duration:       body.duration ?? 30,
+      notes:          body.notes ?? null,
+      status:         (body.status as any) ?? "pending",
+      type:           (body.type as any) ?? "consultation_externe",
+    }, actor(req));
 
     res.status(201).json(mapAppointment(created));
   } catch (err) {
@@ -119,25 +154,17 @@ router.post("/", async (req, res, next) => {
 });
 
 /** PATCH /appointments/:id — update appointment status */
-router.patch("/:id", async (req, res, next) => {
+router.patch("/:id", async (req: AuthenticatedRequest, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      res.status(400).json({ error: "Invalid appointment id" });
-      return;
-    }
+    const id = String(req.params.id);
     const { status } = req.body as { status?: string };
+
     if (!status) {
       res.status(400).json({ error: "status is required" });
       return;
     }
 
-    const { eq } = await import("drizzle-orm");
-    const [updated] = await db
-      .update(appointmentsTable)
-      .set({ status })
-      .where(eq(appointmentsTable.id, id))
-      .returning();
+    const updated = await appointmentService.updateStatus(id, status, actor(req));
 
     if (!updated) {
       res.status(404).json({ error: "Appointment not found" });
@@ -149,28 +176,5 @@ router.patch("/:id", async (req, res, next) => {
     next(err);
   }
 });
-
-function mapAppointment(a: typeof appointmentsTable.$inferSelect) {
-  const firstName = a.patientFirstName ?? a.patientName.split(" ")[0];
-  const lastName = a.patientLastName ?? (a.patientName.split(" ").slice(1).join(" ") || a.patientName);
-  const deptName = a.departmentName ?? a.service;
-  return {
-    id: `db-${a.id}`,
-    patientId: a.patientId ? `db-${a.patientId}` : `db-apt-${a.id}`,
-    patient: {
-      id: a.patientId ? `db-${a.patientId}` : `db-apt-${a.id}`,
-      firstName,
-      lastName,
-    },
-    doctorId: "system",
-    doctorName: a.doctorName,
-    departmentId: deptName,
-    departmentName: deptName,
-    scheduledAt: a.scheduledAt.toISOString(),
-    duration: a.duration,
-    status: a.status,
-    notes: a.notes ?? undefined,
-  };
-}
 
 export default router;

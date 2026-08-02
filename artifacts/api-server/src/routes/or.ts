@@ -1,7 +1,14 @@
+/**
+ * /or routes — Operating Room status.
+ *
+ * Schema alignment (operatingRoomsTable):
+ *  Status enum values (French): libre | reserve | en_preparation | en_intervention |
+ *                                nettoyage | hors_service | maintenance
+ *  (NOT "available" / "occupied" / "prep" — those were legacy English values)
+ */
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { operatingRoomsTable } from "@workspace/db/schema";
-import { eq, count } from "drizzle-orm";
 
 const router = Router();
 
@@ -11,11 +18,22 @@ router.get("/status", async (_req, res, next) => {
     const rows = await db.select().from(operatingRoomsTable);
 
     const totalRooms = rows.length;
-    const available = rows.filter((r) => r.status === "available").length;
-    const occupied = rows.filter((r) => r.status === "occupied").length;
-    const prep = rows.filter((r) => r.status === "prep").length;
+    const available  = rows.filter((r) => r.status === "libre").length;
+    const occupied   = rows.filter((r) => r.status === "en_intervention").length;
+    const prep       = rows.filter((r) => r.status === "en_preparation").length;
+    const cleaning   = rows.filter((r) => r.status === "nettoyage").length;
 
-    res.json({ totalRooms, available, occupied, prep });
+    res.json({
+      totalRooms,
+      available,
+      occupied,
+      prep,
+      cleaning,
+      // Legacy aliases kept for frontend widgets
+      libre:           available,
+      enIntervention:  occupied,
+      enPreparation:   prep,
+    });
   } catch (err) {
     next(err);
   }

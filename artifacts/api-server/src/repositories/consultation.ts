@@ -70,6 +70,14 @@ export class ConsultationRepository {
     return row ?? null;
   }
 
+  async countAll(): Promise<number> {
+    const [{ total }] = await this.db
+      .select({ total: count() })
+      .from(consultationsTable)
+      .where(isNull(consultationsTable.deletedAt));
+    return Number(total);
+  }
+
   async softDelete(id: string, ctx: TxContext): Promise<boolean> {
     const [row] = await qb(this.db, ctx)
       .update(consultationsTable)

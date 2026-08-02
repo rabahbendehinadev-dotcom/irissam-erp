@@ -1,3 +1,19 @@
+/**
+ * /dashboard routes — aggregate stats and chart data.
+ *
+ * Schema alignment:
+ *  admissionsTable:
+ *   - status: "active" | "discharged" | ... (replaces dischargedAt IS NULL)
+ *   - admissionDate: date string YYYY-MM-DD (replaces admittedAt timestamp)
+ *   - serviceName: text (replaces `service`)
+ *
+ *  dailyStatsTable:
+ *   - statDate: date (replaces `date`)
+ *   - newAdmissions: integer (replaces `admissions`)
+ *   - discharges: integer (replaces `sorties`)
+ *   - consultations: integer ✓
+ *   - No rendezVous / analyses / imaging / invoices / revenueDA columns
+ */
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
@@ -6,7 +22,7 @@ import {
   admissionsTable,
   dailyStatsTable,
 } from "@workspace/db/schema";
-import { count, isNull, sql, eq, desc, gte, lt, and } from "drizzle-orm";
+import { count, isNull, eq, gte, lt, and, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -28,37 +44,52 @@ router.get("/stats", async (_req, res, next) => {
     const { start, end } = todayRange();
     const today = todayDateString();
 
-    const [[{ totalPatients }], [{ hospitalized }], [{ admissionsToday }], [{ appointmentsToday }], todayStat] =
-      await Promise.all([
-        db.select({ totalPatients: count() }).from(patientsTable),
-        db
-          .select({ hospitalized: count() })
-          .from(admissionsTable)
-          .where(isNull(admissionsTable.dischargedAt)),
-        db
-          .select({ admissionsToday: count() })
-          .from(admissionsTable)
-          .where(
-            and(
-              gte(admissionsTable.admittedAt, start),
-              lt(admissionsTable.admittedAt, end),
-            ),
+    const [
+      [{ totalPatients }],
+      [{ hospitalized }],
+      [{ admissionsToday }],
+      [{ appointmentsToday }],
+      todayStat,
+    ] = await Promise.all([
+      db.select({ totalPatients: count() })
+        .from(patientsTable)
+        .where(isNull(patientsTable.deletedAt)),
+
+      // "Currently hospitalized" = active admissions (not yet discharged)
+      db.select({ hospitalized: count() })
+        .from(admissionsTable)
+        .where(
+          and(
+            eq(admissionsTable.status, "active"),
+            isNull(admissionsTable.deletedAt),
           ),
-        db
-          .select({ appointmentsToday: count() })
-          .from(appointmentsTable)
-          .where(
-            and(
-              gte(appointmentsTable.scheduledAt, start),
-              lt(appointmentsTable.scheduledAt, end),
-            ),
+        ),
+
+      // Admissions today: admissionDate = today (date string)
+      db.select({ admissionsToday: count() })
+        .from(admissionsTable)
+        .where(
+          and(
+            eq(admissionsTable.admissionDate, today),
+            isNull(admissionsTable.deletedAt),
           ),
-        db
-          .select()
-          .from(dailyStatsTable)
-          .where(eq(dailyStatsTable.date, today))
-          .limit(1),
-      ]);
+        ),
+
+      db.select({ appointmentsToday: count() })
+        .from(appointmentsTable)
+        .where(
+          and(
+            gte(appointmentsTable.scheduledAt, start),
+            lt(appointmentsTable.scheduledAt, end),
+            isNull(appointmentsTable.deletedAt),
+          ),
+        ),
+
+      db.select()
+        .from(dailyStatsTable)
+        .where(eq(dailyStatsTable.statDate, today))
+        .limit(1),
+    ]);
 
     const stats = todayStat[0];
     const bedOccupancyPercent =
@@ -69,14 +100,14 @@ router.get("/stats", async (_req, res, next) => {
       appointmentsToday,
       hospitalized,
       admissionsToday,
-      emergenciesWaiting: stats?.admissions
-        ? Math.max(3, Math.round(stats.admissions * 0.3))
+      emergenciesWaiting: stats?.emergencyVisits
+        ? Math.max(3, Math.round(stats.emergencyVisits * 0.3))
         : 0,
       consultationsToday: stats?.consultations ?? 0,
-      analysesToday: stats?.analyses ?? 0,
-      imagingToday: stats?.imaging ?? 0,
-      invoicesToday: stats?.invoices ?? 0,
-      revenueToday: stats?.revenueDA ?? 0,
+      analysesToday:      0,   // not tracked in dailyStatsTable v2
+      imagingToday:       0,
+      invoicesToday:      0,
+      revenueToday:       0,
       bedOccupancyPercent,
     });
   } catch (err) {
@@ -89,19 +120,18 @@ router.get("/charts/consultations", async (_req, res, next) => {
   try {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
     const fromDate = sevenDaysAgo.toISOString().slice(0, 10);
 
     const rows = await db
       .select()
       .from(dailyStatsTable)
-      .where(gte(dailyStatsTable.date, fromDate))
-      .orderBy(dailyStatsTable.date);
+      .where(gte(dailyStatsTable.statDate, fromDate))
+      .orderBy(dailyStatsTable.statDate);
 
     const data = rows.map((r) => ({
-      name: formatDate(r.date),
+      name:         formatDate(r.statDate),
       consultations: r.consultations,
-      rendezVous: r.rendezVous,
+      rendezVous:   0,   // not tracked in v2 schema
     }));
 
     res.json(data);
@@ -115,19 +145,18 @@ router.get("/charts/admissions", async (_req, res, next) => {
   try {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
     const fromDate = sevenDaysAgo.toISOString().slice(0, 10);
 
     const rows = await db
       .select()
       .from(dailyStatsTable)
-      .where(gte(dailyStatsTable.date, fromDate))
-      .orderBy(dailyStatsTable.date);
+      .where(gte(dailyStatsTable.statDate, fromDate))
+      .orderBy(dailyStatsTable.statDate);
 
     const data = rows.map((r) => ({
-      name: formatDate(r.date),
-      admissions: r.admissions,
-      sorties: r.sorties,
+      name:       formatDate(r.statDate),
+      admissions: r.newAdmissions,   // newAdmissions replaces legacy `admissions`
+      sorties:    r.discharges,       // discharges replaces legacy `sorties`
     }));
 
     res.json(data);
@@ -136,16 +165,17 @@ router.get("/charts/admissions", async (_req, res, next) => {
   }
 });
 
-/** GET /dashboard/charts/services */
+/** GET /dashboard/charts/services — top services by admission count */
 router.get("/charts/services", async (_req, res, next) => {
   try {
     const rows = await db
       .select({
-        name: admissionsTable.service,
+        name:  admissionsTable.serviceName,  // serviceName replaces legacy `service`
         value: count(),
       })
       .from(admissionsTable)
-      .groupBy(admissionsTable.service)
+      .where(isNull(admissionsTable.deletedAt))
+      .groupBy(admissionsTable.serviceName)
       .orderBy(desc(count()));
 
     res.json(rows);

@@ -1,52 +1,140 @@
+/**
+ * /patients routes — backed by PatientService + PatientRepository.
+ *
+ * JSON shape is preserved for frontend compatibility.
+ *
+ * Schema alignment (patientsTable):
+ *  - No `name` / `age` / `service` / `registeredAt` / `medicalJson` /
+ *    `emergencyContactJson` / `insuranceJson` columns (legacy).
+ *  - firstName + lastName replace name; createdAt replaces registeredAt.
+ *  - medical data is stored as arrays (allergies, chronicDiseases, majorHistory).
+ *  - emergency contact is stored as separate columns.
+ *  - insurance is stored as separate columns.
+ *  - id: UUID (not integer).
+ */
 import { Router } from "express";
-import { db } from "@workspace/db";
-import { patientsTable } from "@workspace/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { desc, isNull } from "drizzle-orm";
+import { db, patientsTable } from "@workspace/db";
+import { patientService } from "../services/patient";
+import { repos } from "../repositories";
+import type { AuthenticatedRequest } from "../middleware/requireAuth";
+import type { ActorCtx } from "../repositories/types";
+import type { DbPatient } from "../repositories/patient";
 
 const router = Router();
+
+function actor(req: AuthenticatedRequest): ActorCtx {
+  return {
+    userId:   req.auth?.userId ?? "system",
+    userName: req.auth?.userId ?? "system",
+    userRole: req.auth?.role   ?? "guest",
+  };
+}
+
+function calcAge(dob: string): number {
+  const year = parseInt(dob.slice(0, 4), 10);
+  return isNaN(year) ? 0 : new Date().getFullYear() - year;
+}
+
+function mapPatient(p: DbPatient) {
+  const emergencyContact = (
+    p.emergencyContactName || p.emergencyContactPhone
+  ) ? {
+    name:     p.emergencyContactName    ?? undefined,
+    relation: p.emergencyContactRelation ?? undefined,
+    phone:    p.emergencyContactPhone   ?? undefined,
+    address:  p.emergencyContactAddress ?? undefined,
+  } : undefined;
+
+  const insurance = p.insuranceType ? {
+    type:         p.insuranceType         ?? undefined,
+    orgName:      p.insuranceOrgName      ?? undefined,
+    memberNumber: p.insuranceMemberNumber ?? undefined,
+    validUntil:   p.insuranceValidUntil   ?? undefined,
+  } : undefined;
+
+  return {
+    id:             p.id,
+    mpiId:          p.mpiId,
+    mrn:            p.mrn,
+    fileNumber:     p.fileNumber,
+    internalNumber: p.internalNumber ?? undefined,
+    firstName:      p.firstName,
+    lastName:       p.lastName,
+    maidenName:     p.maidenName ?? undefined,
+    gender:         p.gender,
+    dateOfBirth:    p.dateOfBirth,
+    age:            calcAge(p.dateOfBirth),
+    placeOfBirth:   p.placeOfBirth   ?? undefined,
+    nationality:    p.nationality,
+    maritalStatus:  p.maritalStatus  ?? undefined,
+    idDocumentType: p.idDocumentType ?? undefined,
+    idDocumentNumber: p.idDocumentNumber ?? undefined,
+    socialSecurityNumber: p.socialSecurityNumber ?? undefined,
+    phone:          p.phone,
+    phoneSecondary: p.phoneSecondary ?? undefined,
+    email:          p.email    ?? undefined,
+    address:        p.address  ?? undefined,
+    commune:        p.commune  ?? undefined,
+    wilaya:         p.wilaya   ?? undefined,
+    postalCode:     p.postalCode ?? undefined,
+    country:        p.country,
+    bloodType:      p.bloodType ?? null,
+    rhesus:         p.rhesus   ?? undefined,
+    medical: {
+      allergies:       p.allergies       ?? [],
+      chronicDiseases: p.chronicDiseases ?? [],
+      majorHistory:    p.majorHistory    ?? [],
+    },
+    emergencyContact,
+    insurance,
+    departmentId:       p.departmentId ?? undefined,
+    status:             p.status,
+    syncStatus:         p.syncStatus,
+    isIncomplete:       p.isIncomplete,
+    potentialDuplicate: p.potentialDuplicate,
+    createdAt:   p.createdAt.toISOString(),
+    updatedAt:   p.updatedAt.toISOString(),
+    createdById: "system",
+    siteId:      "site-1",
+  };
+}
 
 /** GET /patients/recent — dashboard widget (5 newest) */
 router.get("/recent", async (_req, res, next) => {
   try {
-    const patients = await db
+    const rows = await db
       .select()
       .from(patientsTable)
-      .orderBy(desc(patientsTable.registeredAt))
+      .where(isNull(patientsTable.deletedAt))
+      .orderBy(desc(patientsTable.createdAt))
       .limit(5);
 
-    res.json(
-      patients.map((p) => ({
-        id: p.id,
-        name: p.name,
-        age: p.age,
-        fileNumber: p.fileNumber,
-        service: p.service,
-        registeredAt: p.registeredAt.toISOString(),
-      })),
-    );
+    res.json(rows.map((p) => ({
+      id:          p.id,
+      firstName:   p.firstName,
+      lastName:    p.lastName,
+      name:        `${p.firstName} ${p.lastName}`,
+      age:         calcAge(p.dateOfBirth),
+      fileNumber:  p.fileNumber,
+      mrn:         p.mrn,
+      createdAt:   p.createdAt.toISOString(),
+    })));
   } catch (err) {
     next(err);
   }
 });
 
-/** GET /patients — full patient list for the Patients page */
+/** GET /patients — full patient list */
 router.get("/", async (req, res, next) => {
   try {
-    const { search, status, gender, bloodType } = req.query as Record<string, string | undefined>;
+    const { search, status, gender, bloodType } =
+      req.query as Record<string, string | undefined>;
 
-    let rows = await db.select().from(patientsTable).orderBy(patientsTable.lastName, patientsTable.firstName);
+    const result = await repos.patient.search({ query: search, status, limit: 500 });
+    let rows = result.data;
 
-    // Apply filters in memory (dataset is modest)
-    if (search) {
-      const q = search.toLowerCase();
-      rows = rows.filter((p) => {
-        const fields = [p.firstName, p.lastName, p.mpiId, p.fileNumber, p.phone, p.internalNumber, p.name];
-        return fields.some((f) => f?.toLowerCase().includes(q));
-      });
-    }
-    if (status && status !== "all") {
-      rows = rows.filter((p) => p.status === status);
-    }
+    // gender and bloodType filters are not in PatientRepository.search() — apply in-memory
     if (gender && gender !== "all") {
       rows = rows.filter((p) => p.gender === gender);
     }
@@ -61,112 +149,121 @@ router.get("/", async (req, res, next) => {
 });
 
 /** POST /patients — create a new patient */
-router.post("/", async (req, res, next) => {
+router.post("/", async (req: AuthenticatedRequest, res, next) => {
   try {
     const body = req.body as PatientPayload;
 
-    const dobYear = body.dateOfBirth ? parseInt(body.dateOfBirth.slice(0, 4), 10) : null;
-    const age = dobYear ? new Date().getFullYear() - dobYear : 0;
-    const fullName = [body.firstName, body.lastName].filter(Boolean).join(" ") || body.lastName || "Inconnu";
+    if (!body.firstName && !body.lastName) {
+      res.status(400).json({ message: "firstName or lastName is required" });
+      return;
+    }
+    if (!body.gender) {
+      res.status(400).json({ message: "gender is required" });
+      return;
+    }
+    if (!body.dateOfBirth) {
+      res.status(400).json({ message: "dateOfBirth is required" });
+      return;
+    }
+    if (!body.phone) {
+      res.status(400).json({ message: "phone is required" });
+      return;
+    }
 
-    const [inserted] = await db
-      .insert(patientsTable)
-      .values({
-        name: fullName,
-        age,
-        fileNumber: body.fileNumber || generateFileNumber(),
-        service: body.departmentId || "",
-        firstName: body.firstName,
-        lastName: body.lastName,
-        maidenName: body.maidenName || null,
-        mpiId: body.mpiId || null,
-        internalNumber: body.internalNumber || null,
-        gender: body.gender,
-        dateOfBirth: body.dateOfBirth,
-        placeOfBirth: body.placeOfBirth || null,
-        nationality: body.nationality || "Algérienne",
-        maritalStatus: body.maritalStatus || null,
-        idDocumentType: body.idDocumentType || null,
-        idDocumentNumber: body.idDocumentNumber || null,
-        socialSecurityNumber: body.socialSecurityNumber || null,
-        phone: body.phone,
-        phoneSecondary: body.phoneSecondary || null,
-        email: body.email || null,
-        address: body.address || null,
-        commune: body.commune || null,
-        wilaya: body.wilaya || null,
-        postalCode: body.postalCode || null,
-        country: body.country || "Algérie",
-        bloodType: body.bloodType || null,
-        rhesus: body.rhesus || null,
-        medicalJson: body.medical ? JSON.stringify(body.medical) : null,
-        emergencyContactJson: body.emergencyContact ? JSON.stringify(body.emergencyContact) : null,
-        insuranceJson: body.insurance ? JSON.stringify(body.insurance) : null,
-        departmentId: body.departmentId || null,
-        status: (body.status as string) || "active",
-        syncStatus: "synced",
-        isIncomplete: false,
-        potentialDuplicate: false,
-      })
-      .returning();
+    const firstName = body.firstName || "";
+    const lastName  = body.lastName  || "Inconnu";
+    const timestamp = Date.now().toString().slice(-6);
 
-    res.status(201).json(mapPatient(inserted));
+    const patient = await patientService.create({
+      mpiId:          body.mpiId        || `MPI-${timestamp}`,
+      fileNumber:     body.fileNumber   || `${new Date().getFullYear()}-${timestamp}`,
+      internalNumber: body.internalNumber || null,
+      firstName,
+      lastName,
+      maidenName:     body.maidenName   || null,
+      gender:         body.gender as any,
+      dateOfBirth:    body.dateOfBirth,
+      placeOfBirth:   body.placeOfBirth || null,
+      nationality:    body.nationality  || "DZ",
+      maritalStatus:  (body.maritalStatus as any) || null,
+      idDocumentType:       (body.idDocumentType as any) || null,
+      idDocumentNumber:     body.idDocumentNumber || null,
+      socialSecurityNumber: body.socialSecurityNumber || null,
+      phone:          body.phone,
+      phoneSecondary: body.phoneSecondary || null,
+      email:          body.email   || null,
+      address:        body.address || null,
+      commune:        body.commune || null,
+      wilaya:         body.wilaya  || null,
+      postalCode:     body.postalCode || null,
+      country:        body.country || "DZ",
+      bloodType:      (body.bloodType as any) || null,
+      rhesus:         (body.rhesus as any)    || null,
+      allergies:      body.medical?.allergies       ?? [],
+      chronicDiseases: body.medical?.chronicDiseases ?? [],
+      majorHistory:   body.medical?.majorHistory    ?? [],
+      emergencyContactName:     body.emergencyContact?.name     || null,
+      emergencyContactRelation: body.emergencyContact?.relation || null,
+      emergencyContactPhone:    body.emergencyContact?.phone    || null,
+      emergencyContactAddress:  body.emergencyContact?.address  || null,
+      insuranceType:         (body.insurance?.type as any) || null,
+      insuranceOrgName:      body.insurance?.orgName      || null,
+      insuranceMemberNumber: body.insurance?.memberNumber || null,
+      insuranceValidUntil:   body.insurance?.validUntil   || null,
+      departmentId:  body.departmentId || null,
+      status:        (body.status as any) || "active",
+      syncStatus:    "synced",
+      isIncomplete:  false,
+      potentialDuplicate: false,
+    }, actor(req));
+
+    res.status(201).json(mapPatient(patient));
   } catch (err) {
     next(err);
   }
 });
 
-/** PUT /patients/:id — update an existing patient */
-router.put("/:id", async (req, res, next) => {
+/** PUT /patients/:id — update patient */
+router.put("/:id", async (req: AuthenticatedRequest, res, next) => {
   try {
-    const rawId = req.params.id;
-    // IDs from the ERP may be prefixed with "db-"
-    const numId = parseInt(rawId.replace(/^db-/, ""), 10);
-    if (isNaN(numId)) {
-      res.status(400).json({ message: "Invalid patient ID" });
-      return;
-    }
-
+    const id = String(req.params.id);
     const body = req.body as PatientPayload;
 
-    const dobYear = body.dateOfBirth ? parseInt(body.dateOfBirth.slice(0, 4), 10) : null;
-    const age = dobYear ? new Date().getFullYear() - dobYear : 0;
-    const fullName = [body.firstName, body.lastName].filter(Boolean).join(" ") || body.lastName || "Inconnu";
-
-    const [updated] = await db
-      .update(patientsTable)
-      .set({
-        name: fullName,
-        age,
-        firstName: body.firstName,
-        lastName: body.lastName,
-        maidenName: body.maidenName || null,
-        gender: body.gender,
-        dateOfBirth: body.dateOfBirth,
-        placeOfBirth: body.placeOfBirth || null,
-        nationality: body.nationality || "Algérienne",
-        maritalStatus: body.maritalStatus || null,
-        idDocumentType: body.idDocumentType || null,
-        idDocumentNumber: body.idDocumentNumber || null,
-        socialSecurityNumber: body.socialSecurityNumber || null,
-        phone: body.phone,
-        phoneSecondary: body.phoneSecondary || null,
-        email: body.email || null,
-        address: body.address || null,
-        commune: body.commune || null,
-        wilaya: body.wilaya || null,
-        postalCode: body.postalCode || null,
-        country: body.country || "Algérie",
-        bloodType: body.bloodType || null,
-        rhesus: body.rhesus || null,
-        medicalJson: body.medical ? JSON.stringify(body.medical) : null,
-        emergencyContactJson: body.emergencyContact ? JSON.stringify(body.emergencyContact) : null,
-        insuranceJson: body.insurance ? JSON.stringify(body.insurance) : null,
-        departmentId: body.departmentId || null,
-        updatedAt: new Date(),
-      })
-      .where(eq(patientsTable.id, numId))
-      .returning();
+    const updated = await patientService.update(id, {
+      firstName:      body.firstName,
+      lastName:       body.lastName,
+      maidenName:     body.maidenName   || null,
+      gender:         body.gender as any,
+      dateOfBirth:    body.dateOfBirth,
+      placeOfBirth:   body.placeOfBirth || null,
+      nationality:    body.nationality  || "DZ",
+      maritalStatus:  (body.maritalStatus as any) || null,
+      idDocumentType:       (body.idDocumentType as any) || null,
+      idDocumentNumber:     body.idDocumentNumber || null,
+      socialSecurityNumber: body.socialSecurityNumber || null,
+      phone:          body.phone,
+      phoneSecondary: body.phoneSecondary || null,
+      email:          body.email   || null,
+      address:        body.address || null,
+      commune:        body.commune || null,
+      wilaya:         body.wilaya  || null,
+      postalCode:     body.postalCode || null,
+      country:        body.country || "DZ",
+      bloodType:      (body.bloodType as any) || null,
+      rhesus:         (body.rhesus as any)    || null,
+      allergies:      body.medical?.allergies       ?? undefined,
+      chronicDiseases: body.medical?.chronicDiseases ?? undefined,
+      majorHistory:   body.medical?.majorHistory    ?? undefined,
+      emergencyContactName:     body.emergencyContact?.name     || null,
+      emergencyContactRelation: body.emergencyContact?.relation || null,
+      emergencyContactPhone:    body.emergencyContact?.phone    || null,
+      emergencyContactAddress:  body.emergencyContact?.address  || null,
+      insuranceType:         (body.insurance?.type as any) || null,
+      insuranceOrgName:      body.insurance?.orgName      || null,
+      insuranceMemberNumber: body.insurance?.memberNumber || null,
+      insuranceValidUntil:   body.insurance?.validUntil   || null,
+      departmentId:  body.departmentId || null,
+    }, actor(req));
 
     if (!updated) {
       res.status(404).json({ message: "Patient not found" });
@@ -179,7 +276,7 @@ router.put("/:id", async (req, res, next) => {
   }
 });
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PatientPayload {
   firstName?: string;
@@ -206,78 +303,11 @@ interface PatientPayload {
   country?: string;
   bloodType?: string;
   rhesus?: string;
-  medical?: Record<string, unknown>;
-  emergencyContact?: Record<string, unknown>;
-  insurance?: Record<string, unknown>;
+  medical?: { allergies?: string[]; chronicDiseases?: string[]; majorHistory?: string[] };
+  emergencyContact?: { name?: string; relation?: string; phone?: string; address?: string };
+  insurance?: { type?: string; orgName?: string; memberNumber?: string; validUntil?: string };
   departmentId?: string;
   status?: string;
-}
-
-function generateFileNumber() {
-  return `${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
-}
-
-function mapPatient(p: typeof patientsTable.$inferSelect) {
-  const firstName = p.firstName ?? (p.name.split(" ")[0] ?? "");
-  const lastName = p.lastName ?? (p.name.split(" ").slice(1).join(" ") ?? "");
-
-  let medical = { allergies: [], chronicDiseases: [], majorHistory: [] };
-  if (p.medicalJson) {
-    try { medical = JSON.parse(p.medicalJson); } catch { /* ignore */ }
-  }
-
-  let emergencyContact: unknown = undefined;
-  if (p.emergencyContactJson) {
-    try { emergencyContact = JSON.parse(p.emergencyContactJson); } catch { /* ignore */ }
-  }
-
-  let insurance: unknown = undefined;
-  if (p.insuranceJson) {
-    try { insurance = JSON.parse(p.insuranceJson); } catch { /* ignore */ }
-  }
-
-  return {
-    id: `db-${p.id}`,
-    mpiId: p.mpiId ?? `MPI-${String(p.id).padStart(6, "0")}`,
-    fileNumber: p.fileNumber,
-    internalNumber: p.internalNumber ?? `INT-${String(p.id).padStart(3, "0")}`,
-    firstName,
-    lastName,
-    maidenName: p.maidenName ?? undefined,
-    gender: p.gender ?? "M",
-    dateOfBirth: p.dateOfBirth ?? "1980-01-01",
-    placeOfBirth: p.placeOfBirth ?? undefined,
-    nationality: p.nationality ?? "Algérienne",
-    maritalStatus: p.maritalStatus ?? undefined,
-    idDocumentType: p.idDocumentType ?? undefined,
-    idDocumentNumber: p.idDocumentNumber ?? undefined,
-    socialSecurityNumber: p.socialSecurityNumber ?? undefined,
-    phone: p.phone ?? "",
-    phoneSecondary: p.phoneSecondary ?? undefined,
-    email: p.email ?? undefined,
-    address: p.address ?? undefined,
-    commune: p.commune ?? undefined,
-    wilaya: p.wilaya ?? undefined,
-    postalCode: p.postalCode ?? undefined,
-    country: p.country ?? "Algérie",
-    bloodType: p.bloodType ?? null,
-    rhesus: p.rhesus ?? undefined,
-    medical,
-    emergencyContact,
-    insurance,
-    departmentId: p.departmentId ?? undefined,
-    status: p.status,
-    syncStatus: p.syncStatus,
-    isIncomplete: p.isIncomplete,
-    potentialDuplicate: p.potentialDuplicate,
-    createdAt: p.registeredAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-    nationality_backup: undefined,
-    country_backup: undefined,
-    createdById: "system",
-    siteId: "site-1",
-    service: p.service,
-  };
 }
 
 export default router;

@@ -13,3 +13,5 @@ export * from "./encounter";
 export * from "./admission";
 export * from "./clinicalOrder";
 export * from "./pharmacy";
+export * from "./consultation";
+export * from "./appointment";
