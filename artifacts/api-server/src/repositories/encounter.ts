@@ -92,10 +92,13 @@ export class EncounterRepository {
     record: { recordType: string; recordId: string; summary: string },
     ctx: TxContext,
   ): Promise<void> {
+    // Use JSONB concatenation operator (||) — jsonb_append does not exist in PostgreSQL.
+    // COALESCE ensures we start from '[]' if linked_records is NULL.
+    const entry = JSON.stringify({ ...record, createdAt: new Date().toISOString() });
     await qb(this.db, ctx)
       .update(encountersTable)
       .set({
-        linkedRecords: sql`jsonb_append(COALESCE(linked_records, '[]'::jsonb), ${JSON.stringify({ ...record, createdAt: new Date().toISOString() })}::jsonb)`,
+        linkedRecords: sql`COALESCE(linked_records, '[]'::jsonb) || ${entry}::jsonb`,
         updatedBy: safeUuid(ctx.userId),
       })
       .where(eq(encountersTable.id, id));

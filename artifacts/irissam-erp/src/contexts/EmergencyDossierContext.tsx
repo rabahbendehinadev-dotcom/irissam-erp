@@ -24,11 +24,17 @@ import type { EmergencyPatient } from '@/types/emergency';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
+/** Status of the real DB encounter created on mount. */
+export type EncounterStatus = 'loading' | 'ready' | 'error';
+
 interface EmergencyDossierContextType {
   dossier: EmergencyDossier;
   patient: EmergencyPatient | null;
   saveState: SaveState;
   lastSaved: string | null;
+  /** Whether the real PostgreSQL encounter is available. Clinical actions are blocked until 'ready'. */
+  encounterStatus: EncounterStatus;
+  retryEncounter: () => void;
   // Workflow
   transitionStatus: (to: EmergencyWorkflowStatus, notes?: string) => void;
   startCare: () => void;
@@ -44,12 +50,12 @@ interface EmergencyDossierContextType {
   addVitalReading: (reading: Omit<VitalReading, 'timestamp'>) => void;
   addGlasgowReading: (breakdown: Omit<GlasgowBreakdown, 'recordedAt'>) => void;
   updateAbcde: (assessment: ABCDEAssessment) => void;
-  // Orders
+  // Orders — blocked until encounterStatus === 'ready'
   addLabRequest: (req: Omit<LabRequest, 'id' | 'requestedAt' | 'requestedBy'>) => void;
   updateLabStatus: (id: string, status: LabRequest['status'], result?: string, isCritical?: boolean) => void;
   addImagingRequest: (req: Omit<ImagingRequest, 'id' | 'requestedAt' | 'requestedBy'>) => void;
   updateImagingStatus: (id: string, status: ImagingRequest['status'], result?: string) => void;
-  // Treatment
+  // Treatment — blocked until encounterStatus === 'ready'
   addPrescription: (rx: Omit<Prescription, 'id' | 'prescribedAt' | 'prescribedBy' | 'status'>) => void;
   updatePrescriptionStatus: (id: string, status: Prescription['status'], adminAt?: string, by?: string) => void;
   addProcedure: (proc: Omit<Procedure, 'id' | 'performedAt' | 'performedBy'>) => void;
@@ -87,8 +93,15 @@ export function EmergencyDossierProvider({
   const [dossier, setDossier] = useState<EmergencyDossier>(() => getMockDossier(patientId));
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [lastSaved, setLastSaved] = useState<string | null>(null);
-  // Real encounter UUID from PostgreSQL — replaces synthetic `enc-${patientId}`
+  // Real encounter UUID from PostgreSQL — NO fallback allowed
   const [realEncounterId, setRealEncounterId] = useState<string | null>(null);
+  const [encounterStatus, setEncounterStatus] = useState<EncounterStatus>('loading');
+  // Incrementing this key retries the encounter creation effect
+  const [retryKey, setRetryKey] = useState(0);
+  const retryEncounter = useCallback(() => {
+    setEncounterStatus('loading');
+    setRetryKey(k => k + 1);
+  }, []);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -111,9 +124,12 @@ export function EmergencyDossierProvider({
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [dossier]);
 
-  // ── Create a real DB encounter on mount (replaces synthetic enc-patientId) ─
+  // ── Create a real DB encounter on mount — NO silent fallback ─────────────
+  // If this fails, encounterStatus → 'error' and all clinical actions are blocked.
+  // The user must click "Réessayer" (retryEncounter) to try again.
   useEffect(() => {
     let cancelled = false;
+    setEncounterStatus('loading');
     async function initEncounter() {
       try {
         const enc = await apiClient.post<{ id: string; encounterNumber: string }>(
@@ -127,17 +143,21 @@ export function EmergencyDossierProvider({
         );
         if (!cancelled) {
           setRealEncounterId(enc.id);
+          setEncounterStatus('ready');
           setDossier(d => ({ ...d, encounterId: enc.id, encounterNumber: enc.encounterNumber }));
         }
       } catch (err) {
-        // Silently fall back — clinical work must not be blocked by encounter API failure
-        console.warn('[EmergencyDossier] encounter creation failed:', err);
+        if (!cancelled) {
+          console.error('[EmergencyDossier] encounter creation failed — clinical actions BLOCKED:', err);
+          setEncounterStatus('error');
+        }
       }
     }
     void initEncounter();
     return () => { cancelled = true; };
+  // retryKey triggers a retry; patientId is stable for the provider's lifetime
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientId]); // Only on mount — patientId is stable for the provider's lifetime
+  }, [patientId, retryKey]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const who = user ? `${user.firstName} ${user.lastName}` : 'Utilisateur';
@@ -242,29 +262,46 @@ export function EmergencyDossierProvider({
 
   // ── Lab ───────────────────────────────────────────────────────────────────
   const addLabRequest = useCallback((req: Omit<LabRequest, 'id' | 'requestedAt' | 'requestedBy'>) => {
-    const r: LabRequest = {
-      ...req, id: nextId('l'), requestedAt: new Date().toISOString(),
-      requestedBy: who, requestedById: whoId,
-    };
-    setDossier(d => ({ ...d, labRequests: [...d.labRequests, r] }));
-    pushAudit({ action: 'Analyse demandée', category: 'lab', details: r.test });
+    // HARD BLOCK: no lab order without a real encounter UUID
+    if (!realEncounterId) {
+      toast({
+        title: 'Dossier non initialisé',
+        description: 'Impossible de demander une analyse sans encounter actif. Cliquez sur « Réessayer ».',
+        variant: 'destructive',
+      });
+      return;
+    }
     // Phase 3: validate doctor is present
     const vLab = validateLabOrder({ requestedById: whoId });
     if (!vLab.valid) {
       toast({ title: 'Analyse refusée', description: vLab.error, variant: 'destructive' });
       return;
     }
-    // Cross-module: register in global repository so Lab module can see it
-    const pt = repo.getPatient(patientId);
-    repo.createLabOrder({
-      visitId: realEncounterId ?? `visit-${patientId}`, encounterId: realEncounterId ?? `enc-${patientId}`, patientId,
-      patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
-      test: r.test, category: r.category, urgency: r.urgency,
+    // Optimistic UI update
+    const r: LabRequest = {
+      ...req, id: nextId('l'), requestedAt: new Date().toISOString(),
       requestedBy: who, requestedById: whoId,
-      status: 'demandee', sourceModule: 'urgences',
+    };
+    setDossier(d => ({ ...d, labRequests: [...d.labRequests, r] }));
+    pushAudit({ action: 'Analyse demandée', category: 'lab', details: r.test });
+    // Persist to PostgreSQL via API — fire-and-forget with error feedback
+    const pt = repo.getPatient(patientId);
+    const patientName = pt ? `${pt.lastName} ${pt.firstName}` : patientId;
+    apiClient.post('/lab-orders', {
+      patientId,
+      encounterId: realEncounterId,
+      patientName,
+      test: r.test,
+      category: r.category,
+      urgency: r.urgency,
+      requestedByName: who,
       laboratory: r.laboratory,
+      sourceModule: 'urgences',
+    }).catch((err: Error) => {
+      console.error('[EmergencyDossier] lab order API failed:', err);
+      toast({ title: 'Erreur réseau', description: 'L\'analyse a été enregistrée localement. Réessayez si elle n\'apparaît pas.', variant: 'destructive' });
     });
-  }, [who, whoId, pushAudit, repo, patientId, toast]);
+  }, [who, whoId, realEncounterId, pushAudit, repo, patientId, toast]);
 
   const updateLabStatus = useCallback((id: string, status: LabRequest['status'], result?: string, isCritical?: boolean) => {
     setDossier(d => ({
@@ -280,29 +317,47 @@ export function EmergencyDossierProvider({
 
   // ── Imaging ───────────────────────────────────────────────────────────────
   const addImagingRequest = useCallback((req: Omit<ImagingRequest, 'id' | 'requestedAt' | 'requestedBy'>) => {
-    const r: ImagingRequest = {
-      ...req, id: nextId('i'), requestedAt: new Date().toISOString(),
-      requestedBy: who, requestedById: whoId,
-    };
-    setDossier(d => ({ ...d, imagingRequests: [...d.imagingRequests, r] }));
-    pushAudit({ action: 'Imagerie demandée', category: 'imaging', details: `${r.exam} — ${r.region}` });
+    // HARD BLOCK: no imaging order without a real encounter UUID
+    if (!realEncounterId) {
+      toast({
+        title: 'Dossier non initialisé',
+        description: 'Impossible de demander une imagerie sans encounter actif. Cliquez sur « Réessayer ».',
+        variant: 'destructive',
+      });
+      return;
+    }
     // Phase 3: validate doctor is present
     const vImg = validateImagingOrder({ requestedById: whoId });
     if (!vImg.valid) {
       toast({ title: 'Imagerie refusée', description: vImg.error, variant: 'destructive' });
       return;
     }
-    // Cross-module: register in global repository so Radiology module can see it
-    const pt = repo.getPatient(patientId);
-    repo.createImagingOrder({
-      visitId: realEncounterId ?? `visit-${patientId}`, encounterId: realEncounterId ?? `enc-${patientId}`, patientId,
-      patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
-      exam: r.exam, region: r.region, side: r.side,
-      urgency: r.urgency, withContrast: r.withContrast,
+    // Optimistic UI update
+    const r: ImagingRequest = {
+      ...req, id: nextId('i'), requestedAt: new Date().toISOString(),
       requestedBy: who, requestedById: whoId,
-      status: 'demandee', sourceModule: 'urgences',
+    };
+    setDossier(d => ({ ...d, imagingRequests: [...d.imagingRequests, r] }));
+    pushAudit({ action: 'Imagerie demandée', category: 'imaging', details: `${r.exam} — ${r.region}` });
+    // Persist to PostgreSQL via API — fire-and-forget with error feedback
+    const pt = repo.getPatient(patientId);
+    const patientName = pt ? `${pt.lastName} ${pt.firstName}` : patientId;
+    apiClient.post('/imaging-orders', {
+      patientId,
+      encounterId: realEncounterId,
+      patientName,
+      exam: r.exam,
+      region: r.region,
+      side: r.side,
+      urgency: r.urgency,
+      withContrast: r.withContrast,
+      requestedByName: who,
+      sourceModule: 'urgences',
+    }).catch((err: Error) => {
+      console.error('[EmergencyDossier] imaging order API failed:', err);
+      toast({ title: 'Erreur réseau', description: 'L\'imagerie a été enregistrée localement. Réessayez si elle n\'apparaît pas.', variant: 'destructive' });
     });
-  }, [who, whoId, pushAudit, repo, patientId, toast]);
+  }, [who, whoId, realEncounterId, pushAudit, repo, patientId, toast]);
 
   const updateImagingStatus = useCallback((id: string, status: ImagingRequest['status'], result?: string) => {
     setDossier(d => ({
@@ -318,23 +373,41 @@ export function EmergencyDossierProvider({
 
   // ── Prescriptions ─────────────────────────────────────────────────────────
   const addPrescription = useCallback((rx: Omit<Prescription, 'id' | 'prescribedAt' | 'prescribedBy' | 'status'>) => {
+    // HARD BLOCK: no prescription without a real encounter UUID
+    if (!realEncounterId) {
+      toast({
+        title: 'Dossier non initialisé',
+        description: 'Impossible d\'ajouter une prescription sans encounter actif. Cliquez sur « Réessayer ».',
+        variant: 'destructive',
+      });
+      return;
+    }
+    // Optimistic UI update
     const p: Prescription = {
       ...rx, id: nextId('p'), prescribedAt: new Date().toISOString(),
       prescribedBy: who, prescribedById: whoId, status: 'prescrit',
     };
     setDossier(d => ({ ...d, prescriptions: [...d.prescriptions, p] }));
     pushAudit({ action: 'Prescription', category: 'prescription', details: `${p.drug} ${p.dosage} ${p.route}` });
-    // Cross-module: register in global repository so patient history can see it
+    // Persist to PostgreSQL via API — fire-and-forget with error feedback
     const pt = repo.getPatient(patientId);
-    repo.createPrescription({
-      visitId: realEncounterId ?? `visit-${patientId}`, encounterId: realEncounterId ?? `enc-${patientId}`, patientId,
-      patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
-      drug: p.drug, dosage: p.dosage, route: p.route,
-      frequency: p.frequency, duration: p.duration,
-      prescribedBy: who, prescribedById: whoId,
-      status: 'prescrit', sourceModule: 'urgences',
+    const patientName = pt ? `${pt.lastName} ${pt.firstName}` : patientId;
+    apiClient.post('/prescriptions', {
+      patientId,
+      encounterId: realEncounterId,
+      patientName,
+      drug: p.drug,
+      dosage: p.dosage,
+      route: p.route,
+      frequency: p.frequency,
+      duration: p.duration,
+      prescribedByName: who,
+      sourceModule: 'urgences',
+    }).catch((err: Error) => {
+      console.error('[EmergencyDossier] prescription API failed:', err);
+      toast({ title: 'Erreur réseau', description: 'La prescription a été enregistrée localement. Réessayez si elle n\'apparaît pas.', variant: 'destructive' });
     });
-  }, [who, whoId, pushAudit, repo, patientId]);
+  }, [who, whoId, realEncounterId, pushAudit, repo, patientId, toast]);
 
   const updatePrescriptionStatus = useCallback((id: string, status: Prescription['status'], adminAt?: string, by?: string) => {
     setDossier(d => ({
@@ -563,6 +636,7 @@ export function EmergencyDossierProvider({
   return (
     <EmergencyDossierContext.Provider value={{
       dossier, patient, saveState, lastSaved,
+      encounterStatus, retryEncounter,
       transitionStatus, startCare, suspendCare, closeFile,
       updateClinicalText, updateFullExam,
       addVitalReading, addGlasgowReading, updateAbcde,

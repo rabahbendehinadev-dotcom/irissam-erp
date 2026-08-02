@@ -8,9 +8,11 @@
  */
 import { Router } from "express";
 import { encounterService } from "../services/encounter";
+import { repos } from "../repositories";
 import type { AuthenticatedRequest } from "../middleware/requireAuth";
 import type { ActorCtx } from "../repositories/types";
 import type { DbEncounter } from "../repositories/encounter";
+import timelineRouter from "./timeline";
 
 const router = Router();
 
@@ -145,6 +147,58 @@ router.patch("/:id/status", async (req: AuthenticatedRequest, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ── Nested routes ─────────────────────────────────────────────────────────────
+
+/** GET /encounters/:encounterId/timeline */
+router.use("/:encounterId/timeline", timelineRouter);
+
+/** GET /encounters/:encounterId/lab-orders */
+router.get("/:encounterId/lab-orders", async (req, res, next) => {
+  try {
+    const { encounterId } = req.params;
+    const result = await repos.labOrder.list({ encounterId, limit: 200 });
+    res.json(result.data.map(o => ({
+      id: o.id, encounterId: o.encounterId, patientId: o.patientId,
+      test: o.test, category: o.category, urgency: o.urgency,
+      status: o.status, result: o.result ?? null, isCritical: o.isCritical,
+      requestedByName: o.requestedByName,
+      requestedAt: o.requestedAt?.toISOString() ?? null,
+      resultAt: o.resultAt?.toISOString() ?? null,
+    })));
+  } catch (err) { next(err); }
+});
+
+/** GET /encounters/:encounterId/imaging-orders */
+router.get("/:encounterId/imaging-orders", async (req, res, next) => {
+  try {
+    const { encounterId } = req.params;
+    const result = await repos.imagingOrder.list({ encounterId, limit: 200 });
+    res.json(result.data.map(o => ({
+      id: o.id, encounterId: o.encounterId, patientId: o.patientId,
+      exam: o.exam, region: o.region, urgency: o.urgency,
+      status: o.status, report: o.report ?? null,
+      requestedByName: o.requestedByName,
+      requestedAt: o.requestedAt?.toISOString() ?? null,
+      interpretedAt: o.interpretedAt?.toISOString() ?? null,
+    })));
+  } catch (err) { next(err); }
+});
+
+/** GET /encounters/:encounterId/prescriptions */
+router.get("/:encounterId/prescriptions", async (req, res, next) => {
+  try {
+    const { encounterId } = req.params;
+    const result = await repos.prescription.list({ encounterId, limit: 200 });
+    res.json(result.data.map(p => ({
+      id: p.id, encounterId: p.encounterId, patientId: p.patientId,
+      drug: p.drug, dosage: p.dosage, route: p.route, frequency: p.frequency,
+      status: p.status, prescribedByName: p.prescribedByName,
+      prescribedAt: p.prescribedAt?.toISOString() ?? null,
+      dispensedAt: p.dispensedAt?.toISOString() ?? null,
+    })));
+  } catch (err) { next(err); }
 });
 
 export default router;

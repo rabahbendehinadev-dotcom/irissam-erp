@@ -229,8 +229,9 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
 
   // ── Internal: Encounter sync ───────────────────────────────────────────────
   const syncEncounterWorkflow = useCallback((patientId: string, workflowStatus: string, patch?: Partial<Encounter>) => {
+    // Match by patientId field (works for both real-UUID encounters and legacy seeded mock data)
     setEncounters(prev => prev.map(e =>
-      e.id === `enc-${patientId}`
+      e.patientId === patientId
         ? { ...e, workflowStatus, updatedAt: new Date().toISOString(), ...patch }
         : e,
     ));
@@ -402,9 +403,9 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
       roomName: ctx.assignedRoom,
     });
 
-    // Phase 7: audit
+    // Phase 7: audit (encounterId not available here — real UUID lives in EmergencyDossierContext)
     audit('urgences', 'Prise en charge démarrée', ctx, {
-      patientId, encounterId: `enc-${patientId}`,
+      patientId,
       oldValue: oldStatus, newValue: 'en_soins',
     });
   }, [patients, assignPatientToRoom, assignPatientToDoctor, assignPatientToNurse, syncEncounterWorkflow, audit]);
@@ -430,8 +431,9 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
 
     patchPatient(patientId, { status });
     syncEncounterWorkflow(patientId, status);
+    // encounterId omitted — real UUID lives in EmergencyDossierContext, not in MockRepository
     audit('urgences', `Statut: ${TRANSITION_LABELS[status] ?? status}`, ctx, {
-      patientId, encounterId: `enc-${patientId}`,
+      patientId,
       oldValue: p.status, newValue: status,
       ...(notes ? { resourceType: notes } : {}),
     });

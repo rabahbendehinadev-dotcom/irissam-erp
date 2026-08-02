@@ -1,0 +1,255 @@
+ممتاز، الإصلاحات الأساسية نجحت، لكن كاين **نقطة وحدة ما نخليوهاش**:
+
+```text
+?? `enc-${patientId}`
+```
+
+حتى كـ fallback ماشي مليحة، لأنها تقدر ترجع تخلق بيانات سريرية بمعرّف وهمي إذا الـAPI فشل. في نظام طبي، إذا فشل إنشاء Encounter الحقيقي لازم العملية تتوقف برسالة واضحة، ماشي تكمل بمعرّف اصطناعي.
+
+الخطوة القادمة: **نحي fallback نهائيًا، ثم نربط Lab / Imagerie / Prescriptions بالـAPI الحقيقي**. ابعثلو هذا البرومبت:
+
+```text
+لا تبدأ Task #85 الآن.
+
+نفّذ الآن مرحلة إلغاء الـFallback الوهمي وربط الأوامر السريرية بقاعدة PostgreSQL.
+
+مهم جدًا:
+- لا تغيّر التصميم.
+- لا تضف Pages جديدة.
+- لا تستعمل أي Encounter ID اصطناعي.
+- لا تستعمل enc-${patientId} نهائيًا، حتى كـFallback.
+- عند فشل إنشاء أو تحميل Encounter الحقيقي، أوقف العملية واعرض Error State مع زر Réessayer.
+- كل السجلات السريرية يجب أن تحمل UUID حقيقيًا موجودًا في PostgreSQL.
+
+==================================================
+1. إزالة Encounter Fallback
+==================================================
+
+احذف جميع الاستعمالات من نوع:
+
+enc-${patientId}
+enc-${...}
+fakeEncounterId
+temporaryEncounterId
+
+من:
+
+- EmergencyDossierContext
+- Consultation Workspace
+- Lab Orders
+- Imaging Orders
+- Prescriptions
+- Admissions
+- Patient Timeline
+- Audit
+
+السلوك الجديد:
+
+- loading أثناء جلب أو إنشاء Encounter.
+- success عند الحصول على UUID حقيقي.
+- error إذا فشل API.
+- زر Réessayer.
+- تعطيل الأزرار السريرية حتى يصبح realEncounterId جاهزًا.
+- ممنوع إنشاء أي Order أو Prescription أو Decision بدون encounterId حقيقي.
+
+==================================================
+2. API Lab Orders
+==================================================
+
+أنشئ Routes وService وRepository كاملة:
+
+GET /api/lab-orders
+GET /api/lab-orders/:id
+GET /api/encounters/:encounterId/lab-orders
+POST /api/lab-orders
+PATCH /api/lab-orders/:id/status
+POST /api/lab-orders/:id/result
+
+POST يجب أن يتحقق من:
+
+- patientId
+- encounterId
+- testName
+- priority
+- requestedBy
+
+الحالات:
+
+- requested
+- collected
+- processing
+- validated
+- cancelled
+
+عند اعتماد النتيجة:
+
+- حفظ result.
+- حفظ validatedBy وvalidatedAt.
+- إنشاء Timeline Event.
+- إنشاء Audit Log.
+- إرسال Notification للطبيب.
+- إذا Critical Result، أنشئ Alert حرج.
+
+==================================================
+3. API Imaging Orders
+==================================================
+
+أنشئ:
+
+GET /api/imaging-orders
+GET /api/imaging-orders/:id
+GET /api/encounters/:encounterId/imaging-orders
+POST /api/imaging-orders
+PATCH /api/imaging-orders/:id/status
+POST /api/imaging-orders/:id/report
+
+الحالات:
+
+- requested
+- scheduled
+- performed
+- interpreted
+- cancelled
+
+عند اعتماد التقرير:
+
+- حفظ report.
+- حفظ interpretedBy وinterpretedAt.
+- Timeline.
+- Audit.
+- Notification للطبيب.
+
+==================================================
+4. API Prescriptions
+==================================================
+
+أنشئ:
+
+GET /api/prescriptions
+GET /api/prescriptions/:id
+GET /api/encounters/:encounterId/prescriptions
+POST /api/prescriptions
+PATCH /api/prescriptions/:id/status
+POST /api/prescriptions/:id/dispense
+
+كل Prescription ترتبط بـ:
+
+- patientId
+- encounterId
+- emergencyVisitId أو consultationId إن وجد
+- prescriberId
+- medicationId أو medicationName
+- dose
+- route
+- frequency
+- duration
+- quantity
+- status
+
+عند الصرف:
+
+- حفظ dispensedBy وdispensedAt.
+- تحديث المخزون داخل Transaction.
+- منع الصرف إذا المخزون غير كافٍ.
+- التحقق من الحساسية.
+- Timeline.
+- Audit.
+- Notification للطبيب.
+
+==================================================
+5. Frontend API Repository
+==================================================
+
+حدّث ApiRepository ليطبق نفس Contract الحالي:
+
+- createLabOrder
+- updateLabOrderStatus
+- validateLabResult
+- createImagingOrder
+- updateImagingStatus
+- validateImagingReport
+- createPrescription
+- updatePrescriptionStatus
+- dispensePrescription
+
+في وضع PostgreSQL:
+
+- لا تستعمل MockRepository لهذه العمليات.
+- كل الطلبات تذهب إلى API.
+- بعد Mutation اعمل تحديثًا للـQuery Cache.
+- أظهر Loading وError وSuccess State.
+- لا Reload كامل.
+
+==================================================
+6. Timeline
+==================================================
+
+أنشئ API:
+
+GET /api/encounters/:encounterId/timeline
+
+تجمع الأحداث من:
+
+- emergency visit
+- consultation
+- lab orders/results
+- imaging orders/reports
+- prescriptions/dispense
+- admission
+- transfer
+- discharge
+- audit clinical events
+
+رتبها زمنيًا من قاعدة البيانات.
+
+Frontend Timeline تقرأ من هذا endpoint في وضع PostgreSQL، وليس من Context محلي.
+
+==================================================
+7. اختبارات القبول
+==================================================
+
+اختبار 1:
+- عطّل API Encounter مؤقتًا.
+- افتح Dossier Urgence.
+- يجب ظهور Error State.
+- يجب منع إنشاء Analyse/Imagerie/Prescription.
+- لا يُنشأ أي enc-${patientId}.
+
+اختبار 2:
+- أنشئ Encounter حقيقي.
+- اطلب NFS.
+- تحقق أن LabOrder في PostgreSQL يحمل نفس patientId وencounterId.
+- اعتمد النتيجة.
+- تحقق من Timeline وAudit وNotification.
+
+اختبار 3:
+- اطلب Imagerie.
+- اعتمد التقرير.
+- تحقق من نفس Encounter.
+
+اختبار 4:
+- أنشئ Prescription.
+- اصرفها.
+- تحقق من المخزون وdispensedBy وTimeline وAudit.
+
+اختبار 5:
+- ابحث في كامل المشروع عن:
+  enc-
+  fakeEncounter
+  temporaryEncounter
+- يجب ألا توجد أي نتيجة في المنطق السريري.
+
+في النهاية أعطني:
+
+- Routes الجديدة.
+- Services وRepositories الجديدة.
+- نتائج الاختبارات.
+- إثبات إزالة الـFallback نهائيًا.
+- قائمة الملفات التي مازالت تعتمد على MockRepository.
+- صفر أخطاء TypeScript وRuntime SQL.
+
+لا تبدأ Task #85.
+لا تبدأ Facturation.
+```
+
+بعد نجاح هذا، نربط **Admissions Frontend + ICU + Bloc + Notifications realtime**، وبعدها فقط نروح لـTask #85.

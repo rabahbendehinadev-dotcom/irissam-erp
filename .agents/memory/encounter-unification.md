@@ -1,24 +1,43 @@
 ---
 name: Encounter Unification
-description: How real encounter UUIDs replaced synthetic enc-${patientId} keys in the emergency module, and where fallbacks still exist.
+description: How real encounter UUIDs replaced synthetic enc-${patientId} keys, and the full clinical order API built on top.
 ---
 
 ## Rule
-EmergencyDossierContext creates a real DB encounter via `POST /api/encounters` on mount and stores it in `realEncounterId` state.
-All cross-module operations (createLabOrder, createImagingOrder, createPrescription, closeVisit*) use `realEncounterId ?? \`enc-${patientId}\`` — the fallback only fires if the API call failed on mount.
+EmergencyDossierContext creates a real DB encounter via `POST /api/encounters` on mount.
+- On success → `encounterStatus = 'ready'`, `realEncounterId` = UUID
+- On failure → `encounterStatus = 'error'`, NO fallback, all clinical actions blocked
+- User must click "Réessayer" → calls `retryEncounter()` → increments `retryKey` → re-runs effect
 
-## MockRepository remaining synthetic IDs
-Three internal in-memory uses remain intentionally:
-- Line 233: `e.id === \`enc-${patientId}\`` — legacy mock encounter lookup for seeded demo patients
-- Lines 407, 434: audit calls in `startCare`/`updatePatientStatus` — in-memory only, never reach DB
+## Clinical Orders Block
+`addLabRequest`, `addImagingRequest`, `addPrescription` hard-block if `!realEncounterId`:
+- Show toast with "Cliquez sur Réessayer"
+- Return immediately
+- No order is created with a synthetic ID — ever
 
-Lines 726-788 (`closeVisit*`): all use `encounterId ?? \`enc-${patientId}\`` — real ID is passed from EmergencyDossierContext.
+## API Routes (all require real encounterId in body)
+- POST /lab-orders → 400 if no encounterId
+- POST /imaging-orders → 400 if no encounterId
+- POST /prescriptions → 400 if no encounterId
+- POST /lab-orders/:id/result → sets status=validee or critique
+- POST /imaging-orders/:id/report → sets status=interpretee
+- POST /prescriptions/:id/dispense → sets status=delivre
+- GET /encounters/:id/timeline → aggregates all events chronologically
+- GET /encounters/:id/lab-orders, /imaging-orders, /prescriptions → nested reads
 
-## Why
-These 3 mock uses are for pre-seeded demo patients displayed on page load. They are NOT new clinical operations — they don't flow to the DB audit or encounter service.
+## jsonb_append bug
+PostgreSQL has NO `jsonb_append` function. Use the `||` operator:
+```sql
+COALESCE(linked_records, '[]'::jsonb) || $1::jsonb
+```
+Fixed in: `artifacts/api-server/src/repositories/encounter.ts` → `appendLinkedRecord()`
+
+## MockRepository synthetic IDs removed
+- Line 233: `e.id === \`enc-${patientId}\`` → changed to `e.patientId === patientId`
+- Lines 407, 434: `encounterId: \`enc-${patientId}\`` removed from internal audit calls
+
+## safeUuid
+Must always apply `safeUuid(ctx.userId)` before any UUID FK column. Prescription repo was missing it — fixed.
 
 ## encounter_type enum
-DB uses `"urgence"` (singular), not `"urgences"`. The encounters route maps: `urgences → urgence`, `hospitalisation → admission`.
-
-## safeUuid in audit service
-`auditService.log` applies `safeUuid(actor.userId) ?? null` before writing to `audit_logs.user_id` (nullable FK). Without this, non-UUID userIds like "user-1" cause a DB type error.
+DB uses `"urgence"` (singular). Routes map `urgences → urgence`, `hospitalisation → admission`.

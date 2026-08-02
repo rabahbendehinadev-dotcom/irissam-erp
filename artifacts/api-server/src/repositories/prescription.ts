@@ -15,7 +15,7 @@ import { eq, and, isNull, desc, count } from "drizzle-orm";
 import {
   db as globalDb, prescriptionsTable, type DbPrescription, type InsertPrescription,
 } from "@workspace/db";
-import { type TxContext, type QueryOptions, type PagedResult, paged, qb } from "./types";
+import { type TxContext, type QueryOptions, type PagedResult, paged, qb, safeUuid } from "./types";
 
 export type { DbPrescription };
 
@@ -56,7 +56,7 @@ export class PrescriptionRepository {
   async create(data: InsertPrescription, ctx: TxContext): Promise<DbPrescription> {
     const [row] = await qb(this.db, ctx)
       .insert(prescriptionsTable)
-      .values({ ...data, createdBy: ctx.userId, updatedBy: ctx.userId })
+      .values({ ...data, createdBy: safeUuid(ctx.userId), updatedBy: safeUuid(ctx.userId) })
       .returning();
     return row;
   }
@@ -64,7 +64,7 @@ export class PrescriptionRepository {
   async update(id: string, data: Partial<InsertPrescription>, ctx: TxContext): Promise<DbPrescription | null> {
     const [row] = await qb(this.db, ctx)
       .update(prescriptionsTable)
-      .set({ ...data, updatedAt: new Date(), updatedBy: ctx.userId })
+      .set({ ...data, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(prescriptionsTable.id, id), isNull(prescriptionsTable.deletedAt)))
       .returning();
     return row ?? null;
@@ -77,9 +77,9 @@ export class PrescriptionRepository {
       .set({
         status:          "delivre",
         dispensedAt:     new Date(),
-        dispensedById:   ctx.userId,
+        dispensedById:   safeUuid(ctx.userId),
         updatedAt:       new Date(),
-        updatedBy:       ctx.userId,
+        updatedBy:       safeUuid(ctx.userId),
       })
       .where(and(eq(prescriptionsTable.id, id), isNull(prescriptionsTable.deletedAt)))
       .returning();
