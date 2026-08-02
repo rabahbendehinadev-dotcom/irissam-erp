@@ -19,24 +19,62 @@
 
 export interface ValidationResult {
   valid: boolean;
-  error?: string;    // User-facing message (French)
+  error?: string;    // Primary user-facing message (French)
   field?: string;    // Form field ID to highlight
+  messages?: { fr: string; ar: string; en: string }; // Trilingual messages
 }
 
 export const ok    = (): ValidationResult => ({ valid: true });
 export const fail  = (error: string, field?: string): ValidationResult =>
   ({ valid: false, error, field });
+/** Produce a trilingual failure result. `error` is set to the French message for backward compatibility. */
+export const failMulti = (fr: string, ar: string, en: string, field?: string): ValidationResult =>
+  ({ valid: false, error: fr, field, messages: { fr, ar, en } });
 
-// ─── Rule 1 & 8: Lab / Imaging — requires assigned doctor ────────────────────
+// ─── Rule 1 & 8: Lab / Imaging — content + requester validation ──────────────
 
 export function validateLabOrder(params: {
   requestedById?: string;
   patientAssignedDoctorId?: string;
+  /** Test name — validated when present (even as empty string). */
+  test?: string;
+  patientId?: string;
+  encounterId?: string;
 }): ValidationResult {
+  // Content: test name must not be blank
+  if (params.test !== undefined && !params.test.trim()) {
+    return failMulti(
+      'Le nom de l\'analyse est obligatoire.',
+      'اسم التحليل إجباري.',
+      'Test name is required.',
+      'test',
+    );
+  }
+  // Requester: a doctor must be identified
   if (!params.requestedById?.trim()) {
-    return fail(
+    return failMulti(
       'Un médecin doit être connecté pour demander une analyse.',
+      'يجب أن يكون طبيب متصلًا لطلب التحليل.',
+      'A doctor must be connected to order a lab test.',
       'requestedById',
+    );
+  }
+  // Patient reference must not be blank when provided
+  if (params.patientId !== undefined && !params.patientId.trim()) {
+    return failMulti(
+      'L\'identifiant du patient est requis.',
+      'معرّف المريض مطلوب.',
+      'Patient ID is required.',
+      'patientId',
+    );
+  }
+  // Encounter reference must not be blank when provided
+  if (params.encounterId !== undefined && !params.encounterId.trim()) {
+    return failMulti(
+      'L\'identifiant de la consultation est requis.',
+      'معرّف الزيارة مطلوب.',
+      'Encounter ID is required.',
+      'encounterId',
     );
   }
   return ok();
@@ -44,11 +82,54 @@ export function validateLabOrder(params: {
 
 export function validateImagingOrder(params: {
   requestedById?: string;
+  /** Exam type — validated when present. */
+  exam?: string;
+  /** Anatomical region — validated when present. */
+  region?: string;
+  patientId?: string;
+  encounterId?: string;
+  /** When true, `report` must be non-empty (required for interpretation). */
+  requireReport?: boolean;
+  report?: string;
 }): ValidationResult {
+  if (params.exam !== undefined && !params.exam.trim()) {
+    return failMulti(
+      'Le type d\'examen est obligatoire.',
+      'نوع الفحص إجباري.',
+      'Exam type is required.',
+      'exam',
+    );
+  }
+  if (params.region !== undefined && !params.region.trim()) {
+    return failMulti(
+      'La zone anatomique est obligatoire.',
+      'المنطقة التشريحية إجبارية.',
+      'Anatomical region is required.',
+      'region',
+    );
+  }
   if (!params.requestedById?.trim()) {
-    return fail(
+    return failMulti(
       'Un médecin doit être connecté pour demander une imagerie.',
+      'يجب أن يكون طبيب متصلًا لطلب الأشعة.',
+      'A doctor must be connected to order imaging.',
       'requestedById',
+    );
+  }
+  if (params.patientId !== undefined && !params.patientId.trim()) {
+    return failMulti(
+      'L\'identifiant du patient est requis.',
+      'معرّف المريض مطلوب.',
+      'Patient ID is required.',
+      'patientId',
+    );
+  }
+  if (params.requireReport && !params.report?.trim()) {
+    return failMulti(
+      'Un compte rendu est obligatoire pour interpréter l\'examen.',
+      'تقرير الأشعة إجباري لتفسير الفحص.',
+      'A report is required to interpret the exam.',
+      'report',
     );
   }
   return ok();

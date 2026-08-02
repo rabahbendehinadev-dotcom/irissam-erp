@@ -20,6 +20,7 @@ import { MOCK_EMERGENCY_PATIENTS, MOCK_EMERGENCY_ROOMS, MOCK_EMERGENCY_AMBULANCE
 import { MOCK_OCCUPANCY_BEDS, MOCK_ICU_BEDS, MOCK_OPERATING_ROOMS } from '@/mock/occupancy';
 import { useNotifications } from './NotificationsContext';
 import { canTransition, canStartCare, TRANSITION_LABELS } from '@/engine/workflowEngine';
+import { validateLabOrder, validateImagingOrder } from '@/engine/validationEngine';
 import type { EmergencyPatient, EmergencyPatientStatus, EmergencyRoom, EmergencyDoctor, EmergencyNurse, Ambulance, AmbulanceStatus } from '@/types/emergency';
 import type { Encounter, EncounterLinkedRecord } from '@/types/encounter';
 import type {
@@ -134,6 +135,10 @@ export interface MockRepositoryContextType {
   closeVisitICU:          (patientId: string, icuAdmissionId: string, ctx: AuditCtx) => void;
   closeVisitTransferred:  (patientId: string, ctx: AuditCtx, destEtablissement?: string) => void;
   closeVisitDeceased:     (patientId: string, ctx: AuditCtx, provisionalCause?: string) => void;
+
+  // ── Test / dev utilities ──────────────────────────────────────────────────
+  /** Reset all in-memory state to the original mock seed data. Dev/test use only. */
+  resetRepository: () => void;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -437,6 +442,12 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
   // ─────────────────────────────────────────────────────────────────────────
 
   const createLabOrder = useCallback((order: Omit<RepoLabOrder, 'id' | 'requestedAt'>): string => {
+    // Repository-level guard — mirrors UI validation (Rule 1 + content)
+    const guard = validateLabOrder({ requestedById: order.requestedById, test: order.test, patientId: order.patientId });
+    if (!guard.valid) {
+      console.error(`[MockRepository.createLabOrder] Rejected — ${guard.error}`);
+      return genId('lab-rejected');
+    }
     const id = genId('lab');
     const full: RepoLabOrder = { ...order, id, requestedAt: new Date().toISOString() };
     setLabOrders(prev => [...prev, full]);
@@ -467,6 +478,12 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
   }, [linkRecordToEncounter, addNotification, audit]);
 
   const createImagingOrder = useCallback((order: Omit<RepoImagingOrder, 'id' | 'requestedAt'>): string => {
+    // Repository-level guard — mirrors UI validation (Rule 8 + content)
+    const guard = validateImagingOrder({ requestedById: order.requestedById, exam: order.exam, region: order.region, patientId: order.patientId });
+    if (!guard.valid) {
+      console.error(`[MockRepository.createImagingOrder] Rejected — ${guard.error}`);
+      return genId('img-rejected');
+    }
     const id = genId('img');
     const full: RepoImagingOrder = { ...order, id, requestedAt: new Date().toISOString() };
     setImagingOrders(prev => [...prev, full]);
@@ -772,6 +789,29 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
     });
   }, [patchPatient, freeOccupancy, syncEncounterWorkflow, closeEncounter, audit]);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // DEV / TEST UTILITY: reset all state to initial mock seed data
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Deep-clone and restore every state array to its original mock seed. */
+  const resetRepository = useCallback(() => {
+    setPatients(MOCK_EMERGENCY_PATIENTS.map(p => ({ ...p })));
+    setEncounters(buildInitialEncounters(MOCK_EMERGENCY_PATIENTS));
+    setLabOrders([]);
+    setImagingOrders([]);
+    setPrescriptions([]);
+    setSurgicalRequests([]);
+    setICUAdmissions([]);
+    setRooms(MOCK_EMERGENCY_ROOMS.map(r => ({ ...r })));
+    setErDoctors(MOCK_EMERGENCY_DOCTORS.map(d => ({ ...d })));
+    setErNurses(MOCK_EMERGENCY_NURSES.map(n => ({ ...n })));
+    setAmbulances(MOCK_EMERGENCY_AMBULANCES.map(a => ({ ...a })));
+    setBeds(MOCK_OCCUPANCY_BEDS.map(b => ({ ...b })));
+    setICUBeds(MOCK_ICU_BEDS.map(b => ({ ...b })));
+    setOperatingRooms(MOCK_OPERATING_ROOMS.map(r => ({ ...r, slots: r.slots.map(s => ({ ...s })) })));
+    setGlobalAudit([]);
+  }, []);
+
   const addGlobalAudit = useCallback((entry: Omit<RepoAuditEntry, 'id' | 'timestamp' | 'ip'>) => {
     setGlobalAudit(prev => [{
       ...entry, id: genId('aud'), timestamp: new Date().toISOString(), ip: MOCK_IP,
@@ -1076,6 +1116,7 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
       updateLabOrderStatus, updateImagingStatus, updatePrescriptionStatus,
       closeVisitDischarged, closeVisitHospitalized, closeVisitBloc,
       closeVisitICU, closeVisitTransferred, closeVisitDeceased,
+      resetRepository,
     }}>
       {children}
     </MockRepositoryContext.Provider>

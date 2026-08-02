@@ -1,0 +1,162 @@
+نفّذ الآن المهام #63 و#64 و#65 فقط قبل الانتقال إلى PostgreSQL.
+
+مهم جدًا:
+- لا تضف Features جديدة.
+- لا تغيّر التصميم.
+- لا تغيّر Architecture الحالية.
+- ركّز فقط على تصحيح المنطق والاختبارات.
+- لا تبدأ PostgreSQL حتى تنتهي هذه المهام وتنجح جميع الاختبارات.
+
+==================================================
+المهمة #63 — تحرير السرير تلقائيًا عند الخروج
+==================================================
+
+عند تنفيذ Sortie / Discharge من:
+
+- Admissions
+- Hospitalisation
+- Urgences
+- Réanimation
+
+يجب تنفيذ العملية التالية في Transaction منطقية واحدة:
+
+1. تحديث حالة Admission إلى Sortie / Discharged.
+2. تحديث حالة Encounter إذا كان يجب إغلاقه.
+3. إزالة ربط:
+   - patientId
+   - encounterId
+   - admissionId
+   من السرير الحالي.
+4. تحويل حالة السرير من Occupé إلى En nettoyage.
+5. تسجيل cleaningStartedAt.
+6. تحديث Occupation في جميع Dashboards فورًا.
+7. إنشاء حدث داخل Timeline.
+8. تسجيل Audit كامل.
+9. إرسال Notification إلى فريق التنظيف.
+
+بعد الضغط على “Nettoyage terminé”:
+
+1. يتحول السرير إلى Disponible.
+2. تسجيل cleaningCompletedAt.
+3. تحديث جميع الإحصائيات فورًا.
+4. إنشاء Audit وNotification.
+
+يجب منع:
+- تحرير سرير غير مرتبط بالمريض.
+- خروج المريض مرتين.
+- جعل السرير Disponible مباشرة قبل انتهاء التنظيف.
+
+==================================================
+المهمة #64 — منع أوامر التحاليل والأشعة الفارغة
+==================================================
+
+أضف Validation مركزية داخل validationEngine.
+
+Laboratoire:
+- منع إنشاء LabOrder إذا كان اسم التحليل فارغًا.
+- منع الاسم المكوّن من مسافات فقط.
+- منع إنشاء طلب بدون:
+  - patientId
+  - encounterId
+  - requestedBy
+  - priority
+- منع Validation لطلب بدون نتيجة.
+
+Imagerie:
+- منع إنشاء ImagingOrder إذا كان نوع الفحص فارغًا.
+- منع الطلب بدون zone anatomique عندما تكون مطلوبة.
+- منع الطلب بدون patientId أو encounterId أو requestedBy.
+- منع Interpréter بدون compte rendu.
+
+الرسائل تكون واضحة ومترجمة إلى:
+- Français
+- العربية
+- English
+
+مثال:
+“Le nom de l’analyse est obligatoire.”
+“اسم التحليل إجباري.”
+“Test name is required.”
+
+لا يكفي تعطيل الزر في UI؛ يجب أن تكون Validation داخل Engine والRepository أيضًا.
+
+==================================================
+المهمة #65 — Reset بيانات الاختبارات
+==================================================
+
+أضف Reset موحدًا للـMockRepository قبل كل تشغيل للاختبارات.
+
+المطلوب:
+
+- createInitialRepositoryState()
+- resetRepository()
+- استعادة نسخة جديدة Deep Clone في كل تشغيل.
+- عدم مشاركة State بين Workflow وآخر.
+- عدم اعتماد الاختبار على ترتيب تشغيل الاختبارات.
+- إعادة:
+  - patients
+  - encounters
+  - admissions
+  - emergencyVisits
+  - labOrders
+  - imagingOrders
+  - prescriptions
+  - beds
+  - icuBeds
+  - operatingRooms
+  - ambulances
+  - notifications
+  - auditLogs
+  إلى الحالة الأصلية.
+
+داخل Test Runner:
+
+1. Reset قبل كل Workflow.
+2. Reset عند الضغط على “Relancer”.
+3. أضف زر:
+   “Réinitialiser les données de test”.
+4. اعرض وقت آخر Reset.
+5. لا يؤثر Reset الاختبارات على Session المستخدم أو إعدادات الواجهة.
+
+==================================================
+اختبارات القبول
+==================================================
+
+اختبار 1:
+- أدخل مريضًا إلى سرير.
+- نفّذ Sortie.
+- تحقق أن السرير يصبح En nettoyage.
+- أكمل التنظيف.
+- تحقق أنه يصبح Disponible.
+- تحقق من Audit وTimeline وNotification.
+
+اختبار 2:
+- حاول إنشاء Analyse باسم فارغ.
+- يجب رفضها برسالة واضحة.
+- حاول باسم مسافات فقط.
+- يجب رفضها.
+- أنشئ NFS صحيحة.
+- يجب قبولها.
+
+اختبار 3:
+- حاول إنشاء Imagerie بدون نوع فحص.
+- يجب رفضها.
+- حاول Interpréter بدون compte rendu.
+- يجب رفضها.
+
+اختبار 4:
+- شغّل Test Runner مرتين.
+- يجب أن تكون النتائج متطابقة.
+- لا يجب أن يزيد عدد السجلات من تشغيل إلى آخر.
+
+اختبار 5:
+- شغّل Workflows بترتيب مختلف.
+- يجب أن تحصل على نفس النتائج.
+
+بعد التنفيذ:
+
+- شغّل جميع Integration Tests.
+- اعرض عدد الناجحة والفاشلة والمتجاهلة.
+- اعرض تفاصيل أي فشل.
+- تأكد من صفر أخطاء TypeScript وConsole.
+- لا تبدأ PostgreSQL.

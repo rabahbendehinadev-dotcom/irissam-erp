@@ -19,6 +19,9 @@ import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { useAdmissions } from '@/store/AdmissionsContext';
+import { useMockRepository } from '@/store/MockRepository';
+import { useAuth } from '@/store/AuthContext';
+import type { AuditCtx } from '@/types/repository';
 import { formatDate } from '@/utils/format';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
 
@@ -199,6 +202,15 @@ export default function AdmissionsPage() {
   const { log } = useAuditLog();
   const [, navigate] = useLocation();
   const { admissions, discharge, transfer, cancel } = useAdmissions();
+  const repo = useMockRepository();
+  const { user } = useAuth();
+
+  /** AuditCtx forwarded to bed-lifecycle mutations */
+  const repoCtx: AuditCtx = {
+    userId:   user?.id ?? 'admissions-page',
+    userName: user ? `${user.firstName} ${user.lastName}` : 'Admissions',
+    userRole: user?.role ?? 'admin',
+  };
 
   const [filters, setFilters] = useState<AdmissionFiltersState>(DEFAULT_ADM_FILTERS);
   const [page, setPage]       = useState(1);
@@ -368,6 +380,10 @@ export default function AdmissionsPage() {
           onConfirm={(type, date, time, notes) => {
             discharge(discharging.id, type, date, time, notes);
             log('archive', 'admission', discharging.id, `Sortie ${type}`);
+            // Task #63 — free bed via cleaning cycle on discharge
+            if (discharging.bedId) {
+              repo.startBedCleaning(discharging.bedId, repoCtx);
+            }
             setDischarging(null);
           }}
           onCancel={() => setDischarging(null)}
@@ -380,6 +396,10 @@ export default function AdmissionsPage() {
           onConfirm={(to, date, notes) => {
             transfer(transferring.id, to, date, notes);
             log('update', 'admission', transferring.id, `Transfert → ${to}`);
+            // Task #63 — free bed via cleaning cycle on transfer
+            if (transferring.bedId) {
+              repo.startBedCleaning(transferring.bedId, repoCtx);
+            }
             setTransferring(null);
           }}
           onCancel={() => setTransferring(null)}
@@ -404,6 +424,10 @@ export default function AdmissionsPage() {
               <button onClick={() => {
                 cancel(cancelling.id);
                 log('archive', 'admission', cancelling.id);
+                // Task #63 — skip cleaning on cancel; free bed immediately
+                if (cancelling.bedId) {
+                  repo.freeBed(cancelling.bedId, repoCtx);
+                }
                 setCancelling(null);
               }}
                 className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">
