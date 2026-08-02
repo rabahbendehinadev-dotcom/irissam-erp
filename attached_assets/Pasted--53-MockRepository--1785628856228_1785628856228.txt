@@ -1,0 +1,288 @@
+نفّذ الآن المهمة رقم #53 فقط:
+
+أريد ربط بيانات الإشغال الحقيقية الموجودة في MockRepository مع جميع الواجهات المعنية، بدون إنشاء صفحات جديدة وبدون تغيير التصميم الحالي.
+
+مهم جدًا:
+- لا تبدأ PostgreSQL الآن.
+- لا تغيّر Architecture الحالية.
+- لا تضف بيانات Mock محلية جديدة داخل الصفحات.
+- كل البيانات تقرأ وتُحدّث من الـRepository الموحد.
+- أي تغيير يظهر فورًا بدون Refresh.
+
+==================================================
+1. نموذج الإشغال الموحد
+==================================================
+
+حضّر أو أكمل أنواع البيانات التالية داخل الـRepository:
+
+- Site
+- Building
+- Floor
+- Department
+- Room
+- Bed
+- EmergencyRoom
+- OperatingRoom
+- ICUBed
+- ObservationBed
+- DoctorAssignment
+- NurseAssignment
+- AmbulanceAssignment
+
+كل سرير أو غرفة يحتوي على:
+
+- id
+- siteId
+- buildingId
+- floorId
+- departmentId
+- roomId
+- type
+- status
+- patientId اختياري
+- encounterId اختياري
+- admissionId اختياري
+- assignedDoctorId اختياري
+- assignedNurseId اختياري
+- occupiedAt اختياري
+- expectedReleaseAt اختياري
+- cleaningStatus
+- maintenanceStatus
+- updatedAt
+
+الحالات الممكنة:
+
+- Disponible
+- Occupé
+- Réservé
+- En nettoyage
+- Hors service
+- Maintenance
+
+==================================================
+2. Dashboard Urgences
+==================================================
+
+اربط قسم État des salles بالـRepository الحقيقي.
+
+عند:
+
+- Prendre en charge
+- Affecter une salle
+- Transférer
+- Hospitaliser
+- Sortir
+- Décès
+
+يجب أن تتغير مباشرة:
+
+- حالة الغرفة.
+- عدد الأماكن الحرة.
+- نسبة الإشغال.
+- عدد المرضى في الانتظار.
+- عدد المرضى في soins actifs.
+- عدد المرضى في observation.
+- Charge médecin.
+- Charge infirmier.
+
+لا تستعمل أرقامًا ثابتة داخل الصفحة.
+
+==================================================
+3. Admissions
+==================================================
+
+عند إنشاء Admission:
+
+- اعرض فقط الأسرة المتاحة.
+- امنع اختيار سرير Occupé أو Hors service أو Maintenance.
+- عند تأكيد Admission يصبح السرير Occupé.
+- اربط السرير بـPatient وEncounter وAdmission.
+- عند Transfert حرر السرير القديم واحجز الجديد في عملية واحدة.
+- عند Sortie يتحول السرير إلى En nettoyage.
+- بعد تأكيد انتهاء التنظيف يصبح Disponible.
+
+==================================================
+4. Hospitalisation
+==================================================
+
+اربط بطاقات:
+
+- Total lits
+- Occupés
+- Disponibles
+- En nettoyage
+- Hors service
+- Taux d’occupation
+
+بالـRepository الحقيقي.
+
+أضف عرضًا حسب:
+
+- Site
+- Building
+- Floor
+- Department
+- Room type
+
+أي تغيير في Admissions أو Urgences يجب أن يظهر فورًا داخل Hospitalisation.
+
+==================================================
+5. Réanimation
+==================================================
+
+اربط أسرة الإنعاش بالـRepository.
+
+عند اختيار Décision = Réanimation:
+
+- تحقق من وجود سرير ICU متاح.
+- إذا لا يوجد سرير، امنع التأكيد واعرض رسالة واضحة.
+- إذا يوجد سرير، احجزه ثم أنشئ ICUAdmission.
+- اربط Patient وEncounter وEmergencyVisit.
+- حدّث Dashboard Urgences وRéanimation مباشرة.
+
+==================================================
+6. Bloc opératoire
+==================================================
+
+اربط غرف العمليات بالـRepository.
+
+الحالات:
+
+- Libre
+- Réservée
+- En préparation
+- En intervention
+- En nettoyage
+- Hors service
+
+عند إنشاء SurgicalRequest لا تعتبر الغرفة محجوزة تلقائيًا إلا بعد اختيار موعد وغرفة.
+
+امنع حجز نفس الغرفة في نفس التوقيت.
+
+==================================================
+7. Personnel
+==================================================
+
+اربط Charge de travail للأطباء والممرضين بالـRepository.
+
+لكل مستخدم اعرض:
+
+- عدد المرضى الحاليين.
+- الحد الأقصى المسموح.
+- الحالة:
+  - Disponible
+  - Occupé
+  - Surchargé
+  - Hors service
+- القسم الحالي.
+- بداية المناوبة.
+- نهاية المناوبة.
+
+عند Assign أو Unassign لمريض تتغير الحمولة فورًا.
+
+==================================================
+8. Ambulances
+==================================================
+
+اربط حالات سيارات الإسعاف:
+
+- Disponible
+- En route
+- Sur place
+- Transport patient
+- Maintenance
+- Hors service
+
+عند إرسال Ambulance:
+
+- تصبح En route.
+- تربط بالمريض وEmergencyVisit.
+- تحسب ETA Mock.
+- عند الوصول تصبح Sur place.
+- عند نقل المريض تصبح Transport patient.
+- بعد العودة تصبح Disponible.
+
+حدّث الخريطة والعدادات مباشرة.
+
+==================================================
+9. Validation Engine
+==================================================
+
+أضف Validation تمنع:
+
+- تخصيص سرير مشغول.
+- تخصيص غرفة في Maintenance.
+- تخصيص طبيب تجاوز الحد الأقصى.
+- تخصيص ممرض تجاوز الحد الأقصى.
+- إدخال مريض إلى ICU بدون سرير.
+- إرسال Ambulance غير متاحة.
+- حجز غرفة عمليات في وقت متعارض.
+
+كل Validation ترجع رسالة مفهومة للمستخدم.
+
+==================================================
+10. Audit وNotifications
+==================================================
+
+سجل داخل Audit:
+
+- Bed assigned
+- Bed released
+- Room assigned
+- Room released
+- Transfer
+- Cleaning started
+- Cleaning completed
+- Staff assigned
+- Staff unassigned
+- Ambulance dispatched
+- Ambulance arrived
+- Operating room reserved
+
+أرسل Notifications للأقسام المعنية عند:
+
+- سرير أصبح متاحًا.
+- ICU امتلأت.
+- غرفة عمليات أصبحت جاهزة.
+- سيارة إسعاف وصلت.
+- قسم تجاوز 90% إشغال.
+
+==================================================
+11. الفلاتر Multi-site
+==================================================
+
+يجب أن تتأثر كل الإحصائيات باختيارات:
+
+- Site
+- Building
+- Floor
+- Department
+
+لكن لا تغيّر البيانات خارج الفلتر، فقط طريقة العرض.
+
+==================================================
+12. معايير القبول
+==================================================
+
+لا تعتبر المهمة مكتملة إلا إذا نجح السيناريو التالي:
+
+1. مريض في Urgences يضغط عليه Hospitaliser.
+2. يختار سريرًا متاحًا.
+3. السرير يتحول Occupé.
+4. Urgences تنقص مريضًا.
+5. Hospitalisation تزيد مريضًا.
+6. Admissions يظهر السجل.
+7. Charge الطبيب والممرض تتحدث.
+8. عند Sortie يصبح السرير En nettoyage.
+9. بعد إنهاء التنظيف يصبح Disponible.
+10. كل الخطوات تظهر في Audit وTimeline وNotifications.
+
+اختبر أيضًا:
+
+- Réanimation بدون سرير.
+- سرير مشغول.
+- غرفة عمليات متعارضة.
+- Ambulance غير متاحة.
+- موظف Surchargé.
+
+لا تبدأ المهمة #54 ولا PostgreSQL حتى تعرض لي نتائج الاختبارات كاملة.
