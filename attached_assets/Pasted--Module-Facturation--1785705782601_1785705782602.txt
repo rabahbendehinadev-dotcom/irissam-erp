@@ -1,0 +1,503 @@
+الآن نبدأو **Module Facturation**، بصح ما نخلطوش فيه كلش دفعة وحدة.
+
+المرحلة الأولى تكون غير **الأساس المالي**:
+
+* Factures
+* Lignes de facture
+* Paiements
+* Reste à payer
+* Assurance
+* Tiers payant
+* Reçus
+* Audit
+
+انسخ هذا البرومبت وابعثه لـ Replit:
+
+```text
+ابدأ الآن تطوير Module Facturation داخل IRISSAM HOSPITAL ERP.
+
+مهم جدًا:
+- لا تغيّر التصميم الحالي.
+- لا تغيّر الـSidebar أو الـTopbar.
+- لا تضف Modules أخرى.
+- استعمل نفس Design System.
+- استعمل PostgreSQL الحقيقي والـAPI الحقيقي.
+- لا تستعمل MockRepository.
+- دعم كامل للفرنسية والعربية RTL والإنجليزية.
+- طبّق Authentication وRBAC وAudit على جميع العمليات.
+
+==================================================
+1. الهدف
+==================================================
+
+إنشاء نظام فوترة طبي مترابط مع:
+
+- Patient
+- Encounter
+- Consultation
+- Urgences
+- Admission
+- Hospitalisation
+- Laboratoire
+- Imagerie
+- Pharmacie
+- Bloc opératoire
+- Réanimation
+
+كل Facture يجب أن ترتبط على الأقل بـ:
+
+- patientId
+- encounterId
+- siteId
+- issuedBy
+- invoiceNumber
+- status
+- totalAmount
+- paidAmount
+- remainingAmount
+
+==================================================
+2. الجداول وقاعدة البيانات
+==================================================
+
+راجع الجداول الحالية وأكملها بدون تكرار:
+
+invoices
+invoice_items
+payments
+insurance_claims
+insurance_policies
+payment_allocations
+credit_notes
+receipts
+
+Invoice:
+
+- id UUID
+- invoiceNumber unique
+- patientId
+- encounterId
+- admissionId اختياري
+- consultationId اختياري
+- siteId
+- invoiceDate
+- dueDate
+- status
+- subtotal
+- discountAmount
+- taxAmount
+- totalAmount
+- patientShare
+- insurerShare
+- paidAmount
+- remainingAmount
+- currency = DZD
+- notes
+- createdBy
+- updatedBy
+- createdAt
+- updatedAt
+- deletedAt
+- version
+
+Statuses:
+
+- draft
+- issued
+- partially_paid
+- paid
+- overdue
+- cancelled
+- refunded
+
+Invoice Item:
+
+- id
+- invoiceId
+- sourceModule
+- sourceEntityId
+- serviceCode
+- description
+- quantity
+- unitPrice
+- discount
+- tax
+- total
+- performedAt
+- performedBy
+
+==================================================
+3. صفحة Facturation الرئيسية
+==================================================
+
+أنشئ صفحة باسم:
+
+Facturation
+
+تحتوي على:
+
+- زر Nouvelle facture
+- بطاقات إحصائية:
+  - Chiffre d’affaires اليوم
+  - Chiffre d’affaires الشهر
+  - Factures impayées
+  - Paiements reçus
+  - Reste à recouvrer
+  - Dossiers assurance en attente
+- البحث
+- الفلاتر
+- جدول الفواتير
+
+الأعمدة:
+
+- N° Facture
+- Patient
+- MPI / MRN
+- Encounter
+- Date
+- Total
+- Part patient
+- Part assurance
+- Payé
+- Reste
+- Statut
+- Actions
+
+==================================================
+4. إنشاء Facture
+==================================================
+
+أنشئ Wizard:
+
+Step 1:
+- اختيار Patient
+- اختيار Encounter
+- إظهار Consultation / Admission / Urgence المرتبطة
+
+Step 2:
+- جلب الخدمات الطبية تلقائيًا:
+  - Consultation
+  - Analyses
+  - Imagerie
+  - Médicaments
+  - Hospitalisation
+  - Bloc opératoire
+  - Réanimation
+  - Consommables
+
+Step 3:
+- إضافة أو تعديل Invoice Items
+- الكمية
+- السعر
+- التخفيض
+- الضريبة
+- المجموع
+
+Step 4:
+- اختيار نوع التغطية:
+  - Paiement direct
+  - Assurance
+  - CNAS
+  - CASNOS
+  - Tiers payant
+  - Convention
+  - Gratuité autorisée
+
+Step 5:
+- حساب:
+  - Part patient
+  - Part organisme
+  - Total
+  - Reste à payer
+
+Step 6:
+- Résumé
+- Enregistrer brouillon
+- Émettre facture
+- Imprimer
+
+==================================================
+5. Payments
+==================================================
+
+أنشئ نظام Paiement يدعم:
+
+- Espèces
+- Carte bancaire
+- Virement
+- Chèque
+- Paiement mobile
+- Assurance
+- Tiers payant
+
+يدعم:
+
+- Paiement total
+- Paiement partiel
+- Plusieurs paiements لنفس الفاتورة
+- Allocation لكل دفعة على فاتورة واحدة أو عدة فواتير
+- Reçu تلقائي
+
+Payment fields:
+
+- paymentNumber
+- invoiceId
+- patientId
+- amount
+- method
+- reference
+- paidAt
+- collectedBy
+- notes
+- status
+
+==================================================
+6. Assurance وTiers payant
+==================================================
+
+أنشئ:
+
+- Insurance Policy
+- Organisme payeur
+- Numéro adhérent
+- Taux couverture
+- Plafond
+- Validité
+- Documents
+- Claim status
+
+Claim statuses:
+
+- draft
+- submitted
+- under_review
+- approved
+- partially_approved
+- rejected
+- paid
+
+كل Claim ترتبط بـ:
+
+- patient
+- invoice
+- insurer
+- amountRequested
+- amountApproved
+- amountPaid
+
+==================================================
+7. Credit Notes وAnnulation
+==================================================
+
+ممنوع حذف Facture مدفوعة.
+
+استعمل:
+
+- Cancel Invoice
+- Credit Note
+- Refund
+
+كل عملية تتطلب:
+
+- السبب
+- المستخدم
+- التاريخ
+- المبلغ
+- Permission خاصة
+- Audit كامل
+
+==================================================
+8. الربط التلقائي مع Modules
+==================================================
+
+عند اعتماد:
+
+- Consultation
+- Analyse
+- Imagerie
+- Prescription délivrée
+- Admission
+- Hospitalisation
+- Intervention
+- ICU stay
+
+أنشئ Billable Event مرتبط بنفس patientId وencounterId.
+
+لا تنشئ Facture تلقائيًا مباشرة.
+
+اعرض الأحداث القابلة للفوترة داخل Encounter.
+
+المحاسب يحدد ما يدخل في الفاتورة.
+
+==================================================
+9. الصلاحيات
+==================================================
+
+Permissions:
+
+- billing.view
+- billing.create
+- billing.update
+- billing.issue
+- billing.cancel
+- billing.print
+- billing.export
+- payments.view
+- payments.create
+- payments.refund
+- insurance.view
+- insurance.create_claim
+- insurance.approve_claim
+- insurance.reject_claim
+- credit_notes.create
+- financial_reports.view
+
+كل Endpoint محمي في Backend.
+
+==================================================
+10. Audit
+==================================================
+
+سجل:
+
+- إنشاء Facture
+- تعديل Facture
+- إصدار Facture
+- إضافة Paiement
+- تعديل Paiement
+- Annulation
+- Refund
+- Credit Note
+- Claim insurance
+- Print
+- Export
+- View sensitive financial data
+
+==================================================
+11. APIs
+==================================================
+
+أنشئ:
+
+GET /api/invoices
+GET /api/invoices/:id
+POST /api/invoices
+PATCH /api/invoices/:id
+POST /api/invoices/:id/issue
+POST /api/invoices/:id/cancel
+
+GET /api/payments
+POST /api/payments
+POST /api/payments/:id/refund
+
+GET /api/insurance/policies
+POST /api/insurance/claims
+PATCH /api/insurance/claims/:id/status
+
+GET /api/encounters/:id/billable-events
+
+==================================================
+12. Transactions
+==================================================
+
+استعمل Transaction في:
+
+- Issue invoice
+- Payment + allocation
+- Refund
+- Credit note
+- Insurance claim approval
+
+أي فشل = Rollback كامل.
+
+==================================================
+13. PDF وImpression
+==================================================
+
+حضّر:
+
+- Facture PDF
+- Reçu de paiement
+- Relevé patient
+- Bordereau assurance
+
+تحتوي على:
+
+- شعار المستشفى
+- رقم الفاتورة
+- Patient
+- MRN
+- Encounter
+- الخدمات
+- المبالغ
+- المدفوع
+- الباقي
+- طرق الدفع
+- التوقيع / Cachet Placeholder
+
+==================================================
+14. اختبارات القبول
+==================================================
+
+TEST A:
+Consultation + Lab + Imaging
+→ تظهر كـBillable Events
+
+TEST B:
+إنشاء Facture
+→ المجموع صحيح
+
+TEST C:
+Paiement جزئي
+→ status = partially_paid
+→ remainingAmount صحيح
+
+TEST D:
+Paiement كامل
+→ status = paid
+
+TEST E:
+Assurance تغطي 80%
+→ patientShare وinsurerShare صحيحين
+
+TEST F:
+إلغاء Facture مدفوعة
+→ مرفوض
+→ Credit Note مطلوبة
+
+TEST G:
+مستخدم بدون billing.issue
+→ 403
+
+TEST H:
+Audit يسجل كل العمليات
+
+TEST I:
+PDF Invoice وReceipt يعملان
+
+==================================================
+التقرير النهائي
+==================================================
+
+بعد الانتهاء أعطني:
+
+- الجداول الجديدة أو المعدلة.
+- Routes الجديدة.
+- Services وRepositories.
+- Permissions.
+- نتائج TEST A–I.
+- الملفات التي أنشأتها.
+- ما تم تأجيله.
+- صفر TypeScript Errors.
+- صفر Runtime SQL Errors.
+
+لا تبدأ RH أو BI أو أي Module آخر.
+```
+
+بعد ما يكمل **المرحلة الأولى من Facturation**، صوّرلي:
+
+* الصفحة الرئيسية Facturation.
+* نافذة Nouvelle facture.
+* صفحة تفاصيل Facture.
+* نافذة Paiement.
+* Assurance / Tiers payant.

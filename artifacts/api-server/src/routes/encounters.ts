@@ -7,6 +7,7 @@
  *  - Frontend to verify encounter continuity across modules
  */
 import { Router } from "express";
+import { pool } from "@workspace/db";
 import { encounterService } from "../services/encounter";
 import { repos } from "../repositories";
 import type { AuthenticatedRequest } from "../middleware/requireAuth";
@@ -198,6 +199,18 @@ router.get("/:encounterId/prescriptions", async (req, res, next) => {
       prescribedAt: p.prescribedAt?.toISOString() ?? null,
       dispensedAt: p.dispensedAt?.toISOString() ?? null,
     })));
+  } catch (err) { next(err); }
+});
+
+/** GET /encounters/:encounterId/billable-events */
+router.get("/:encounterId/billable-events", async (req, res, next) => {
+  try {
+    const { encounterId } = req.params;
+    const { rows } = await pool.query(
+      `SELECT * FROM billable_events WHERE encounter_id = $1 ORDER BY performed_at DESC`,
+      [encounterId],
+    );
+    res.json(rows);
   } catch (err) { next(err); }
 });
 

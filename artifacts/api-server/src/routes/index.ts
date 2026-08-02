@@ -23,6 +23,9 @@ import operatingRoomsRouter   from "./operating-rooms";
 import notificationsRouter    from "./notifications";
 import occupancyBedsRouter    from "./occupancy-beds";
 import emergencyRouter        from "./emergency";
+import invoicesRouter         from "./invoices";
+import paymentsRouter         from "./payments";
+import insuranceRouter        from "./insurance";
 import { requireAuth } from "../middleware/requireAuth";
 import { requirePermission } from "../middleware/requirePermission";
 
@@ -57,6 +60,10 @@ router.use("/surgical-requests",   requireAuth, surgicalRequestsRouter);
 router.use("/operating-rooms",     requireAuth, operatingRoomsRouter);
 // Emergency department
 router.use("/emergencies",         requireAuth, emergencyRouter);
+// Billing
+router.use("/invoices",            requireAuth, invoicesRouter);
+router.use("/payments",            requireAuth, paymentsRouter);
+router.use("/insurance",           requireAuth, insuranceRouter);
 // Notifications — stream does NOT require auth (SSE reconnects can't set headers)
 router.use("/notifications",       notificationsRouter);
 
