@@ -1,0 +1,63 @@
+قبل إعادة النشر، لا أريد الاكتفاء باختبار Migration 007 على قاعدة بيانات UUID؛ هذا الاختبار تخطى جميع مسارات التحويل.
+
+أنشئ قاعدة اختبار مطابقة لبنية Production القديمة، تحتوي فعليًا على SERIAL/INTEGER IDs وبيانات مترابطة، ثم نفّذ migrations 001→007 عليها.
+
+المطلوب:
+
+1. إنشاء نسخة اختبار Legacy Schema تحتوي على الأقل على:
+- encounters integer PK
+- admissions integer PK مع encounter_id integer
+- occupancy_beds integer PK وروابط patient/admission/encounter
+- consultations integer PK مع patient_id وencounter_id
+- lab_orders وimaging_orders وprescriptions
+- invoices وinvoice_items وpayments
+
+2. إضافة بيانات مترابطة حقيقية:
+- Patient
+- Encounter
+- Admission
+- Bed assignment
+- Consultation
+- Lab order
+- Imaging order
+- Prescription
+- Invoice + Items + Payment
+
+3. تشغيل 007_safe_uuid_migration.sql فعليًا، وليس Skipping.
+
+4. التحقق بعد التحويل أن:
+- جميع IDs الجديدة UUID صحيحة.
+- عدد الصفوف قبل وبعد متطابق لكل جدول.
+- encounter_id في Admission يشير إلى Encounter الصحيح.
+- consultation/lab/imaging/prescription ما زالت مرتبطة بنفس Patient وEncounter.
+- invoice_items وpayments ما زالت مرتبطة بنفس Invoice.
+- لا توجد Foreign Keys أصبحت NULL إلا إذا كانت NULL أصلًا قبل الترحيل.
+- لا توجد Orphan Records.
+- جميع Foreign Key constraints رجعت مفعلة.
+- جميع Unique constraints وIndexes موجودة.
+
+5. لا تقبل سياسة:
+“FK غير قابلة للربط → NULL”
+بشكل صامت.
+
+إذا فشل Mapping:
+- أوقف Migration بـ EXCEPTION.
+- اعمل ROLLBACK.
+- اعرض الجدول والسجل والـFK التي فشل ربطها.
+- لا تكمل ببيانات سريرية مقطوعة.
+
+6. نفّذ Migration كاملة داخل Transaction آمنة إن أمكن، أو مع Checkpoints موثقة وقابلة للاسترجاع.
+
+7. لا تحذف جداول *_int_legacy الآن.
+احتفظ بها إلى ما بعد نجاح النشر والتحقق اليدوي.
+
+8. أعطني تقرير مقارنة قبل/بعد:
+- Row count لكل جدول
+- عدد FKs mapped
+- عدد FKs failed
+- عدد NULL قبل وبعد
+- عدد orphan records
+- نتيجة جميع constraints
+- نتيجة تشغيل API Smoke Tests على قاعدة UUID الجديدة
+
+لا تعلن Migration جاهزة للنشر إلا إذا تم تنفيذ مسار integer→UUID فعليًا ونجحت جميع العلاقات دون فقد أو تحويل صامت إلى NULL.
