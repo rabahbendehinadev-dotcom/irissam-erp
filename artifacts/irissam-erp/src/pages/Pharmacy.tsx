@@ -24,6 +24,7 @@ import {
   Pill, Search, ChevronRight, X, Package,
   AlertTriangle, CheckCircle2, Clock, Truck,
   Plus, Pencil, Trash2, Loader2, ChevronLeft, ChevronRight as ChevronRightIcon,
+  Download,
 } from 'lucide-react';
 import type { RepoPrescription, AuditCtx } from '@/types/repository';
 import {
@@ -31,6 +32,7 @@ import {
   useCreateMedication,
   useUpdateMedication,
   useDeleteMedication,
+  getMedications,
   getGetMedicationsQueryKey,
   type MedicationItem,
   type CreateMedicationBody,
@@ -452,6 +454,52 @@ function StockTab() {
 
   const isMutating = createMut.isPending || updateMut.isPending;
 
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function handleExportCSV() {
+    setIsExporting(true);
+    try {
+      const result = await getMedications({
+        status: statusFilter as 'all' | 'ok' | 'low' | 'critical' | 'expired',
+        search: search || undefined,
+        page: 1,
+        pageSize: 10000,
+      });
+      const rows = result.data ?? [];
+
+      const STATUS_LABELS: Record<string, string> = {
+        ok: 'OK', low: 'Faible', critical: 'Critique', expired: 'Expiré',
+      };
+
+      const header = ['Médicament', 'Quantité', 'Unité', 'Seuil d\'alerte', 'Date d\'expiration', 'État'];
+      const csvLines = [
+        header.join(';'),
+        ...rows.map(m => [
+          `"${m.name.replace(/"/g, '""')}"`,
+          m.quantity,
+          `"${(m.unit ?? '').replace(/"/g, '""')}"`,
+          m.lowStockThreshold,
+          m.expiryDate ? new Date(m.expiryDate).toLocaleDateString('fr-FR') : '',
+          STATUS_LABELS[m.status] ?? m.status,
+        ].join(';')),
+      ];
+
+      const csv = '\uFEFF' + csvLines.join('\r\n'); // BOM for Excel UTF-8
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const filterLabel = statusFilter !== 'all' ? `_${statusFilter}` : '';
+      link.href = url;
+      link.download = `stock_pharmacie${filterLabel}_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silent — toast not critical for export
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   return (
     <div>
       {/* Action bar */}
@@ -485,14 +533,24 @@ function StockTab() {
           ))}
         </div>
 
-        {/* New medication button */}
-        <button
-          onClick={() => setFormTarget('new')}
-          className="ml-auto flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          Nouveau médicament
-        </button>
+        {/* Export CSV + New medication buttons */}
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleExportCSV}
+            disabled={isExporting}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Exporter CSV
+          </button>
+          <button
+            onClick={() => setFormTarget('new')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Nouveau médicament
+          </button>
+        </div>
       </div>
 
       {/* Summary bar */}
