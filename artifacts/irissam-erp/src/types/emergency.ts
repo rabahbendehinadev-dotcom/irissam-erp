@@ -17,7 +17,7 @@ export type EmergencyPatientStatus =
 
 export type RoomType = 'triage' | 'soins' | 'reanimation' | 'observation' | 'attente';
 export type RoomStatus = 'libre' | 'occupee' | 'partielle' | 'nettoyage';
-export type AmbulanceStatus = 'disponible' | 'vers_hopital' | 'vers_patient' | 'sur_place' | 'maintenance';
+export type AmbulanceStatus = 'disponible' | 'vers_hopital' | 'vers_patient' | 'sur_place' | 'maintenance' | 'en_route' | 'transport_patient' | 'hors_service';
 export type StaffStatus = 'actif' | 'pause' | 'intervention_urgente';
 
 export interface EmergencyVitals {

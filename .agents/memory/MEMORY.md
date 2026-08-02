@@ -3,3 +3,4 @@
 - [User type shape](user-type.md) — User has firstName/lastName (not name); no siteId guarantee; role from UserRole
 - [Mock Repository](mock-repository.md) — unified cross-module store in src/store/MockRepository.tsx; swap point for PostgreSQL
 - [FinalDecision field names](final-decision-fields.md) — ward/icuMotif/icuPriority/icuBed/icuTeamNotified (not service/reanimationMotif/priority/teamNotified)
+- [Occupancy Architecture](occupancy-arch.md) — Phase 6b: OccupancyBed/ICUBed/OperatingRoom in MockRepository; AdmissionsContext no longer owns beds; BedSelector reads useMockRepository().beds

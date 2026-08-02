@@ -2,23 +2,37 @@ import { useState, useMemo } from 'react';
 import { Bed, X, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/i18n';
-import { MOCK_BEDS, MOCK_ADM_BUILDINGS, MOCK_ADM_FLOORS, MOCK_ROOMS } from '@/mock';
-import type { Bed as BedType } from '@/types/admission';
+import { MOCK_ADM_BUILDINGS, MOCK_ADM_FLOORS, MOCK_ROOMS } from '@/mock';
+import { useMockRepository } from '@/store/MockRepository';
+import type { OccupancyBed } from '@/types/repository';
 
 const STATUS_STYLE: Record<string, { card: string; label: string }> = {
-  libre:       { card: 'border-green-300 bg-green-50 hover:border-green-500 hover:bg-green-100 cursor-pointer', label: 'text-green-700' },
-  occupe:      { card: 'border-red-300 bg-red-50 opacity-80 cursor-not-allowed', label: 'text-red-700' },
-  nettoyage:   { card: 'border-amber-300 bg-amber-50 opacity-80 cursor-not-allowed', label: 'text-amber-700' },
-  maintenance: { card: 'border-gray-300 bg-gray-50 opacity-60 cursor-not-allowed', label: 'text-gray-500' },
+  disponible:   { card: 'border-green-300 bg-green-50 hover:border-green-500 hover:bg-green-100 cursor-pointer',    label: 'text-green-700' },
+  occupe:       { card: 'border-red-300 bg-red-50 opacity-80 cursor-not-allowed',                                    label: 'text-red-700' },
+  reserve:      { card: 'border-purple-300 bg-purple-50 opacity-80 cursor-not-allowed',                              label: 'text-purple-700' },
+  nettoyage:    { card: 'border-amber-300 bg-amber-50 opacity-80 cursor-not-allowed',                                label: 'text-amber-700' },
+  maintenance:  { card: 'border-gray-300 bg-gray-50 opacity-60 cursor-not-allowed',                                  label: 'text-gray-500' },
+  hors_service: { card: 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed',                                 label: 'text-gray-400' },
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  disponible:   'Disponible',
+  occupe:       'Occupé',
+  reserve:      'Réservé',
+  nettoyage:    'Nettoyage',
+  maintenance:  'Maintenance',
+  hors_service: 'Hors service',
 };
 
 interface Props {
   selectedBedId?: string;
-  onSelect: (bed: BedType | null) => void;
+  onSelect: (bed: OccupancyBed | null) => void;
 }
 
 export function BedSelector({ selectedBedId, onSelect }: Props) {
   const { t } = useLanguage();
+  const { beds } = useMockRepository();
+
   const [buildingId, setBuildingId] = useState('');
   const [floorId, setFloorId] = useState('');
   const [roomId, setRoomId] = useState('');
@@ -32,12 +46,12 @@ export function BedSelector({ selectedBedId, onSelect }: Props) {
     () => MOCK_ROOMS.filter(r => r.floorId === floorId),
     [floorId],
   );
-  const beds = useMemo(
-    () => MOCK_BEDS.filter(b => b.roomId === roomId),
-    [roomId],
+  const roomBeds = useMemo(
+    () => beds.filter(b => b.roomId === roomId),
+    [beds, roomId],
   );
 
-  const selectedBed = selectedBedId ? MOCK_BEDS.find(b => b.id === selectedBedId) : null;
+  const selectedBed = selectedBedId ? beds.find(b => b.id === selectedBedId) ?? null : null;
 
   const handleBuildingChange = (id: string) => { setBuildingId(id); setFloorId(''); setRoomId(''); onSelect(null); };
   const handleFloorChange    = (id: string) => { setFloorId(id);    setRoomId(''); onSelect(null); };
@@ -74,33 +88,33 @@ export function BedSelector({ selectedBedId, onSelect }: Props) {
         </div>
       </div>
 
-      {/* Légende */}
+      {/* Legend */}
       {roomId && (
-        <div className="flex gap-4 text-xs">
-          {(['libre', 'occupe', 'nettoyage', 'maintenance'] as const).map(s => (
+        <div className="flex flex-wrap gap-3 text-xs">
+          {(['disponible', 'occupe', 'nettoyage', 'maintenance'] as const).map(s => (
             <span key={s} className="flex items-center gap-1">
               <span className={cn('w-3 h-3 rounded border', {
-                'bg-green-100 border-green-400': s === 'libre',
-                'bg-red-100 border-red-400': s === 'occupe',
-                'bg-amber-100 border-amber-400': s === 'nettoyage',
-                'bg-gray-100 border-gray-400': s === 'maintenance',
+                'bg-green-100 border-green-400':  s === 'disponible',
+                'bg-red-100 border-red-400':      s === 'occupe',
+                'bg-amber-100 border-amber-400':  s === 'nettoyage',
+                'bg-gray-100 border-gray-400':    s === 'maintenance',
               })} />
-              {t(`adm.bed.${s}` as any)}
+              {STATUS_LABELS[s]}
             </span>
           ))}
         </div>
       )}
 
-      {/* Grille des lits */}
+      {/* Bed grid */}
       {roomId && (
-        beds.length === 0 ? (
+        roomBeds.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">Aucun lit dans cette chambre.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {beds.map(bed => {
+            {roomBeds.map(bed => {
               const isSelected = bed.id === selectedBedId;
-              const isDisabled = bed.status !== 'libre';
-              const styles = STATUS_STYLE[bed.status];
+              const isDisabled = bed.status !== 'disponible';
+              const styles     = STATUS_STYLE[bed.status] ?? STATUS_STYLE['hors_service'];
 
               return (
                 <div key={bed.id} className="relative">
@@ -122,7 +136,7 @@ export function BedSelector({ selectedBedId, onSelect }: Props) {
                       <span className="text-sm font-bold text-gray-800">{bed.number}</span>
                     </div>
                     <span className={`text-xs font-medium ${styles.label}`}>
-                      {t(`adm.bed.${bed.status}` as any)}
+                      {STATUS_LABELS[bed.status] ?? bed.status}
                     </span>
                     {bed.status === 'occupe' && bed.patientName && (
                       <p className="text-xs text-red-600 mt-0.5 truncate">{bed.patientName}</p>
@@ -152,7 +166,7 @@ export function BedSelector({ selectedBedId, onSelect }: Props) {
               <p className="text-xs text-blue-600">{selectedBed.buildingName} · {selectedBed.floorLabel} · Ch. {selectedBed.roomNumber}</p>
             </div>
           </div>
-          <button type="button" onClick={() => { onSelect(null); }} className="p-1 rounded-lg hover:bg-blue-100 text-blue-500">
+          <button type="button" onClick={() => onSelect(null)} className="p-1 rounded-lg hover:bg-blue-100 text-blue-500">
             <X size={14} />
           </button>
         </div>

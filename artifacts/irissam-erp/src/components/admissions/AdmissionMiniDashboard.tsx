@@ -1,6 +1,7 @@
 import { BedDouble, LogIn, LogOut, Users, TrendingUp, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import { useAdmissions } from '@/store/AdmissionsContext';
+import { useMockRepository } from '@/store/MockRepository';
 
 function StatCard({ icon, label, value, sub, color }: {
   icon: React.ReactNode; label: string; value: string | number; sub?: string; color: string;
@@ -21,8 +22,10 @@ function StatCard({ icon, label, value, sub, color }: {
 
 export function AdmissionMiniDashboard() {
   const { t } = useLanguage();
-  const { admissions, beds } = useAdmissions();
+  const { admissions } = useAdmissions();
+  const { getBedStats } = useMockRepository();
 
+  const bedStats = getBedStats();
   const today = new Date().toISOString().slice(0, 10);
 
   const todayAdmCount = admissions.filter(
@@ -34,11 +37,6 @@ export function AdmissionMiniDashboard() {
   ).length;
 
   const hospitalized = admissions.filter(a => a.status === 'active').length;
-
-  const freeBeds = beds.filter(b => b.status === 'libre').length;
-  const totalBeds = beds.length;
-  const occupied = beds.filter(b => b.status === 'occupe').length;
-  const occupancy = Math.round((occupied / totalBeds) * 100);
 
   const urgent = admissions.filter(
     a => a.status === 'active' && ['urgent', 'tres_urgent', 'vital'].includes(a.priority),
@@ -67,14 +65,14 @@ export function AdmissionMiniDashboard() {
       <StatCard
         icon={<BedDouble size={20} className="text-teal-600" />}
         label={t('adm.stats.free_beds')}
-        value={freeBeds}
-        sub={`/ ${totalBeds} lits`}
+        value={bedStats.disponible}
+        sub={`/ ${bedStats.total} lits`}
         color="bg-teal-50"
       />
       <StatCard
         icon={<TrendingUp size={20} className="text-purple-600" />}
         label={t('adm.stats.occupancy')}
-        value={`${occupancy}%`}
+        value={`${bedStats.occupancyRate}%`}
         color="bg-purple-50"
       />
       <StatCard

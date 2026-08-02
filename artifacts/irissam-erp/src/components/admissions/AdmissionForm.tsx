@@ -3,7 +3,8 @@ import { X, ChevronRight, ChevronLeft, Check, Loader2, Search, UserCheck, AlertC
 import { useLanguage } from '@/i18n';
 import { MOCK_PATIENTS, MOCK_SERVICES, MOCK_DOCTORS } from '@/mock';
 import type { Patient } from '@/types';
-import type { Admission, AdmissionType, AdmissionPriority, Bed } from '@/types/admission';
+import type { Admission, AdmissionType, AdmissionPriority } from '@/types/admission';
+import type { OccupancyBed } from '@/types/repository';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { PatientSummaryCard } from '@/components/patients/PatientSummaryCard';
 import { BedSelector } from './BedSelector';
@@ -52,8 +53,8 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
     admission ? MOCK_PATIENTS.find(p => p.id === admission.patientId) ?? null : null,
   );
 
-  // Step 3 state — bed
-  const [selectedBed, setSelectedBed] = useState<Bed | null>(null);
+  // Step 3 state — bed (OccupancyBed from MockRepository)
+  const [selectedBed, setSelectedBed] = useState<OccupancyBed | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
   const nowTime = new Date().toTimeString().slice(0, 5);

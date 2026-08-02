@@ -13,11 +13,14 @@ const AMB_POSITIONS: Record<string, { x: number; y: number }> = {
 };
 
 const STATUS_DOT: Record<Ambulance['status'], { fill: string; stroke: string; pulse: boolean; label: string }> = {
-  disponible:    { fill: '#22c55e', stroke: '#16a34a', pulse: false, label: 'Disponible' },
-  vers_hopital:  { fill: '#ef4444', stroke: '#dc2626', pulse: true,  label: 'En route →' },
-  vers_patient:  { fill: '#f59e0b', stroke: '#d97706', pulse: true,  label: '← Vers patient' },
-  sur_place:     { fill: '#f97316', stroke: '#ea580c', pulse: false, label: 'Sur place' },
-  maintenance:   { fill: '#6b7280', stroke: '#4b5563', pulse: false, label: 'Maintenance' },
+  disponible:        { fill: '#22c55e', stroke: '#16a34a', pulse: false, label: 'Disponible' },
+  en_route:          { fill: '#ef4444', stroke: '#dc2626', pulse: true,  label: 'En route' },
+  vers_hopital:      { fill: '#ef4444', stroke: '#dc2626', pulse: true,  label: 'En route →' },
+  vers_patient:      { fill: '#f59e0b', stroke: '#d97706', pulse: true,  label: '← Vers patient' },
+  sur_place:         { fill: '#f97316', stroke: '#ea580c', pulse: false, label: 'Sur place' },
+  transport_patient: { fill: '#f97316', stroke: '#ea580c', pulse: true,  label: 'Transport' },
+  maintenance:       { fill: '#6b7280', stroke: '#4b5563', pulse: false, label: 'Maintenance' },
+  hors_service:      { fill: '#9ca3af', stroke: '#6b7280', pulse: false, label: 'Hors service' },
 };
 
 // ETA countdown hook — decrements displayed ETA once per minute

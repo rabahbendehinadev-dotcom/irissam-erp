@@ -181,3 +181,98 @@ export interface AuditCtx {
   userName: string;
   userRole: string;
 }
+
+// ─── Occupancy — Ward Beds ────────────────────────────────────────────────────
+
+export type OccupancyBedStatus =
+  | 'disponible' | 'occupe' | 'reserve' | 'nettoyage' | 'hors_service' | 'maintenance';
+
+export interface OccupancyBed {
+  id: string;
+  number: string;
+  roomId: string;
+  roomNumber: string;
+  floorId: string;
+  floorLabel: string;
+  buildingId: string;
+  buildingName: string;
+  buildingCode: string;
+  siteId: string;
+  type: 'standard' | 'soins_intensifs' | 'isolement' | 'maternite' | 'pediatrie';
+  status: OccupancyBedStatus;
+  patientId?: string;
+  patientName?: string;
+  encounterId?: string;
+  admissionId?: string;
+  occupiedAt?: string;
+  expectedReleaseAt?: string;
+  cleaningStartedAt?: string;
+  updatedAt: string;
+}
+
+export interface BedFilterParams {
+  siteId?: string;
+  buildingId?: string;
+  floorId?: string;
+  type?: OccupancyBed['type'];
+}
+
+export interface BedStats {
+  total: number;
+  disponible: number;
+  occupe: number;
+  reserve: number;
+  nettoyage: number;
+  hors_service: number;
+  maintenance: number;
+  occupancyRate: number;
+}
+
+// ─── Occupancy — ICU Beds ─────────────────────────────────────────────────────
+
+export type ICUBedStatus = 'disponible' | 'occupe' | 'reserve' | 'nettoyage' | 'hors_service';
+
+export interface OccupancyICUBed {
+  id: string;
+  number: string;
+  unitName: string;
+  siteId: string;
+  type: 'icu' | 'hdu' | 'nicu';
+  status: ICUBedStatus;
+  patientId?: string;
+  patientName?: string;
+  encounterId?: string;
+  icuAdmissionId?: string;
+  priority?: string;
+  occupiedAt?: string;
+  expectedReleaseAt?: string;
+  updatedAt: string;
+}
+
+// ─── Occupancy — Operating Rooms ──────────────────────────────────────────────
+
+export interface OperatingRoomSlot {
+  id: string;
+  startAt: string;
+  endAt: string;
+  surgicalRequestId: string;
+  patientId: string;
+  patientName: string;
+  intervention: string;
+  surgeon: string;
+}
+
+export type OperatingRoomStatus =
+  | 'libre' | 'reserve' | 'en_preparation' | 'en_intervention' | 'nettoyage' | 'hors_service' | 'maintenance';
+
+export interface OperatingRoom {
+  id: string;
+  name: string;
+  shortName: string;
+  siteId: string;
+  specialty?: string;
+  status: OperatingRoomStatus;
+  slots: OperatingRoomSlot[];
+  currentSurgicalRequestId?: string;
+  updatedAt: string;
+}

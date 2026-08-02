@@ -173,3 +173,106 @@ export function validatePrescription(params: {
   }
   return ok();
 }
+
+// ─── Rule 10: Bed assignment — must be disponible ────────────────────────────
+
+export function validateBedAssignment(params: {
+  bedId?: string;
+  bedStatus?: string;
+}): ValidationResult {
+  if (!params.bedId?.trim()) {
+    return fail('Veuillez sélectionner un lit.', 'bedId');
+  }
+  if (params.bedStatus && params.bedStatus !== 'disponible') {
+    const labels: Record<string, string> = {
+      occupe:      'occupé',
+      reserve:     'réservé',
+      nettoyage:   'en cours de nettoyage',
+      hors_service:'hors service',
+      maintenance: 'en maintenance',
+    };
+    const label = labels[params.bedStatus] ?? params.bedStatus;
+    return fail(`Ce lit est ${label} et ne peut pas être assigné.`, 'bedId');
+  }
+  return ok();
+}
+
+// ─── Rule 11: ICU availability ───────────────────────────────────────────────
+
+export function validateICUAvailability(params: {
+  availableICUCount: number;
+}): ValidationResult {
+  if (params.availableICUCount <= 0) {
+    return fail(
+      "Aucun lit de réanimation disponible. Transfert vers un autre établissement requis.",
+      'icuBed',
+    );
+  }
+  return ok();
+}
+
+// ─── Rule 12: Operating room time-slot conflict ───────────────────────────────
+
+export function validateOperatingRoomSlot(params: {
+  roomId: string;
+  startAt: string;
+  endAt: string;
+  existingSlots: Array<{ startAt: string; endAt: string; surgicalRequestId: string }>;
+}): ValidationResult {
+  const start = new Date(params.startAt).getTime();
+  const end   = new Date(params.endAt).getTime();
+  if (end <= start) {
+    return fail("L'heure de fin doit être après l'heure de début.", 'endAt');
+  }
+  const conflict = params.existingSlots.find(s => {
+    const sStart = new Date(s.startAt).getTime();
+    const sEnd   = new Date(s.endAt).getTime();
+    return start < sEnd && end > sStart;
+  });
+  if (conflict) {
+    return fail(
+      "Cette salle est déjà réservée sur ce créneau. Choisissez un autre horaire ou une autre salle.",
+      'startAt',
+    );
+  }
+  return ok();
+}
+
+// ─── Rule 13: Ambulance dispatch — must be disponible ────────────────────────
+
+export function validateAmbulanceDispatch(params: {
+  ambulanceId?: string;
+  ambulanceStatus?: string;
+}): ValidationResult {
+  if (!params.ambulanceId?.trim()) {
+    return fail("Veuillez sélectionner une ambulance.", 'ambulanceId');
+  }
+  if (params.ambulanceStatus && params.ambulanceStatus !== 'disponible') {
+    return fail(
+      "Cette ambulance n'est pas disponible (statut : " + params.ambulanceStatus + ").",
+      'ambulanceId',
+    );
+  }
+  return ok();
+}
+
+// ─── Rule 14: Staff capacity ──────────────────────────────────────────────────
+
+export function validateStaffCapacity(params: {
+  staffId?: string;
+  currentPatients: number;
+  maxPatients: number;
+  staffName?: string;
+}): ValidationResult {
+  if (!params.staffId?.trim()) {
+    return fail("Veuillez sélectionner un membre du personnel.", 'staffId');
+  }
+  if (params.currentPatients >= params.maxPatients) {
+    const name = params.staffName ? `${params.staffName}` : 'Ce membre du personnel';
+    return fail(
+      `${name} a atteint sa capacité maximale (${params.maxPatients} patients). Veuillez en choisir un autre.`,
+      'staffId',
+    );
+  }
+  return ok();
+}

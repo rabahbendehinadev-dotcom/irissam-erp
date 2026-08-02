@@ -17,6 +17,7 @@
 
 import { createContext, useContext, useState, useCallback } from 'react';
 import { MOCK_EMERGENCY_PATIENTS, MOCK_EMERGENCY_ROOMS, MOCK_EMERGENCY_AMBULANCES, MOCK_EMERGENCY_DOCTORS, MOCK_EMERGENCY_NURSES } from '@/mock/emergency';
+import { MOCK_OCCUPANCY_BEDS, MOCK_ICU_BEDS, MOCK_OPERATING_ROOMS } from '@/mock/occupancy';
 import { useNotifications } from './NotificationsContext';
 import { canTransition, canStartCare, TRANSITION_LABELS } from '@/engine/workflowEngine';
 import type { EmergencyPatient, EmergencyPatientStatus, EmergencyRoom, EmergencyDoctor, EmergencyNurse, Ambulance, AmbulanceStatus } from '@/types/emergency';
@@ -24,6 +25,8 @@ import type { Encounter, EncounterLinkedRecord } from '@/types/encounter';
 import type {
   RepoAuditEntry, RepoLabOrder, RepoImagingOrder, RepoPrescription,
   SurgicalRequest, ICUAdmission, AuditCtx, RepoModule,
+  OccupancyBed, OccupancyICUBed, OperatingRoom, OperatingRoomSlot,
+  BedFilterParams, BedStats, OperatingRoomStatus,
 } from '@/types/repository';
 
 // ─── Context Contract ─────────────────────────────────────────────────────────
@@ -47,7 +50,7 @@ export interface MockRepositoryContextType {
   surgicalRequests:     SurgicalRequest[];
   icuAdmissions:        ICUAdmission[];
 
-  // ── Phase 6 data: Real-time occupancy ─────────────────────────────────────
+  // ── Phase 6 data: Real-time occupancy — ER ────────────────────────────────
   rooms:                EmergencyRoom[];
   erDoctors:            EmergencyDoctor[];
   erNurses:             EmergencyNurse[];
@@ -55,6 +58,25 @@ export interface MockRepositoryContextType {
   assignPatientToRoom:  (roomId: string, patientId: string) => void;
   freePatientFromRoom:  (roomId: string, patientId: string) => void;
   updateAmbulanceStatus:(ambulanceId: string, status: AmbulanceStatus, patch?: Partial<Ambulance>) => void;
+
+  // ── Phase 6b: Hospital-wide occupancy — Ward beds / ICU / OR ─────────────
+  beds:                       OccupancyBed[];
+  icuBeds:                    OccupancyICUBed[];
+  operatingRooms:             OperatingRoom[];
+  getAvailableBeds:           (filter?: BedFilterParams) => OccupancyBed[];
+  getAvailableICUBeds:        () => OccupancyICUBed[];
+  getAvailableOperatingRooms: (startAt: string, endAt: string) => OperatingRoom[];
+  getBedStats:                (filter?: BedFilterParams) => BedStats;
+  getICUStats:                () => { total: number; disponible: number; occupe: number; reserve: number; occupancyRate: number };
+  assignBed:                  (bedId: string, params: { patientId: string; patientName: string; encounterId?: string; admissionId?: string; expectedReleaseAt?: string }, ctx: AuditCtx) => void;
+  freeBed:                    (bedId: string, ctx: AuditCtx) => void;
+  startBedCleaning:           (bedId: string, ctx: AuditCtx) => void;
+  completeBedCleaning:        (bedId: string, ctx: AuditCtx) => void;
+  reserveICUBed:              (bedId: string, params: { patientId: string; patientName: string; encounterId?: string; icuAdmissionId?: string; priority?: string }, ctx: AuditCtx) => void;
+  freeICUBed:                 (bedId: string, ctx: AuditCtx) => void;
+  reserveOperatingRoom:       (roomId: string, slot: Omit<OperatingRoomSlot, 'id'>, ctx: AuditCtx) => boolean;
+  releaseOperatingRoom:       (roomId: string, surgicalRequestId: string, ctx: AuditCtx) => void;
+  updateOperatingRoomStatus:  (roomId: string, status: OperatingRoomStatus, ctx: AuditCtx) => void;
 
   // ── Phase 7 data: Audit ────────────────────────────────────────────────────
   globalAudit:          RepoAuditEntry[];
@@ -169,6 +191,11 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
   const [erDoctors,  setErDoctors]  = useState<EmergencyDoctor[]>(() => MOCK_EMERGENCY_DOCTORS.map(d => ({ ...d })));
   const [erNurses,   setErNurses]   = useState<EmergencyNurse[]>(() => MOCK_EMERGENCY_NURSES.map(n => ({ ...n })));
   const [ambulances, setAmbulances] = useState<Ambulance[]>(() => MOCK_EMERGENCY_AMBULANCES.map(a => ({ ...a })));
+
+  // ── Phase 6b: Hospital-wide occupancy ───────────────────────────────────
+  const [beds,           setBeds]           = useState<OccupancyBed[]>(() => MOCK_OCCUPANCY_BEDS.map(b => ({ ...b })));
+  const [icuBeds,        setICUBeds]        = useState<OccupancyICUBed[]>(() => MOCK_ICU_BEDS.map(b => ({ ...b })));
+  const [operatingRooms, setOperatingRooms] = useState<OperatingRoom[]>(() => MOCK_OPERATING_ROOMS.map(r => ({ ...r, slots: r.slots.map(s => ({ ...s })) })));
 
   // ── Phase 7: Global audit ────────────────────────────────────────────────
   const [globalAudit, setGlobalAudit] = useState<RepoAuditEntry[]>([]);
@@ -751,6 +778,273 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
     }, ...prev]);
   }, []);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // PHASE 6b: Hospital-wide occupancy mutations
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Fire a notification when ward occupancy crosses 90 %. */
+  const checkOccupancyThreshold = useCallback((nextBeds: OccupancyBed[]) => {
+    const total     = nextBeds.length;
+    const occupied  = nextBeds.filter(b => b.status === 'occupe' || b.status === 'reserve').length;
+    const rate      = total > 0 ? occupied / total : 0;
+    if (rate >= 0.9) {
+      addNotification({
+        title: 'Taux d\'occupation élevé',
+        body: `${Math.round(rate * 100)}% des lits sont occupés ou réservés.`,
+        type: 'warning',
+        link: '/hospitalization',
+      });
+    }
+  }, [addNotification]);
+
+  const assignBed = useCallback((
+    bedId: string,
+    params: { patientId: string; patientName: string; encounterId?: string; admissionId?: string; expectedReleaseAt?: string },
+    ctx: AuditCtx,
+  ) => {
+    const now = new Date().toISOString();
+    setBeds(prev => {
+      const next = prev.map(b =>
+        b.id !== bedId ? b : {
+          ...b, status: 'occupe' as const,
+          patientId: params.patientId,
+          patientName: params.patientName,
+          admissionId: params.admissionId,
+          encounterId: params.encounterId,
+          expectedReleaseAt: params.expectedReleaseAt,
+          occupiedAt: now,
+          updatedAt: now,
+        },
+      );
+      checkOccupancyThreshold(next);
+      return next;
+    });
+    const bed = beds.find(b => b.id === bedId);
+    audit('hospitalisation', `Lit assigné: ${bed?.number ?? bedId} → ${params.patientName}`, ctx, {
+      patientId: params.patientId, resourceId: bedId, resourceType: 'Bed',
+      oldValue: 'disponible', newValue: 'occupe',
+    });
+  }, [beds, checkOccupancyThreshold, audit]);
+
+  const freeBed = useCallback((bedId: string, ctx: AuditCtx) => {
+    const now = new Date().toISOString();
+    setBeds(prev => prev.map(b =>
+      b.id !== bedId ? b : {
+        ...b, status: 'disponible' as const,
+        patientId: undefined, patientName: undefined,
+        admissionId: undefined, encounterId: undefined,
+        occupiedAt: undefined, expectedReleaseAt: undefined,
+        updatedAt: now,
+      },
+    ));
+    const bed = beds.find(b => b.id === bedId);
+    audit('hospitalisation', `Lit libéré: ${bed?.number ?? bedId}`, ctx, {
+      resourceId: bedId, resourceType: 'Bed', oldValue: bed?.status ?? 'occupe', newValue: 'disponible',
+    });
+  }, [beds, audit]);
+
+  const startBedCleaning = useCallback((bedId: string, ctx: AuditCtx) => {
+    const now = new Date().toISOString();
+    setBeds(prev => prev.map(b =>
+      b.id !== bedId ? b : {
+        ...b, status: 'nettoyage' as const,
+        patientId: undefined, patientName: undefined,
+        admissionId: undefined, encounterId: undefined,
+        occupiedAt: undefined, cleaningStartedAt: now,
+        updatedAt: now,
+      },
+    ));
+    const bed = beds.find(b => b.id === bedId);
+    audit('hospitalisation', `Nettoyage démarré: ${bed?.number ?? bedId}`, ctx, {
+      resourceId: bedId, resourceType: 'Bed', oldValue: bed?.status, newValue: 'nettoyage',
+    });
+  }, [beds, audit]);
+
+  const completeBedCleaning = useCallback((bedId: string, ctx: AuditCtx) => {
+    const now = new Date().toISOString();
+    setBeds(prev => prev.map(b =>
+      b.id !== bedId ? b : {
+        ...b, status: 'disponible' as const,
+        cleaningStartedAt: undefined, updatedAt: now,
+      },
+    ));
+    const bed = beds.find(b => b.id === bedId);
+    audit('hospitalisation', `Nettoyage terminé: ${bed?.number ?? bedId}`, ctx, {
+      resourceId: bedId, resourceType: 'Bed', oldValue: 'nettoyage', newValue: 'disponible',
+    });
+    addNotification({
+      title: 'Lit disponible',
+      body: `Le lit ${bed?.number ?? bedId} est prêt à être assigné.`,
+      type: 'success', link: '/hospitalization',
+    });
+  }, [beds, audit, addNotification]);
+
+  // Selectors
+  const getAvailableBeds = useCallback((filter?: BedFilterParams): OccupancyBed[] => {
+    return beds.filter(b => {
+      if (b.status !== 'disponible') return false;
+      if (filter?.buildingId  && b.buildingId  !== filter.buildingId)  return false;
+      if (filter?.floorId     && b.floorId     !== filter.floorId)     return false;
+      if (filter?.type        && b.type        !== filter.type)        return false;
+      if (filter?.siteId      && b.siteId      !== filter.siteId)      return false;
+      return true;
+    });
+  }, [beds]);
+
+  const getBedStats = useCallback((filter?: BedFilterParams): BedStats => {
+    const filtered = filter
+      ? beds.filter(b => {
+          if (filter.buildingId && b.buildingId !== filter.buildingId) return false;
+          if (filter.floorId    && b.floorId    !== filter.floorId)    return false;
+          if (filter.type       && b.type       !== filter.type)       return false;
+          if (filter.siteId     && b.siteId     !== filter.siteId)     return false;
+          return true;
+        })
+      : beds;
+    const total      = filtered.length;
+    const disponible = filtered.filter(b => b.status === 'disponible').length;
+    const occupe     = filtered.filter(b => b.status === 'occupe').length;
+    const reserve    = filtered.filter(b => b.status === 'reserve').length;
+    const nettoyage  = filtered.filter(b => b.status === 'nettoyage').length;
+    const maintenance   = filtered.filter(b => b.status === 'maintenance').length;
+    const hors_service  = filtered.filter(b => b.status === 'hors_service').length;
+    return {
+      total, disponible, occupe, reserve, nettoyage, maintenance, hors_service,
+      occupancyRate: total > 0 ? Math.round(((occupe + reserve) / total) * 100) : 0,
+    };
+  }, [beds]);
+
+  // ── ICU ──────────────────────────────────────────────────────────────────
+
+  const reserveICUBed = useCallback((
+    bedId: string,
+    params: { patientId: string; patientName: string; encounterId?: string; icuAdmissionId?: string; priority?: string },
+    ctx: AuditCtx,
+  ) => {
+    const now = new Date().toISOString();
+    setICUBeds(prev => prev.map(b =>
+      b.id !== bedId ? b : {
+        ...b, status: 'occupe' as const,
+        patientId: params.patientId,
+        patientName: params.patientName,
+        encounterId: params.encounterId,
+        icuAdmissionId: params.icuAdmissionId,
+        priority: params.priority as OccupancyICUBed['priority'],
+        occupiedAt: now, updatedAt: now,
+      },
+    ));
+    const bed = icuBeds.find(b => b.id === bedId);
+    audit('reanimation', `Lit REA assigné: ${bed?.number ?? bedId} → ${params.patientName}`, ctx, {
+      patientId: params.patientId, resourceId: bedId, resourceType: 'ICUBed',
+      oldValue: 'disponible', newValue: 'occupe',
+    });
+  }, [icuBeds, audit]);
+
+  const freeICUBed = useCallback((bedId: string, ctx: AuditCtx) => {
+    const now = new Date().toISOString();
+    const bed = icuBeds.find(b => b.id === bedId);
+    setICUBeds(prev => prev.map(b =>
+      b.id !== bedId ? b : {
+        ...b, status: 'disponible' as const,
+        patientId: undefined, patientName: undefined,
+        encounterId: undefined, icuAdmissionId: undefined,
+        occupiedAt: undefined, updatedAt: now,
+      },
+    ));
+    audit('reanimation', `Lit REA libéré: ${bed?.number ?? bedId}`, ctx, {
+      resourceId: bedId, resourceType: 'ICUBed', oldValue: bed?.status, newValue: 'disponible',
+    });
+  }, [icuBeds, audit]);
+
+  const getAvailableICUBeds = useCallback((): OccupancyICUBed[] => {
+    return icuBeds.filter(b => b.status === 'disponible');
+  }, [icuBeds]);
+
+  const getICUStats = useCallback(() => {
+    const total      = icuBeds.length;
+    const disponible = icuBeds.filter(b => b.status === 'disponible').length;
+    const occupe     = icuBeds.filter(b => b.status === 'occupe').length;
+    const reserve    = icuBeds.filter(b => b.status === 'reserve').length;
+    return {
+      total, disponible, occupe, reserve,
+      occupancyRate: total > 0 ? Math.round(((occupe + reserve) / total) * 100) : 0,
+    };
+  }, [icuBeds]);
+
+  // ── Operating Rooms ───────────────────────────────────────────────────────
+
+  const reserveOperatingRoom = useCallback((
+    roomId: string,
+    slotData: Omit<OperatingRoomSlot, 'id'>,
+    ctx: AuditCtx,
+  ): boolean => {
+    const room = operatingRooms.find(r => r.id === roomId);
+    if (!room) return false;
+    const slotStart = new Date(slotData.startAt).getTime();
+    const slotEnd   = new Date(slotData.endAt).getTime();
+    const conflict  = room.slots.some(s =>
+      slotStart < new Date(s.endAt).getTime() && slotEnd > new Date(s.startAt).getTime()
+    );
+    if (conflict) return false;
+
+    const slotId = genId('slot');
+    setOperatingRooms(prev => prev.map(r =>
+      r.id !== roomId ? r : {
+        ...r,
+        slots: [...r.slots, { ...slotData, id: slotId }],
+        updatedAt: new Date().toISOString(),
+      },
+    ));
+    audit('bloc', `Créneau réservé: ${room.name} — ${slotData.intervention ?? 'Intervention'}`, ctx, {
+      patientId: slotData.patientId, resourceId: roomId, resourceType: 'OperatingRoom',
+    });
+    return true;
+  }, [operatingRooms, audit]);
+
+  const releaseOperatingRoom = useCallback((roomId: string, surgicalRequestId: string, ctx: AuditCtx) => {
+    const room = operatingRooms.find(r => r.id === roomId);
+    setOperatingRooms(prev => prev.map(r =>
+      r.id !== roomId ? r : {
+        ...r,
+        slots: r.slots.filter(s => s.surgicalRequestId !== surgicalRequestId),
+        status: 'nettoyage' as const,
+        currentSurgicalRequestId: undefined,
+        updatedAt: new Date().toISOString(),
+      },
+    ));
+    audit('bloc', `Fin d'intervention: ${room?.name ?? roomId}`, ctx, {
+      resourceId: roomId, resourceType: 'OperatingRoom', newValue: 'nettoyage',
+    });
+  }, [operatingRooms, audit]);
+
+  const updateOperatingRoomStatus = useCallback((roomId: string, status: OperatingRoomStatus, ctx: AuditCtx) => {
+    const room = operatingRooms.find(r => r.id === roomId);
+    setOperatingRooms(prev => prev.map(r =>
+      r.id !== roomId ? r : { ...r, status, updatedAt: new Date().toISOString() },
+    ));
+    audit('bloc', `Salle ${room?.name ?? roomId}: ${status}`, ctx, {
+      resourceId: roomId, resourceType: 'OperatingRoom', oldValue: room?.status, newValue: status,
+    });
+    if (status === 'libre') {
+      addNotification({
+        title: 'Salle opératoire disponible',
+        body: `${room?.name ?? roomId} est disponible pour une nouvelle intervention.`,
+        type: 'success', link: '/operating-room',
+      });
+    }
+  }, [operatingRooms, audit, addNotification]);
+
+  const getAvailableOperatingRooms = useCallback((startAt: string, endAt: string): OperatingRoom[] => {
+    const start = new Date(startAt).getTime();
+    const end   = new Date(endAt).getTime();
+    return operatingRooms.filter(r => {
+      if (r.status === 'hors_service' || r.status === 'maintenance') return false;
+      return !r.slots.some(s =>
+        start < new Date(s.endAt).getTime() && end > new Date(s.startAt).getTime()
+      );
+    });
+  }, [operatingRooms]);
+
   return (
     <MockRepositoryContext.Provider value={{
       // Encounters
@@ -758,9 +1052,16 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
       createEncounter, closeEncounter, linkRecordToEncounter,
       // Clinical data
       patients, labOrders, imagingOrders, prescriptions, surgicalRequests, icuAdmissions,
-      // Occupancy
+      // ER Occupancy
       rooms, erDoctors, erNurses, ambulances,
       assignPatientToRoom, freePatientFromRoom, updateAmbulanceStatus,
+      // Hospital-wide occupancy (Phase 6b)
+      beds, icuBeds, operatingRooms,
+      getAvailableBeds, getAvailableICUBeds, getAvailableOperatingRooms,
+      getBedStats, getICUStats,
+      assignBed, freeBed, startBedCleaning, completeBedCleaning,
+      reserveICUBed, freeICUBed,
+      reserveOperatingRoom, releaseOperatingRoom, updateOperatingRoomStatus,
       // Audit
       globalAudit, addGlobalAudit,
       // Queries

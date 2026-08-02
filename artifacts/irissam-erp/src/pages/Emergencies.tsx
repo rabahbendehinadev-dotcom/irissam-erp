@@ -16,13 +16,7 @@ import { EmergencyAlertStrip } from '@/components/emergencies/EmergencyAlertStri
 import { EmergencyKPIs } from '@/components/emergencies/EmergencyKPIs';
 import { EmergencyAmbulanceMap } from '@/components/emergencies/EmergencyAmbulanceMap';
 import { EmergencyNotifications } from '@/components/emergencies/EmergencyNotifications';
-import {
-  MOCK_EMERGENCY_PATIENTS,
-  MOCK_EMERGENCY_ROOMS,
-  MOCK_EMERGENCY_AMBULANCES,
-  MOCK_EMERGENCY_DOCTORS,
-  MOCK_EMERGENCY_NURSES,
-} from '@/mock';
+import { MOCK_EMERGENCY_PATIENTS } from '@/mock';
 import type {
   EmergencyPatient, EmergencyPatientStatus,
   EmergencyRoom, Ambulance, EmergencyDoctor, EmergencyNurse,
@@ -893,11 +887,7 @@ export default function EmergenciesPage() {
   const [, setLocation] = useLocation();
   const { isDark, toggle: toggleDark } = useDarkMode();
 
-  const { patients } = useMockRepository();
-  const rooms      = MOCK_EMERGENCY_ROOMS;
-  const ambulances = MOCK_EMERGENCY_AMBULANCES;
-  const doctors    = MOCK_EMERGENCY_DOCTORS;
-  const nurses     = MOCK_EMERGENCY_NURSES;
+  const { patients, rooms, ambulances, erDoctors: doctors, erNurses: nurses } = useMockRepository();
 
   const active = patients.filter(p => !['sorti', 'transfere', 'decede'].includes(p.status));
 

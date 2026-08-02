@@ -1,16 +1,16 @@
 /**
- * AdmissionsContext — mutable in-memory state for admissions + beds.
- * All writes go through the provided actions so the whole app stays in sync.
+ * AdmissionsContext — mutable in-memory state for admissions.
+ * Bed state has moved to MockRepository (Phase 6b).
+ * Pages that need bed operations call useMockRepository() directly.
  */
 import { createContext, useContext, useState, useCallback } from 'react';
-import { MOCK_ADMISSIONS, MOCK_BEDS } from '@/mock';
-import type { Admission, Bed, DischargeType } from '@/types/admission';
+import { MOCK_ADMISSIONS } from '@/mock';
+import type { Admission, DischargeType } from '@/types/admission';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface AdmissionsState {
   admissions: Admission[];
-  beds: Bed[];
   discharge: (
     admissionId: string,
     dischargeType: string,
@@ -39,19 +39,6 @@ export function AdmissionsProvider({ children }: { children: React.ReactNode }) 
   const [admissions, setAdmissions] = useState<Admission[]>(() =>
     MOCK_ADMISSIONS.map(a => ({ ...a })),
   );
-  const [beds, setBeds] = useState<Bed[]>(() => MOCK_BEDS.map(b => ({ ...b })));
-
-  /** Free the bed associated with an admission (set to 'libre', clear patient info). */
-  const freeBed = useCallback((bedId: string | undefined) => {
-    if (!bedId) return;
-    setBeds(prev =>
-      prev.map(b =>
-        b.id === bedId
-          ? { ...b, status: 'libre' as const, patientId: undefined, patientName: undefined, admissionId: undefined }
-          : b,
-      ),
-    );
-  }, []);
 
   const discharge = useCallback(
     (admissionId: string, dischargeType: string, date: string, time: string, notes: string) => {
@@ -69,11 +56,9 @@ export function AdmissionsProvider({ children }: { children: React.ReactNode }) 
           };
         }),
       );
-      // Libérer le lit
-      const adm = admissions.find(a => a.id === admissionId);
-      freeBed(adm?.bedId);
+      // Bed release is handled by the calling page via repo.startBedCleaning()
     },
-    [admissions, freeBed],
+    [],
   );
 
   const transfer = useCallback(
@@ -92,10 +77,9 @@ export function AdmissionsProvider({ children }: { children: React.ReactNode }) 
           };
         }),
       );
-      const adm = admissions.find(a => a.id === admissionId);
-      freeBed(adm?.bedId);
+      // Bed release is handled by the calling page via repo.startBedCleaning()
     },
-    [admissions, freeBed],
+    [],
   );
 
   const cancel = useCallback(
@@ -110,10 +94,9 @@ export function AdmissionsProvider({ children }: { children: React.ReactNode }) 
           };
         }),
       );
-      const adm = admissions.find(a => a.id === admissionId);
-      freeBed(adm?.bedId);
+      // Bed release is handled by the calling page via repo.freeBed()
     },
-    [admissions, freeBed],
+    [],
   );
 
   const addAdmission = useCallback((admission: Admission) => {
@@ -126,7 +109,7 @@ export function AdmissionsProvider({ children }: { children: React.ReactNode }) 
 
   return (
     <AdmissionsContext.Provider
-      value={{ admissions, beds, discharge, transfer, cancel, addAdmission, updateAdmission }}
+      value={{ admissions, discharge, transfer, cancel, addAdmission, updateAdmission }}
     >
       {children}
     </AdmissionsContext.Provider>

@@ -22,6 +22,11 @@ const LaboratoryPage = lazy(() => import('@/pages/Laboratory'));
 const ImagingPage = lazy(() => import('@/pages/Imaging'));
 const EmergenciesPage = lazy(() => import('@/pages/Emergencies'));
 const EmergencyPatientDetail = lazy(() => import('@/pages/EmergencyPatientDetail'));
+const HospitalizationPage = lazy(() => import('@/pages/Hospitalization'));
+const ResuscitationPage = lazy(() => import('@/pages/Resuscitation'));
+const OperatingRoomPage = lazy(() => import('@/pages/OperatingRoom'));
+const PersonnelPage = lazy(() => import('@/pages/Personnel'));
+const AmbulancesPage = lazy(() => import('@/pages/Ambulances'));
 
 // ---------------------------------------------------------------------------
 // Loading skeleton shown while a lazy chunk is fetching
@@ -119,9 +124,9 @@ function Router() {
       <Route path="/alerts" component={() => <ProtectedRoute component={AlertsPage} />} />
       <Route path="/emergencies/:id" component={() => <ProtectedRoute component={EmergencyPatientDetail} />} />
       <Route path="/emergencies" component={() => <ProtectedRoute component={EmergenciesPage} />} />
-      <Route path="/hospitalization" component={() => <ProtectedRoute component={PlaceholderPage} />} />
-      <Route path="/operating-room" component={() => <ProtectedRoute component={PlaceholderPage} />} />
-      <Route path="/resuscitation" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/hospitalization" component={() => <ProtectedRoute component={HospitalizationPage} />} />
+      <Route path="/operating-room" component={() => <ProtectedRoute component={OperatingRoomPage} />} />
+      <Route path="/resuscitation" component={() => <ProtectedRoute component={ResuscitationPage} />} />
       <Route path="/maternity" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/laboratory" component={() => <ProtectedRoute component={LaboratoryPage} />} />
       <Route path="/imaging" component={() => <ProtectedRoute component={ImagingPage} />} />
@@ -129,10 +134,10 @@ function Router() {
       <Route path="/blood-bank" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/medical-stock" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/biomedical" component={() => <ProtectedRoute component={PlaceholderPage} />} />
-      <Route path="/doctors" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/doctors" component={() => <ProtectedRoute component={PersonnelPage} />} />
       <Route path="/hr" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/finance" component={() => <ProtectedRoute component={PlaceholderPage} />} />
-      <Route path="/ambulances" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/ambulances" component={() => <ProtectedRoute component={AmbulancesPage} />} />
       <Route path="/archives" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/reports" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={PlaceholderPage} />} />
