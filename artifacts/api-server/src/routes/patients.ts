@@ -148,6 +148,18 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+/** GET /patients/:id — fetch one patient by UUID */
+router.get("/:id", async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const row = await repos.patient.findById(id);
+    if (!row) { res.status(404).json({ message: "Patient not found" }); return; }
+    res.json(mapPatient(row));
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** POST /patients — create a new patient */
 router.post("/", async (req: AuthenticatedRequest, res, next) => {
   try {

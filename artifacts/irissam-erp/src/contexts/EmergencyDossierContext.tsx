@@ -6,6 +6,7 @@ import { useMockRepository } from '@/store/MockRepository';
 import { useAdmissions } from '@/store/AdmissionsContext';
 import { useToast } from '@/hooks/use-toast';
 import { getMockDossier } from '@/mock/emergencyDossier';
+import { apiClient } from '@/services/api/client';
 import {
   validateLabOrder, validateImagingOrder,
   validateHospitalization, validateBloc, validateICU,
@@ -86,6 +87,8 @@ export function EmergencyDossierProvider({
   const [dossier, setDossier] = useState<EmergencyDossier>(() => getMockDossier(patientId));
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  // Real encounter UUID from PostgreSQL — replaces synthetic `enc-${patientId}`
+  const [realEncounterId, setRealEncounterId] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -107,6 +110,34 @@ export function EmergencyDossierProvider({
     }, 2000);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [dossier]);
+
+  // ── Create a real DB encounter on mount (replaces synthetic enc-patientId) ─
+  useEffect(() => {
+    let cancelled = false;
+    async function initEncounter() {
+      try {
+        const enc = await apiClient.post<{ id: string; encounterNumber: string }>(
+          '/encounters',
+          {
+            patientId,
+            type: 'urgences',
+            sourceModule: 'urgences',
+            chiefComplaint: dossier.chiefComplaint || 'Urgence',
+          },
+        );
+        if (!cancelled) {
+          setRealEncounterId(enc.id);
+          setDossier(d => ({ ...d, encounterId: enc.id, encounterNumber: enc.encounterNumber }));
+        }
+      } catch (err) {
+        // Silently fall back — clinical work must not be blocked by encounter API failure
+        console.warn('[EmergencyDossier] encounter creation failed:', err);
+      }
+    }
+    void initEncounter();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientId]); // Only on mount — patientId is stable for the provider's lifetime
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const who = user ? `${user.firstName} ${user.lastName}` : 'Utilisateur';
@@ -226,7 +257,7 @@ export function EmergencyDossierProvider({
     // Cross-module: register in global repository so Lab module can see it
     const pt = repo.getPatient(patientId);
     repo.createLabOrder({
-      visitId: `visit-${patientId}`, encounterId: `enc-${patientId}`, patientId,
+      visitId: realEncounterId ?? `visit-${patientId}`, encounterId: realEncounterId ?? `enc-${patientId}`, patientId,
       patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
       test: r.test, category: r.category, urgency: r.urgency,
       requestedBy: who, requestedById: whoId,
@@ -264,7 +295,7 @@ export function EmergencyDossierProvider({
     // Cross-module: register in global repository so Radiology module can see it
     const pt = repo.getPatient(patientId);
     repo.createImagingOrder({
-      visitId: `visit-${patientId}`, encounterId: `enc-${patientId}`, patientId,
+      visitId: realEncounterId ?? `visit-${patientId}`, encounterId: realEncounterId ?? `enc-${patientId}`, patientId,
       patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
       exam: r.exam, region: r.region, side: r.side,
       urgency: r.urgency, withContrast: r.withContrast,
@@ -296,7 +327,7 @@ export function EmergencyDossierProvider({
     // Cross-module: register in global repository so patient history can see it
     const pt = repo.getPatient(patientId);
     repo.createPrescription({
-      visitId: `visit-${patientId}`, encounterId: `enc-${patientId}`, patientId,
+      visitId: realEncounterId ?? `visit-${patientId}`, encounterId: realEncounterId ?? `enc-${patientId}`, patientId,
       patientName: pt ? `${pt.lastName} ${pt.firstName}` : patientId,
       drug: p.drug, dosage: p.dosage, route: p.route,
       frequency: p.frequency, duration: p.duration,
@@ -421,7 +452,7 @@ export function EmergencyDossierProvider({
 
     const now = new Date().toISOString();
     const auditCtx = { userId: whoId, userName: who, userRole: whoRole };
-    const visitId = `visit-${patientId}`;
+    const visitId = realEncounterId ?? `visit-${patientId}`;
     const pt = repo.getPatient(patientId);
     const patientName = pt ? `${pt.lastName} ${pt.firstName}` : patientId;
 
@@ -437,7 +468,7 @@ export function EmergencyDossierProvider({
 
     // ── Cross-module actions based on decision ─────────────────────────────
     if (decision === 'domicile') {
-      repo.closeVisitDischarged(patientId, auditCtx);
+      repo.closeVisitDischarged(patientId, auditCtx, realEncounterId ?? undefined);
 
     } else if (decision === 'hospitalisation') {
       const admId = `adm-urg-${Date.now()}`;
@@ -464,7 +495,7 @@ export function EmergencyDossierProvider({
         updatedAt: now,
         createdById: whoId,
       });
-      repo.closeVisitHospitalized(patientId, admId, auditCtx);
+      repo.closeVisitHospitalized(patientId, admId, auditCtx, realEncounterId ?? undefined);
 
     } else if (decision === 'bloc') {
       const surgId = repo.createSurgicalRequest({
@@ -479,7 +510,7 @@ export function EmergencyDossierProvider({
         requestedBy: who,
         requestedById: whoId,
       });
-      repo.closeVisitBloc(patientId, surgId, auditCtx);
+      repo.closeVisitBloc(patientId, surgId, auditCtx, realEncounterId ?? undefined);
 
     } else if (decision === 'reanimation') {
       const icuId = repo.createICUAdmission({
@@ -492,13 +523,13 @@ export function EmergencyDossierProvider({
         requestedBy: who,
         requestedById: whoId,
       });
-      repo.closeVisitICU(patientId, icuId, auditCtx);
+      repo.closeVisitICU(patientId, icuId, auditCtx, realEncounterId ?? undefined);
 
     } else if (decision === 'transfert') {
-      repo.closeVisitTransferred(patientId, auditCtx, d.finalDecision.destEtablissement);
+      repo.closeVisitTransferred(patientId, auditCtx, d.finalDecision.destEtablissement, realEncounterId ?? undefined);
 
     } else if (decision === 'deces') {
-      repo.closeVisitDeceased(patientId, auditCtx, d.finalDecision.provisionalCause);
+      repo.closeVisitDeceased(patientId, auditCtx, d.finalDecision.provisionalCause, realEncounterId ?? undefined);
     }
 
     // Auto-transition dossier workflow

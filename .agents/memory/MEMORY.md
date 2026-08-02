@@ -7,3 +7,4 @@
 - [Clinical Schema](clinical-schema.md) — 36-table UUID schema + MRN/encounterNumber/attachments/user_activity_logs; migrations 001-003 in lib/db/migrations/
 - [DAL Layer](dal-layer.md) — Task #70+83 done: repositories + services + all 12 routes wired; 0 TS errors
 - [Task 84 DB Migration](task84-db-migration.md) — migration bugs, enum values, safeUuid(), audit_logs columns, seed fix, missing admissions route
+- [Encounter Unification](encounter-unification.md) — realEncounterId replaces enc-${patientId} in EmergencyDossierContext; encounter_type enum="urgence" not "urgences"; safeUuid in auditService

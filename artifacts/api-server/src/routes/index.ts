@@ -12,6 +12,8 @@ import vehiclesRouter from "./vehicles";
 import medicationsRouter from "./medications";
 import consultationsRouter from "./consultations";
 import admissionsRouter from "./admissions";
+import encountersRouter from "./encounters";
+import auditLogsRouter from "./audit-logs";
 import { requireAuth } from "../middleware/requireAuth";
 
 const router: IRouter = Router();
@@ -21,16 +23,18 @@ router.use(healthRouter);
 router.use("/auth", authRouter);
 
 // Protected routes — valid JWT required
-router.use("/dashboard", requireAuth, dashboardRouter);
-router.use("/patients", requireAuth, patientsRouter);
-router.use("/appointments", requireAuth, appointmentsRouter);
-router.use("/alerts", requireAuth, alertsRouter);
-router.use("/beds", requireAuth, bedsRouter);
-router.use("/or", requireAuth, orRouter);
-router.use("/blood-bank", requireAuth, bloodBankRouter);
-router.use("/vehicles", requireAuth, vehiclesRouter);
+router.use("/dashboard",   requireAuth, dashboardRouter);
+router.use("/patients",    requireAuth, patientsRouter);
+router.use("/appointments",requireAuth, appointmentsRouter);
+router.use("/alerts",      requireAuth, alertsRouter);
+router.use("/beds",        requireAuth, bedsRouter);
+router.use("/or",          requireAuth, orRouter);
+router.use("/blood-bank",  requireAuth, bloodBankRouter);
+router.use("/vehicles",    requireAuth, vehiclesRouter);
 router.use("/medications", requireAuth, medicationsRouter);
-router.use("/consultations", requireAuth, consultationsRouter);
-router.use("/admissions", requireAuth, admissionsRouter);
+router.use("/consultations",requireAuth, consultationsRouter);
+router.use("/admissions",  requireAuth, admissionsRouter);
+router.use("/encounters",  requireAuth, encountersRouter);
+router.use("/audit-logs",  requireAuth, auditLogsRouter);
 
 export default router;

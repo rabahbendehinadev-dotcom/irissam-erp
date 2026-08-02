@@ -129,12 +129,12 @@ export interface MockRepositoryContextType {
   updatePrescriptionStatus: (prescriptionId: string, status: RepoPrescription['status'], ctx: AuditCtx, meta?: { dispensedBy?: string; comment?: string }) => void;
 
   // ── Visit closure (Phase 6: frees occupancy; Phase 5: notifies modules) ──
-  closeVisitDischarged:   (patientId: string, ctx: AuditCtx) => void;
-  closeVisitHospitalized: (patientId: string, admissionId: string, ctx: AuditCtx) => void;
-  closeVisitBloc:         (patientId: string, surgicalRequestId: string, ctx: AuditCtx) => void;
-  closeVisitICU:          (patientId: string, icuAdmissionId: string, ctx: AuditCtx) => void;
-  closeVisitTransferred:  (patientId: string, ctx: AuditCtx, destEtablissement?: string) => void;
-  closeVisitDeceased:     (patientId: string, ctx: AuditCtx, provisionalCause?: string) => void;
+  closeVisitDischarged:   (patientId: string, ctx: AuditCtx, encounterId?: string) => void;
+  closeVisitHospitalized: (patientId: string, admissionId: string, ctx: AuditCtx, encounterId?: string) => void;
+  closeVisitBloc:         (patientId: string, surgicalRequestId: string, ctx: AuditCtx, encounterId?: string) => void;
+  closeVisitICU:          (patientId: string, icuAdmissionId: string, ctx: AuditCtx, encounterId?: string) => void;
+  closeVisitTransferred:  (patientId: string, ctx: AuditCtx, destEtablissement?: string, encounterId?: string) => void;
+  closeVisitDeceased:     (patientId: string, ctx: AuditCtx, provisionalCause?: string, encounterId?: string) => void;
 
   // ── Test / dev utilities ──────────────────────────────────────────────────
   /** Reset all in-memory state to the original mock seed data. Dev/test use only. */
@@ -719,21 +719,21 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
     freePatientFromNurse(patientId);
   }, [patients, freePatientFromRoom, freePatientFromDoctor, freePatientFromNurse]);
 
-  const closeVisitDischarged = useCallback((patientId: string, ctx: AuditCtx) => {
+  const closeVisitDischarged = useCallback((patientId: string, ctx: AuditCtx, encounterId?: string) => {
     patchPatient(patientId, { status: 'sorti' });
     freeOccupancy(patientId);
     syncEncounterWorkflow(patientId, 'sorti');
-    closeEncounter(`enc-${patientId}`, 'domicile', ctx);
+    closeEncounter(encounterId ?? `enc-${patientId}`, 'domicile', ctx);
     audit('urgences', 'Sortie vers domicile', ctx, {
-      patientId, encounterId: `enc-${patientId}`, oldValue: 'en_soins', newValue: 'sorti',
+      patientId, encounterId: encounterId ?? `enc-${patientId}`, oldValue: 'en_soins', newValue: 'sorti',
     });
   }, [patchPatient, freeOccupancy, syncEncounterWorkflow, closeEncounter, audit]);
 
-  const closeVisitHospitalized = useCallback((patientId: string, admissionId: string, ctx: AuditCtx) => {
+  const closeVisitHospitalized = useCallback((patientId: string, admissionId: string, ctx: AuditCtx, encounterId?: string) => {
     patchPatient(patientId, { status: 'hospitalise' });
     freeOccupancy(patientId);
     syncEncounterWorkflow(patientId, 'hospitalise');
-    closeEncounter(`enc-${patientId}`, 'hospitalisation', ctx);
+    closeEncounter(encounterId ?? `enc-${patientId}`, 'hospitalisation', ctx);
     // Phase 5: notify admissions
     addNotification({
       title: 'Nouvelle hospitalisation',
@@ -742,50 +742,50 @@ export function MockRepositoryProvider({ children }: { children: React.ReactNode
       link: '/admissions',
     });
     audit('hospitalisation', 'Hospitalisation', ctx, {
-      patientId, encounterId: `enc-${patientId}`, newValue: 'hospitalise',
+      patientId, encounterId: encounterId ?? `enc-${patientId}`, newValue: 'hospitalise',
       resourceId: admissionId, resourceType: 'Admission',
     });
   }, [patchPatient, freeOccupancy, syncEncounterWorkflow, closeEncounter, addNotification, audit]);
 
-  const closeVisitBloc = useCallback((patientId: string, surgicalRequestId: string, ctx: AuditCtx) => {
+  const closeVisitBloc = useCallback((patientId: string, surgicalRequestId: string, ctx: AuditCtx, encounterId?: string) => {
     patchPatient(patientId, { status: 'hospitalise' });
     freeOccupancy(patientId);
     syncEncounterWorkflow(patientId, 'hospitalise');
-    closeEncounter(`enc-${patientId}`, 'bloc', ctx);
+    closeEncounter(encounterId ?? `enc-${patientId}`, 'bloc', ctx);
     audit('bloc', 'Transfert bloc opératoire', ctx, {
-      patientId, encounterId: `enc-${patientId}`, newValue: 'hospitalise',
+      patientId, encounterId: encounterId ?? `enc-${patientId}`, newValue: 'hospitalise',
       resourceId: surgicalRequestId, resourceType: 'SurgicalRequest',
     });
   }, [patchPatient, freeOccupancy, syncEncounterWorkflow, closeEncounter, audit]);
 
-  const closeVisitICU = useCallback((patientId: string, icuAdmissionId: string, ctx: AuditCtx) => {
+  const closeVisitICU = useCallback((patientId: string, icuAdmissionId: string, ctx: AuditCtx, encounterId?: string) => {
     patchPatient(patientId, { status: 'hospitalise' });
     freeOccupancy(patientId);
     syncEncounterWorkflow(patientId, 'hospitalise');
-    closeEncounter(`enc-${patientId}`, 'reanimation', ctx);
+    closeEncounter(encounterId ?? `enc-${patientId}`, 'reanimation', ctx);
     audit('reanimation', 'Transfert réanimation', ctx, {
-      patientId, encounterId: `enc-${patientId}`, newValue: 'hospitalise',
+      patientId, encounterId: encounterId ?? `enc-${patientId}`, newValue: 'hospitalise',
       resourceId: icuAdmissionId, resourceType: 'ICUAdmission',
     });
   }, [patchPatient, freeOccupancy, syncEncounterWorkflow, closeEncounter, audit]);
 
-  const closeVisitTransferred = useCallback((patientId: string, ctx: AuditCtx, destEtablissement?: string) => {
+  const closeVisitTransferred = useCallback((patientId: string, ctx: AuditCtx, destEtablissement?: string, encounterId?: string) => {
     patchPatient(patientId, { status: 'transfere' });
     freeOccupancy(patientId);
     syncEncounterWorkflow(patientId, 'transfere');
-    closeEncounter(`enc-${patientId}`, 'transfert', ctx);
+    closeEncounter(encounterId ?? `enc-${patientId}`, 'transfert', ctx);
     audit('urgences', `Transfert: ${destEtablissement ?? 'autre établissement'}`, ctx, {
-      patientId, encounterId: `enc-${patientId}`, newValue: 'transfere',
+      patientId, encounterId: encounterId ?? `enc-${patientId}`, newValue: 'transfere',
     });
   }, [patchPatient, freeOccupancy, syncEncounterWorkflow, closeEncounter, audit]);
 
-  const closeVisitDeceased = useCallback((patientId: string, ctx: AuditCtx, provisionalCause?: string) => {
+  const closeVisitDeceased = useCallback((patientId: string, ctx: AuditCtx, provisionalCause?: string, encounterId?: string) => {
     patchPatient(patientId, { status: 'decede' });
     freeOccupancy(patientId);
     syncEncounterWorkflow(patientId, 'decede');
-    closeEncounter(`enc-${patientId}`, 'deces', ctx);
+    closeEncounter(encounterId ?? `enc-${patientId}`, 'deces', ctx);
     audit('urgences', `Décès${provisionalCause ? ` — ${provisionalCause}` : ''}`, ctx, {
-      patientId, encounterId: `enc-${patientId}`, newValue: 'decede',
+      patientId, encounterId: encounterId ?? `enc-${patientId}`, newValue: 'decede',
     });
   }, [patchPatient, freeOccupancy, syncEncounterWorkflow, closeEncounter, audit]);
 

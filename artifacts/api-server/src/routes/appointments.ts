@@ -108,6 +108,18 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+/** GET /appointments/:id — fetch one appointment by UUID */
+router.get("/:id", async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const row = await appointmentService.findById(id);
+    if (!row) { res.status(404).json({ error: "Appointment not found" }); return; }
+    res.json(mapAppointment(row));
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** POST /appointments — create a new appointment */
 router.post("/", async (req: AuthenticatedRequest, res, next) => {
   try {

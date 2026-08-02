@@ -11,6 +11,7 @@
 import type { InsertAuditLog, InsertUserActivityLog } from "@workspace/db";
 import { repos } from "../repositories";
 import type { TxContext, ActorCtx } from "../repositories/types";
+import { safeUuid } from "../repositories/types";
 
 // ─── Audit log helper types ───────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ export class AuditService {
         newValue:     entry.newValue ?? null,
         patientId:    entry.patientId ?? null,
         encounterId:  entry.encounterId ?? null,
-        userId:       actor.userId,
+        userId:       safeUuid(actor.userId) ?? null,
         userName:     actor.userName,
         userRole:     actor.userRole,
         severity:     entry.severity ?? "info",

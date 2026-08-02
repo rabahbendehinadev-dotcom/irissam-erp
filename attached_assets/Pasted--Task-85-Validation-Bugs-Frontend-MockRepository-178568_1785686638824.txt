@@ -1,0 +1,197 @@
+لا تبدأ Task #85 الآن.
+
+تقرير Validation أثبت وجود Bugs مباشرة وانقطاع بين Frontend MockRepository وPostgreSQL API.
+
+نفّذ الآن مرحلة إصلاح وربط على جزأين فقط، بدون إضافة تصميم جديد وبدون تغيير الواجهات.
+
+==================================================
+الجزء الأول — إصلاح Bugs الحالية B1 إلى B7
+==================================================
+
+1. Patients
+
+أضف:
+
+GET /api/patients/:id
+
+السلوك:
+
+- البحث بواسطة UUID.
+- إرجاع 404 واضح إذا المريض غير موجود.
+- استعمال PatientService أو PatientRepository حسب Architecture الحالية.
+- عدم وضع Business Logic داخل Route.
+
+2. Consultations
+
+أضف:
+
+GET /api/consultations/:id
+
+ويجب أن يعيد:
+
+- id
+- patientId
+- encounterId
+- doctorId
+- serviceId
+- specialty
+- motif
+- status
+- createdAt
+- updatedAt
+
+صحح POST Consultation ليقبل:
+
+- motif
+- reason
+
+واعتبر motif هو الاسم الأساسي، وreason Alias مؤقت للتوافق.
+
+أضف encounterId إلى جميع responses:
+- List
+- Detail
+- Create
+- Update
+
+3. Appointments
+
+أضف:
+
+GET /api/appointments/:id
+
+مع 404 واضح واستعمال Service Layer.
+
+4. Admissions
+
+صحح Query التي تستعمل:
+
+bed_number
+
+إلى اسم العمود الفعلي:
+
+number
+
+راجع كل Queries الخاصة بالأسرة لتفادي أسماء أعمدة قديمة.
+
+5. Frontend Audit
+
+أنشئ API:
+
+POST /api/audit-logs
+GET /api/audit-logs
+
+POST يجب أن يقبل:
+
+- action
+- module
+- patientId
+- encounterId
+- entityId
+- oldValue
+- newValue
+- metadata
+
+لكن لا تثق في userId أو IP المرسلين من Frontend:
+- userId يؤخذ من Session.
+- IP وUser-Agent يؤخذان من Request.
+
+حدّث:
+
+src/services/auditService.ts
+
+ليبعث إلى API بدل Stub.
+
+إذا فشل Audit:
+- لا يكسر العملية الطبية الرئيسية.
+- يسجل الخطأ تقنيًا.
+
+==================================================
+الجزء الثاني — توحيد Encounter الحقيقي
+==================================================
+
+الهدف هو منع استعمال:
+
+enc-${patientId}
+
+أو أي Encounter ID اصطناعي.
+
+1. أنشئ Routes للـEncounter:
+
+GET /api/encounters
+GET /api/encounters/:id
+POST /api/encounters
+PATCH /api/encounters/:id/status
+GET /api/patients/:patientId/encounters
+
+2. كل عملية طبية يجب أن تحمل Encounter UUID حقيقيًا من PostgreSQL.
+
+3. عند بدء زيارة Urgences:
+
+- إنشاء Encounter حقيقي أو استعمال Encounter موجود للزيارة.
+- إنشاء EmergencyVisit مرتبطة به.
+- إعادة patientId وencounterId وemergencyVisitId للFrontend.
+- تخزين هذه IDs داخل Workspace State.
+- ممنوع توليد Encounter ID داخل Frontend.
+
+4. عند إنشاء Consultation من Urgences:
+
+- تمرير نفس encounterId.
+- عدم إنشاء Encounter جديد.
+- التحقق أن Encounter يعود لنفس patientId.
+
+5. عند Hospitalisation من Urgences:
+
+- استعمال نفس encounterId إذا كان Workflow يسمح بذلك.
+- إنشاء Admission مرتبطة به.
+- عدم تكرار المريض أو الزيارة.
+
+==================================================
+معايير القبول للمرحلة
+==================================================
+
+اختبار A:
+
+- أنشئ Patient.
+- GET /api/patients/:id يعيد نفس المريض.
+- UUID وMRN صحيحان.
+
+اختبار B:
+
+- أنشئ Appointment.
+- GET /api/appointments/:id يعمل.
+
+اختبار C:
+
+- أنشئ Consultation باستعمال motif.
+- GET Consultation يعيد motif وencounterId.
+
+اختبار D:
+
+- ابدأ EmergencyVisit.
+- تأكد أن encounterId UUID موجود في DB.
+- افتح Consultation من نفس Urgence.
+- تأكد أن Encounter لم يتغير.
+
+اختبار E:
+
+- أنشئ Admission من نفس الزيارة.
+- تأكد أن patientId وencounterId بقيا نفسهما.
+
+اختبار F:
+
+- نفّذ عملية من Frontend.
+- تحقق أن AuditLog وصل إلى PostgreSQL.
+- تحقق أن userId وIP أخذا من Request/Session وليس من Body.
+
+في النهاية أعطني:
+
+- عدد Bugs التي أصلحت.
+- Routes الجديدة.
+- نتائج الاختبارات A إلى F.
+- إثبات أن enc-${patientId} لم يعد مستخدمًا.
+- قائمة الملفات التي مازالت تعتمد على MockRepository.
+- صفر أخطاء TypeScript وRuntime SQL.
+
+لا تبدأ Task #85.
+لا تبدأ Facturation.
+لا تغيّر UI.
