@@ -1,0 +1,173 @@
+نفّذ الآن مرحلة TypeScript Zero Errors قبل البدء في Facturation.
+
+المطلوب:
+- إصلاح فقط الأخطاء الـ14 المتبقية.
+- لا تغيّر التصميم.
+- لا تضف Features جديدة.
+- لا تبدأ Facturation.
+- لا تستعمل any لإخفاء الأخطاء.
+- لا تستعمل @ts-ignore أو @ts-expect-error إلا إذا كان هناك سبب تقني موثق جدًا.
+- لا تعطل strict mode.
+
+==================================================
+1. تحديد الأخطاء
+==================================================
+
+شغّل:
+
+pnpm tsc --noEmit
+
+وأعطني أولًا قائمة كاملة لكل الأخطاء الـ14:
+
+- الملف
+- السطر
+- نوع الخطأ
+- السبب الحقيقي
+
+ركز خصوصًا على:
+
+- MockRepository.tsx
+- EmergencyPatientDetail.tsx
+- أي Type مشترك مرتبط بهما
+
+==================================================
+2. MockRepository
+==================================================
+
+راجع:
+
+- أنواع الـIDs:
+  - string UUID
+  - legacy integer IDs
+- status enums
+- optional fields
+- repository mutations
+- context contract
+- return types
+- null مقابل undefined
+- arrays والـmappers
+
+المطلوب:
+
+- توحيد الأنواع مع PostgreSQL/API schema الحالية.
+- إزالة أي types قديمة خاصة بالـMock لم تعد مطابقة.
+- إبقاء MockRepository فقط لـ:
+  - DEV mode
+  - Test Runner
+- لا تسمح له أن يفرض Types قديمة على Production code.
+
+إذا كانت Types خاصة بالـMock:
+- افصلها في ملفات واضحة.
+- لا تخلطها مع Domain Types الحقيقية.
+
+==================================================
+3. EmergencyPatientDetail
+==================================================
+
+راجع:
+
+- patientId من route params
+- نتيجة GET /api/patients/:id
+- EmergencyPatient type
+- تحويل Patient API إلى Patient UI
+- الحقول الاختيارية:
+  - allergies
+  - chronic diseases
+  - blood group
+  - contacts
+  - insurance
+- Loading / Error / 404 states
+
+أنشئ Mapper صريحًا إذا لزم:
+
+mapApiPatientToEmergencyPatient()
+
+ممنوع تمرير Object غير مطابق للـProvider.
+
+==================================================
+4. أنواع الـEnums
+==================================================
+
+راجع جميع القيم التي سببت أخطاء:
+
+- admission status
+- emergency status
+- bed status
+- ICU status
+- OR status
+- laboratory status
+- imaging status
+- prescription status
+- urgency levels
+
+استعمل Union Types موحدة أو Mapping واضح.
+
+لا تستعمل casting أعمى مثل:
+
+as SomeStatus
+
+إلا بعد validation.
+
+==================================================
+5. Contract Validation
+==================================================
+
+تأكد أن:
+
+MockRepositoryContextType
+
+يطابق فعلًا جميع الدوال والقيم التي يعيدها Provider.
+
+راجع:
+
+- parameters
+- return types
+- async vs sync
+- nullable values
+- mutation signatures
+
+==================================================
+6. اختبارات القبول
+==================================================
+
+TEST A:
+pnpm tsc --noEmit
+→ 0 errors
+
+TEST B:
+pnpm build
+→ success
+
+TEST C:
+EmergencyPatientDetail يفتح لمريض موجود
+→ بدون TypeScript أو Runtime Error
+
+TEST D:
+مريض غير موجود
+→ 404 State
+
+TEST E:
+MockRepository يعمل فقط في DEV/Test mode
+→ Production لا يعتمد عليه
+
+TEST F:
+لا يوجد:
+- any جديد
+- @ts-ignore
+- @ts-expect-error غير مبرر
+- casting عشوائي
+
+==================================================
+التقرير النهائي
+==================================================
+
+أعطني:
+
+- قائمة الأخطاء الـ14 قبل الإصلاح.
+- الملفات المعدلة.
+- السبب الحقيقي لكل مجموعة أخطاء.
+- عدد any الجديدة.
+- عدد ts-ignore.
+- نتيجة TEST A–F.
+- TypeScript errors النهائية: 0.
+- Build errors النهائية: 0.

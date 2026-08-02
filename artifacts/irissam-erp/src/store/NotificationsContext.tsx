@@ -37,11 +37,26 @@ interface ApiNotification {
   createdAt:    string;
 }
 
+/**
+ * Input type for addNotification().
+ * `priority`, `sourceModule`, and `entityId` are optional here — the implementation
+ * applies safe defaults ('normal', 'system', null) so callers (MockRepository,
+ * tests, etc.) don't have to provide them for every local/optimistic notification.
+ * The stored AppNotification keeps all fields required.
+ */
+export type AddNotificationInput =
+  Omit<AppNotification, 'id' | 'createdAt' | 'isRead' | 'priority' | 'sourceModule' | 'entityId'>
+  & {
+    priority?:     string;
+    sourceModule?: string;
+    entityId?:     string | null;
+  };
+
 interface NotificationsContextType {
   notifications:   AppNotification[];
   unreadCount:     number;
   connected:       boolean;
-  addNotification: (n: Omit<AppNotification, 'id' | 'createdAt' | 'isRead'>) => void;
+  addNotification: (n: AddNotificationInput) => void;
   markAsRead:      (id: string) => Promise<void>;
   markAllAsRead:   () => Promise<void>;
   clearAll:        () => void;
@@ -148,18 +163,23 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   // ── Mutations ────────────────────────────────────────────────────────────────
 
-  /** Optimistic local add (e.g. from MockRepository or tests). */
+  /** Optimistic local add (e.g. from MockRepository or tests).
+   *  Applies defaults for optional fields so callers only need title/body/type. */
   const addNotification = useCallback(
-    (n: Omit<AppNotification, 'id' | 'createdAt' | 'isRead'>) => {
+    (n: AddNotificationInput) => {
       const id = `local-${Date.now()}`;
       if (seenIds.current.has(id)) return;
       seenIds.current.add(id);
-      setNotifications(prev => [{
+      const full: AppNotification = {
+        priority:     'normal',
+        sourceModule: 'system',
+        entityId:     null,
         ...n,
         id,
-        isRead: false,
+        isRead:    false,
         createdAt: new Date().toISOString(),
-      }, ...prev]);
+      };
+      setNotifications(prev => [full, ...prev]);
     },
     [],
   );

@@ -23,10 +23,13 @@ description: Results and patterns from the Task #106 frontend audit. Documents w
 - `Resuscitation.tsx` — `rawIcuBeds` with guard (renamed from icuBeds)
 - `MiniWidgets.tsx` — `lowStock.items` guard: `!Array.isArray(...) || length === 0`
 
-## Pre-existing TypeScript errors (not introduced by this task)
-- `MockRepository.tsx` — 13 errors: `AppNotification` type mismatch (`link` field not in type)
-- `EmergencyPatientDetail.tsx` — 1 error: gender type `"M"|"F"|"other"` vs `"M"|"F"`
-- These existed before; no new TS errors were introduced.
+## TypeScript Zero Errors fix (post-audit)
+All 13 pre-existing TypeScript errors in MockRepository.tsx fixed:
+- **Root cause:** `addNotification()` calls passed `{ title, body, type, link }` but `Omit<AppNotification,'id'|'createdAt'|'isRead'>` required `priority`, `sourceModule`, `entityId` (all non-optional in the stored type).
+- **Fix:** Added `AddNotificationInput` export type in NotificationsContext.tsx making those 3 fields optional with defaults (`priority: 'normal'`, `sourceModule: 'system'`, `entityId: null`). The stored `AppNotification` type stays strict.
+- `EmergencyPatientDetail.tsx` error was fixed by Task #37 merge (no longer present).
+- **Result:** `pnpm tsc --noEmit` → 0 errors. `PORT=3000 BASE_PATH=/irissam-erp pnpm build` → success in 6.10s.
+- **Note:** `pnpm build` without PORT+BASE_PATH always fails — it's the vite.config.ts design, not a bug.
 
 ## Smoke test results (all 20/20 pass, 200 OK)
 - Object responses: /api/dashboard/stats, /api/auth/me, /api/beds/summary, /api/beds/by-service
