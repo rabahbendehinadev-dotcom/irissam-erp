@@ -113,9 +113,10 @@ interface Props {
   saving?: boolean;
   onStatusChange: (status: ConsultationStatus) => void;
   onTerminer: () => void;
+  onPrint: () => void;
 }
 
-export function ConsultationHeader({ consultation: c, saving = false, onStatusChange, onTerminer }: Props) {
+export function ConsultationHeader({ consultation: c, saving = false, onStatusChange, onTerminer, onPrint }: Props) {
   const [, setLocation] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -191,8 +192,8 @@ export function ConsultationHeader({ consultation: c, saving = false, onStatusCh
           )}
 
           {/* Print */}
-          <button onClick={() => window.print()}
-            title="Imprimer"
+          <button onClick={onPrint}
+            title="Imprimer le CR"
             className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors">
             <Printer size={14} />
           </button>
@@ -211,7 +212,7 @@ export function ConsultationHeader({ consultation: c, saving = false, onStatusCh
                   {([
                     { label: 'Voir le patient',    action: () => setLocation(`/patients/${c.patientId}`) },
                     c.admissionId ? { label: "Voir l'admission", action: () => setLocation('/admissions') } : null,
-                    { label: 'Imprimer le CR',     action: () => window.print() },
+                    { label: 'Imprimer le CR',     action: () => onPrint() },
                     { label: 'Annuler la consultation', action: () => onStatusChange('annulee'), danger: true },
                   ] as any[]).filter(Boolean).map((item: any) => (
                     <button key={item.label} onClick={() => { setMenuOpen(false); item.action(); }}

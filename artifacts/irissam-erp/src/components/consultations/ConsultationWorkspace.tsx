@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { ConsultationHeader } from './ConsultationHeader';
 import { ConsultationSummaryModal } from './ConsultationSummaryModal';
+import { ConsultationPrintModal } from './ConsultationPrintModal';
 import { DiagnosisBuilder } from './DiagnosisBuilder';
 import { PrescriptionBuilder } from './PrescriptionBuilder';
 import { LabOrderBuilder, ImagingOrderBuilder } from './LabAndImagingBuilders';
@@ -395,6 +396,7 @@ interface Props {
 export function ConsultationWorkspace({ consultation, onChange, onStatusChange }: Props) {
   const [activeTab, setActiveTab]   = useState('context');
   const [showSummary, setShowSummary] = useState(false);
+  const [showPrint, setShowPrint]   = useState(false);
   const [saving, setSaving]         = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -417,6 +419,7 @@ export function ConsultationWorkspace({ consultation, onChange, onStatusChange }
 
   const handleTerminer          = () => setShowSummary(true);
   const handleConfirmTerminer   = (_reason: string) => { onStatusChange('terminee'); setShowSummary(false); };
+  const handlePrint             = () => setShowPrint(true);
 
   const tabs = buildTabs(consultation);
 
@@ -429,6 +432,7 @@ export function ConsultationWorkspace({ consultation, onChange, onStatusChange }
         saving={saving}
         onStatusChange={onStatusChange}
         onTerminer={handleTerminer}
+        onPrint={handlePrint}
       />
 
       {/* Tab bar */}
@@ -507,6 +511,13 @@ export function ConsultationWorkspace({ consultation, onChange, onStatusChange }
           consultation={consultation}
           onConfirm={handleConfirmTerminer}
           onClose={() => setShowSummary(false)}
+        />
+      )}
+
+      {showPrint && (
+        <ConsultationPrintModal
+          consultation={consultation}
+          onClose={() => setShowPrint(false)}
         />
       )}
     </div>
