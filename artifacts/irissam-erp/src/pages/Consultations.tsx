@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Plus, RefreshCw, Download, Stethoscope, AlertTriangle } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageWrapper } from '@/components/shared/PageWrapper';
 import { PatientDrawer } from '@/components/shared/PatientDrawer';
@@ -103,11 +104,16 @@ export default function ConsultationsPage() {
       if (appointmentId && previousAppointmentStatus) {
         updateAppointmentStatus(appointmentId, previousAppointmentStatus);
       }
+      toast({
+        variant: 'destructive',
+        title: 'Échec de la mise à jour',
+        description: 'Impossible de modifier le statut de la consultation. Veuillez réessayer.',
+      });
       refetch();
     }
   };
 
-  const handleCreated = async (partial: Partial<Consultation>) => {
+  const handleCreated = async (partial: Partial<Consultation>): Promise<boolean> => {
     try {
       await createMutation.mutateAsync({
         data: {
@@ -125,10 +131,17 @@ export default function ConsultationsPage() {
         },
       });
       await refetch();
+      setShowForm(false);
+      return true;
     } catch (err) {
       console.error('Failed to create consultation', err);
+      toast({
+        variant: 'destructive',
+        title: 'Échec de l\'enregistrement',
+        description: 'Impossible de créer la consultation. Vérifiez votre connexion et réessayez.',
+      });
+      return false;
     }
-    setShowForm(false);
   };
 
   const handleVitalsEntered = (consultationId: string, vitals: VitalSigns) => {

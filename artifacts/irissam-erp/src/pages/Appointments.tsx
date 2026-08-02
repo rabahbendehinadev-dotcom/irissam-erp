@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useLanguage } from "@/i18n";
 import { formatDate, formatTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 import {
   CalendarDays, List, Search, Plus, ChevronLeft, ChevronRight,
   Clock, Stethoscope, X, FileText, RefreshCw, AlertTriangle
@@ -62,6 +63,7 @@ export default function Appointments() {
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [editApt, setEditApt] = useState<Appointment | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
 
   // Form state
@@ -148,6 +150,7 @@ export default function Appointments() {
       setShowForm(false);
       return;
     }
+    setFormError(null);
     try {
       await createMutation.mutateAsync({
         data: {
@@ -161,11 +164,17 @@ export default function Appointments() {
         },
       });
       await refetch();
+      setShowForm(false);
+      setEditApt(null);
     } catch (err) {
       console.error("Failed to create appointment", err);
+      setFormError("Échec de l'enregistrement – veuillez réessayer");
+      toast({
+        variant: "destructive",
+        title: "Échec de l'enregistrement",
+        description: "Impossible de créer le rendez-vous. Vérifiez votre connexion et réessayez.",
+      });
     }
-    setShowForm(false);
-    setEditApt(null);
   };
 
   return (
@@ -446,8 +455,18 @@ export default function Appointments() {
               onChange={(v) => { formRef.current = v; }}
             />
 
+            {formError && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span className="flex-1">{formError}</span>
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              <button
+                onClick={() => { setShowForm(false); setFormError(null); }}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
                 {t("appointments.form.cancel" as any)}
               </button>
               <button
@@ -455,7 +474,11 @@ export default function Appointments() {
                 disabled={createMutation.isPending}
                 className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
               >
-                {createMutation.isPending ? "Enregistrement…" : t("appointments.form.save" as any)}
+                {createMutation.isPending
+                  ? "Enregistrement…"
+                  : formError
+                  ? "Réessayer"
+                  : t("appointments.form.save" as any)}
               </button>
             </div>
           </div>

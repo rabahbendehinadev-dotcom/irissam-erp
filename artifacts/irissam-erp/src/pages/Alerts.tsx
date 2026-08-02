@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { toast } from "@/hooks/use-toast";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageWrapper } from "@/components/shared/PageWrapper";
@@ -104,6 +105,11 @@ export default function Alerts() {
         next.delete(id);
         return next;
       });
+      toast({
+        variant: "destructive",
+        title: "Échec de l'enregistrement",
+        description: "Impossible de marquer l'alerte comme lue. Veuillez réessayer.",
+      });
     }
   };
 
@@ -115,6 +121,11 @@ export default function Alerts() {
       refetch();
     } catch {
       setAllRead(false);
+      toast({
+        variant: "destructive",
+        title: "Échec de l'enregistrement",
+        description: "Impossible de marquer toutes les alertes comme lues. Veuillez réessayer.",
+      });
     }
   };
 

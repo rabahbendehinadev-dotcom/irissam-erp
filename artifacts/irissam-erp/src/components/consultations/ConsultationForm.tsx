@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   X, Search, ChevronRight, ChevronLeft, Stethoscope, User,
-  Activity, Check, ExternalLink, AlertTriangle,
+  Activity, Check, ExternalLink, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
@@ -677,7 +677,7 @@ const STEPS = [
 
 interface Props {
   onClose: () => void;
-  onCreated: (c: Partial<Consultation>) => void;
+  onCreated: (c: Partial<Consultation>) => Promise<boolean>;
   initialPatientId?: string;
 }
 
@@ -704,6 +704,8 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
     priority: 'normale',
   });
   const [vitals, setVitals] = useState<VS>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const selectedService  = SERVICE_TREE.find(s => s.id === ctx.serviceId);
   const selectedSpecialty = selectedService?.specialties.find(sp => sp.id === ctx.specialtyId);
@@ -715,7 +717,11 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
     ? !!(ctx.doctorId && ctx.specialtyId && ctx.serviceId && ctx.date && ctx.time && ctx.reason)
     : true;
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    if (isSubmitting) return;
+    setSubmitError(null);
+    setIsSubmitting(true);
+
     const now = new Date().toISOString();
     const id  = `c-new-${Date.now()}`;
     const num = `CON-2026-${String(Math.floor(Math.random() * 900) + 100).padStart(4, '0')}`;
@@ -748,8 +754,14 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
     } as Consultation;
 
     addSessionConsultation(newConsultation);
-    onCreated(newConsultation);
-    setLocation(`/consultations/${id}`);
+    const success = await onCreated(newConsultation);
+    setIsSubmitting(false);
+
+    if (success) {
+      setLocation(`/consultations/${id}`);
+    } else {
+      setSubmitError("Échec de l'enregistrement – veuillez réessayer");
+    }
   };
 
   return (
@@ -802,11 +814,20 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
           {step === 3 && <VitalsStep vitals={vitals} onChange={setVitals} patient={patient} />}
         </div>
 
+        {/* Submission error banner */}
+        {submitError && (
+          <div className="mx-6 mb-0 mt-0 flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
+            <AlertTriangle size={14} className="shrink-0" />
+            <span className="flex-1">{submitError}</span>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50">
           <button
             onClick={step === 1 ? onClose : () => setStep(s => s - 1)}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-100 text-gray-600"
+            disabled={isSubmitting}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-50"
           >
             <ChevronLeft size={15} /> {step === 1 ? 'Annuler' : 'Retour'}
           </button>
@@ -822,11 +843,15 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
             )}
             <button
               onClick={step < 3 ? () => setStep(s => s + 1) : handleCreate}
-              disabled={!canNext}
+              disabled={!canNext || isSubmitting}
               className="flex items-center gap-1.5 px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {step < 3
                 ? <><ChevronRight size={15} /> Suivant</>
+                : isSubmitting
+                ? <><RefreshCw size={15} className="animate-spin" /> Enregistrement…</>
+                : submitError
+                ? <><Check size={15} /> Réessayer</>
                 : <><Check size={15} /> Créer la consultation</>}
             </button>
           </div>

@@ -499,9 +499,10 @@ export default function PatientDetailPage() {
         <ConsultationForm
           initialPatientId={patient.id}
           onClose={() => setShowNewConsultation(false)}
-          onCreated={c => {
+          onCreated={async () => {
             setShowNewConsultation(false);
-            setLocation(`/consultations/${c.id}`);
+            // Navigation to consultation workspace is handled by ConsultationForm on success
+            return true;
           }}
         />
       )}
