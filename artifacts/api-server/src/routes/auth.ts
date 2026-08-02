@@ -408,6 +408,13 @@ router.get("/me", async (req: Request, res: Response) => {
     return;
   }
 
+  // Guard against legacy mock IDs (e.g. "user-1") that crash PostgreSQL's UUID parser
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(payload.userId ?? "")) {
+    res.status(401).json({ message: "Token invalide." });
+    return;
+  }
+
   const { rows } = await pool.query<DbUser>(
     `SELECT id, first_name, last_name, email, role,
             '' AS hashed_password,

@@ -1,0 +1,99 @@
+بعد النشر على Production، الموقع يبقى عالقًا في شاشة:
+
+Chargement...
+
+ولا تظهر صفحة Login أو Dashboard.
+
+أصلح Auth Bootstrap وLoading Loop بدون تغيير التصميم.
+
+المطلوب:
+
+1. راجع AuthContext عند بدء التطبيق.
+
+2. لا تسمح ببقاء authLoading=true إلى ما لا نهاية.
+
+3. عند تشغيل التطبيق:
+
+- نفّذ GET /api/auth/me.
+- إذا نجح: حمّل المستخدم وأنهِ Loading.
+- إذا رجع 401: جرّب /api/auth/refresh مرة واحدة فقط.
+- إذا فشل Refresh:
+  - امسح حالة المستخدم محليًا.
+  - authLoading = false.
+  - حوّل المستخدم إلى /login.
+- إذا حصل Network Error أو Timeout:
+  - authLoading = false.
+  - اعرض صفحة خطأ مع زر Réessayer.
+- ممنوع Refresh Loop.
+
+4. أضف Timeout لا يتجاوز 10 ثوانٍ لعملية Auth Initialization.
+
+5. راجع API base URL في Production:
+
+- لا يستعمل localhost.
+- لا يستعمل Development URL.
+- استعمل نفس الدومين أو Production API URL الصحيح.
+
+6. راجع Cookie الخاصة بالـRefresh Token:
+
+- HttpOnly
+- Secure في Production
+- SameSite مناسب
+- Path=/api/auth أو /
+- Domain متوافق مع irissamhospital.com
+
+7. تأكد أن CORS يسمح بالدومين:
+
+https://irissamhospital.com
+
+مع:
+
+credentials: true
+
+8. تحقق من أن هذه endpoints تعمل في Production:
+
+GET /api/health
+GET /api/auth/me
+POST /api/auth/refresh
+
+9. أضف Error Boundary حول AppProvider وAuthProvider حتى لا تبقى شاشة Loading عند حدوث Exception.
+
+10. أضف Logging مؤقتًا لخطوات Auth Bootstrap:
+
+AUTH_INIT_START
+AUTH_ME_SUCCESS
+AUTH_ME_401
+AUTH_REFRESH_START
+AUTH_REFRESH_SUCCESS
+AUTH_REFRESH_FAILED
+AUTH_INIT_FINISHED
+
+مع عدم تسجيل Tokens أو Cookies.
+
+11. اختبارات القبول:
+
+A. بدون Cookie:
+→ تظهر صفحة Login، ولا تبقى شاشة Loading.
+
+B. Cookie صحيحة:
+→ يفتح Dashboard.
+
+C. Cookie منتهية:
+→ Refresh مرة واحدة ثم Dashboard.
+
+D. Refresh غير صالح:
+→ Login مباشرة.
+
+E. API متوقفة:
+→ Error State بعد 10 ثوانٍ مع زر Réessayer.
+
+F. لا توجد أي حلقة Requests متكررة في Network.
+
+أعطني في النهاية:
+
+- السبب الحقيقي للمشكلة.
+- الطلب الذي كان معلقًا أو يتكرر.
+- الملفات المعدلة.
+- نتيجة الاختبارات A–F.
+- صفر Infinite Loading.
+- صفر Refresh Loop.

@@ -34,10 +34,12 @@ export const authService: AuthServiceInterface = {
 
   async refresh() {
     try {
-      // The HttpOnly cookie is sent automatically; no body needed
+      // _skipRefresh:true prevents the 401 interceptor from calling refresh recursively
+      // (which would deadlock: the in-flight promise waiting on itself)
       const data = await apiClient.post<{ user: User; accessToken: string }>(
         '/auth/refresh',
         {},
+        { _skipRefresh: true },
       );
       return data;
     } catch {

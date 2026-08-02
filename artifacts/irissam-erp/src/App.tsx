@@ -78,8 +78,36 @@ function PlaceholderPage() {
   );
 }
 
-/** Shows a full-screen spinner while the session is being restored */
+/** Shows a full-screen spinner while the session is being restored.
+ *  If the API was unreachable, shows an error state with a retry button. */
 function AuthLoadingScreen() {
+  const { networkError, retryInit } = useAuth();
+
+  if (networkError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#0a2540] via-[#0e3460] to-[#1a5c8a] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-6 text-center px-6">
+          <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+            <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-white font-semibold text-lg">Impossible de contacter le serveur</p>
+            <p className="text-white/60 text-sm mt-1">Vérifiez votre connexion et réessayez.</p>
+          </div>
+          <button
+            onClick={retryInit}
+            className="px-6 py-2.5 bg-white/15 hover:bg-white/25 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return <FullPageSpinner />;
 }
 
