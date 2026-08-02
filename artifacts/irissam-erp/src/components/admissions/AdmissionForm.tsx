@@ -35,7 +35,7 @@ const labelCls  = 'block text-xs font-medium text-gray-600 mb-1';
 
 interface Props {
   admission?: Admission;
-  onSave: (data: Partial<Admission>) => void;
+  onSave: (data: Admission) => void;
   onCancel: () => void;
 }
 
@@ -118,7 +118,9 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
     await new Promise(r => setTimeout(r, 600));
     const service = MOCK_SERVICES.find(s => s.id === form.serviceId);
     const doctor  = MOCK_DOCTORS.find(d => d.id === form.doctorId);
-    const result: Partial<Admission> = {
+    const now = new Date().toISOString();
+    const result: Admission = {
+      id:              admission?.id ?? `adm-${Date.now()}`,
       admissionNumber: admission?.admissionNumber ?? generateAdmNumber(),
       patientId:       selectedPatient!.id,
       patientMpiId:    selectedPatient!.mpiId,
@@ -142,13 +144,13 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
       floorLabel:      selectedBed?.floorLabel,
       buildingName:    selectedBed?.buildingName,
       siteId:          'site-1',
-      createdAt:       new Date().toISOString(),
-      updatedAt:       new Date().toISOString(),
+      createdAt:       admission?.createdAt ?? now,
+      updatedAt:       now,
       createdById:     'u-1',
     };
-    log(admission ? 'update' : 'create', 'admission', admission?.id, `${form.type} — ${selectedPatient!.lastName}`);
-    onSave(result);
+    log(admission ? 'update' : 'create', 'admission', result.id, `${form.type} — ${selectedPatient!.lastName}`);
     setSaving(false);
+    onSave(result);
   };
 
   const STEPS = [t('adm.form.step1'), t('adm.form.step2'), t('adm.form.step3')];

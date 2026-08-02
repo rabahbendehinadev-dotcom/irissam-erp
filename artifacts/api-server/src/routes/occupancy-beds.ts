@@ -86,30 +86,37 @@ router.post("/:id/assign", async (req: AuthenticatedRequest, res, next) => {
   try {
     const id   = String(req.params.id);
     const body = req.body as { patientId?: string; patientName?: string; encounterId?: string; admissionId?: string };
-    if (!body.patientId)   { res.status(400).json({ error: "patientId requis" }); return; }
-    if (!body.encounterId) { res.status(400).json({ error: "encounterId requis" }); return; }
+    if (!body.patientName?.trim()) { res.status(400).json({ error: "patientName requis" }); return; }
+    // patientId, encounterId, admissionId are optional: admissions created from
+    // the front-end mock flow may not have persisted UUID identifiers yet.
+    // All three columns are nullable in the DB schema.
 
     const a = actor(req);
     const result = await db.transaction(async (tx) => {
       const ctx: TxContext = { ...a, tx };
+      // Only pass UUID-valued fields to the repository; skip if they look like
+      // legacy mock IDs (non-UUID strings) to avoid DB type errors.
+      const isUuid = (s?: string) => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
       const bed = await repos.occupancyBed.occupy(id, {
-        patientId:   body.patientId!,
-        patientName: body.patientName ?? "",
-        encounterId: body.encounterId!,
+        patientId:   isUuid(body.patientId)   ? body.patientId   : undefined,
+        patientName: body.patientName!.trim(),
+        encounterId: isUuid(body.encounterId) ? body.encounterId : undefined,
       }, ctx);
       if (!bed) throw Object.assign(new Error("Lit non disponible (déjà occupé ou introuvable)"), { status: 409 });
 
-      if (body.admissionId) {
+      if (isUuid(body.admissionId)) {
         await tx.update(occupancyBedsTable)
           .set({ admissionId: body.admissionId })
           .where(eq(occupancyBedsTable.id, id));
       }
 
+      const patientId   = isUuid(body.patientId)   ? body.patientId   : undefined;
+      const encounterId = isUuid(body.encounterId)  ? body.encounterId : undefined;
       await auditService.log({
         module: "hospitalisation", action: "bed_assigned",
         resourceType: "occupancy_bed", resourceId: id,
-        newValue: { patientId: body.patientId, encounterId: body.encounterId },
-        patientId: body.patientId, encounterId: body.encounterId,
+        newValue: { patientId, encounterId },
+        patientId, encounterId,
       }, a, ctx);
 
       return bed;

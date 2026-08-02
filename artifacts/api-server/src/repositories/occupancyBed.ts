@@ -55,16 +55,16 @@ export class OccupancyBedRepository {
   /** Mark a bed as occupied. Fails (returns null) if bed is not "disponible". */
   async occupy(
     id: string,
-    payload: { patientId: string; patientName: string; encounterId: string },
+    payload: { patientId?: string; patientName: string; encounterId?: string },
     ctx: TxContext,
   ): Promise<DbOccupancyBed | null> {
     const [row] = await qb(this.db, ctx)
       .update(occupancyBedsTable)
       .set({
         status:      "occupe",
-        patientId:   payload.patientId,
+        patientId:   payload.patientId ?? null,
         patientName: payload.patientName,
-        encounterId: payload.encounterId,
+        encounterId: payload.encounterId ?? null,
         occupiedAt:  new Date(),
         updatedBy:   safeUuid(ctx.userId),
         updatedAt:   new Date(),

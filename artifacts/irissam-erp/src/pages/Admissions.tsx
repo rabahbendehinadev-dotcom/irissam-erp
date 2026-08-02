@@ -201,7 +201,7 @@ export default function AdmissionsPage() {
   const { can } = usePermission();
   const { log } = useAuditLog();
   const [, navigate] = useLocation();
-  const { admissions, discharge, transfer, cancel, loading: admLoading } = useAdmissionsApi();
+  const { admissions, discharge, transfer, cancel, addAdmission, updateAdmission, loading: admLoading } = useAdmissionsApi();
   const { user } = useAuth();
   const [bedRefreshKey, setBedRefreshKey] = useState(0);
 
@@ -366,7 +366,41 @@ export default function AdmissionsPage() {
       {showForm && (
         <AdmissionForm
           admission={editing ?? undefined}
-          onSave={() => { setShowForm(false); setEditing(null); }}
+          onSave={async (data) => {
+            // Update local list immediately (optimistic)
+            if (editing) {
+              updateAdmission(data);
+            } else {
+              addAdmission(data);
+            }
+            // Assign bed via API when one is selected; surface failure visibly.
+            // Only UUID-format IDs are sent — the backend silently ignores
+            // non-UUID mock IDs to avoid DB type errors.
+            if (data.bedId) {
+              const isUuid = (s?: string) =>
+                !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+              try {
+                await apiClient.post(`/occupancy-beds/${data.bedId}/assign`, {
+                  patientName:  data.patientName,
+                  patientId:    isUuid(data.patientId)   ? data.patientId   : undefined,
+                  encounterId:  isUuid(data.encounterId) ? data.encounterId : undefined,
+                  admissionId:  isUuid(data.id)          ? data.id          : undefined,
+                  expectedReleaseAt: data.expectedDischargeDate
+                    ? `${data.expectedDischargeDate}T12:00:00`
+                    : undefined,
+                });
+              } catch (err: any) {
+                // Bed assignment failed — admission is saved but bed status may
+                // not have updated. Alert so staff can re-assign manually.
+                window.alert(
+                  `Admission enregistrée, mais l'assignation du lit a échoué : ${err?.message ?? 'erreur inconnue'}. Veuillez vérifier la disponibilité du lit.`
+                );
+              }
+            }
+            setBedRefreshKey(k => k + 1);
+            setShowForm(false);
+            setEditing(null);
+          }}
           onCancel={() => { setShowForm(false); setEditing(null); }}
         />
       )}
