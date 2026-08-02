@@ -11,6 +11,7 @@ import { Router } from "express";
 import { pharmacyService } from "../services/pharmacy";
 import { repos } from "../repositories";
 import type { AuthenticatedRequest } from "../middleware/requireAuth";
+import { requirePermission } from "../middleware/requirePermission";
 import type { ActorCtx } from "../repositories/types";
 import type { DbMedication } from "../repositories/medication";
 
@@ -120,8 +121,8 @@ router.get("/low-stock", async (req, res, next) => {
   }
 });
 
-/** POST /medications — create a new medication */
-router.post("/", async (req: AuthenticatedRequest, res, next) => {
+/** POST /medications — create a new medication (requires pharmacy.manage_stock) */
+router.post("/", requirePermission("pharmacy.manage_stock"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const body = req.body as {
       name?: unknown;
@@ -168,8 +169,8 @@ router.post("/", async (req: AuthenticatedRequest, res, next) => {
   }
 });
 
-/** PATCH /medications/:id — update medication fields */
-router.patch("/:id", async (req: AuthenticatedRequest, res, next) => {
+/** PATCH /medications/:id — update medication fields (requires pharmacy.manage_stock) */
+router.patch("/:id", requirePermission("pharmacy.manage_stock"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const id = String(req.params.id);
     const body = req.body as {
@@ -230,8 +231,8 @@ router.patch("/:id", async (req: AuthenticatedRequest, res, next) => {
   }
 });
 
-/** DELETE /medications/:id — soft-delete a medication */
-router.delete("/:id", async (req: AuthenticatedRequest, res, next) => {
+/** DELETE /medications/:id — soft-delete (requires pharmacy.manage_stock) */
+router.delete("/:id", requirePermission("pharmacy.manage_stock"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const id = String(req.params.id);
     await pharmacyService.deleteMedication(id, actor(req));

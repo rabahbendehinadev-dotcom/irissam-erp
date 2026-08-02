@@ -1,0 +1,406 @@
+ممتاز. دك نقدر نقولو بلي **Core Clinical Flow ولى فعليًا على PostgreSQL**، وهادي مرحلة كبيرة جدًا.
+
+بصح عندي ملاحظة وحدة: السطر هذا غير دقيق شوية:
+
+> `EmergencyPatientDetail.tsx — lookup patient ... (pas de patients API encore — Task #85)`
+
+لأن حسب التقرير السابق عندكم أصلًا:
+
+* `GET /api/patients`
+* `GET /api/patients/:id`
+
+يعني ما لازمش يبقى Header تاع مريض الاستعجالات مربوط ببيانات Mock. نحيّوه الآن، وبعدها نبدأ **Authentication + RBAC الحقيقي**. ما نروحوش لـTask #85 إلا إذا Task #85 عندكم هي فعلًا المصادقة؛ ما نعتمدوش على الرقم وحده.
+
+ابعث لـReplit هذا البرومبت:
+
+```text
+الآن Core Clinical Flow أصبح يعمل على PostgreSQL.
+
+نفّذ المرحلة التالية فقط:
+
+1. إزالة آخر Patient Mock من EmergencyPatientDetail.
+2. إنشاء Authentication حقيقي.
+3. إنشاء RBAC حقيقي من PostgreSQL.
+
+مهم جدًا:
+- لا تغيّر التصميم الحالي.
+- لا تضف Modules جديدة.
+- لا تبدأ Facturation.
+- لا تعاود بناء الصفحات الموجودة.
+- استعمل الـAPI والـService Layer الحاليين.
+- لا ترسل كلمات المرور أو الصلاحيات الحساسة إلى Frontend بشكل غير آمن.
+
+==================================================
+الجزء الأول — إزالة Patient Mock الأخير
+==================================================
+
+في:
+
+EmergencyPatientDetail.tsx
+
+احذف:
+
+getPatient(patientId)
+
+وأي lookup من Mock Data.
+
+استعمل:
+
+GET /api/patients/:id
+
+المطلوب:
+
+- Loading Skeleton أثناء التحميل.
+- Error State مع زر Réessayer.
+- 404 واضح إذا المريض غير موجود.
+- تمرير Patient الحقيقي إلى EmergencyDossierProvider.
+- جميع بيانات Header تأتي من PostgreSQL:
+  - id
+  - MRN
+  - nom
+  - prénom
+  - date de naissance
+  - sexe
+  - groupe sanguin
+  - allergies
+  - maladies chroniques
+  - téléphone
+- لا يوجد أي Fallback إلى Mock Patient.
+
+ابحث داخل EmergencyPatientDetail وEmergencyDossierContext عن أي Patient Mock ويجب أن تكون النتيجة صفر.
+
+==================================================
+الجزء الثاني — Authentication حقيقي
+==================================================
+
+أنشئ نظام مصادقة Production-ready باستعمال قاعدة PostgreSQL الحالية.
+
+Endpoints:
+
+POST /api/auth/login
+POST /api/auth/refresh
+POST /api/auth/logout
+GET /api/auth/me
+POST /api/auth/change-password
+POST /api/auth/forgot-password
+POST /api/auth/reset-password
+
+المطلوب:
+
+- تخزين كلمات المرور باستعمال Argon2id أو bcrypt بمستوى آمن.
+- لا تخزن Password Plain Text نهائيًا.
+- Access Token قصير المدة.
+- Refresh Token طويل المدة.
+- Refresh Token يتم تخزينه Hashed داخل قاعدة البيانات.
+- تدوير Refresh Token عند كل Refresh.
+- إلغاء Session عند Logout.
+- دعم إلغاء جميع Sessions الخاصة بالمستخدم.
+- حماية ضد Brute Force.
+- قفل مؤقت بعد عدد محاولات فاشلة.
+- تسجيل:
+  - successful_login
+  - failed_login
+  - logout
+  - password_changed
+  - session_revoked
+  داخل UserActivityLogs.
+
+يفضل تخزين Refresh Token داخل HttpOnly Secure SameSite Cookie إذا كانت Architecture الحالية تسمح بذلك.
+
+لا تخزن Refresh Token داخل localStorage.
+
+==================================================
+الجزء الثالث — Users
+==================================================
+
+أكمل جدول users ليحتوي على:
+
+- id
+- employeeNumber
+- firstName
+- lastName
+- email
+- phone
+- passwordHash
+- status
+- language
+- siteId
+- departmentId
+- lastLoginAt
+- failedLoginAttempts
+- lockedUntil
+- mfaEnabled
+- createdAt
+- updatedAt
+- deletedAt
+- version
+
+الحالات:
+
+- active
+- inactive
+- suspended
+- locked
+
+أنشئ Admin تجريبي داخل Seed فقط:
+
+Email:
+admin@irissam.dz
+
+Password:
+Admin@2026
+
+لكن:
+- خزّنها Hash.
+- اجبر المستخدم على تغيير كلمة المرور عند أول دخول.
+- لا تعرض كلمة المرور في Production Logs.
+
+==================================================
+الجزء الرابع — RBAC حقيقي
+==================================================
+
+أنشئ أو أكمل الجداول:
+
+roles
+permissions
+user_roles
+role_permissions
+
+الأدوار الأساسية:
+
+- super_admin
+- administrator
+- director
+- doctor
+- nurse
+- reception
+- laboratory
+- radiology
+- pharmacist
+- finance
+- hr
+
+الصلاحيات تكون Granular، مثل:
+
+patients.view
+patients.create
+patients.update
+patients.archive
+
+consultations.view
+consultations.create
+consultations.complete
+
+emergencies.view
+emergencies.triage
+emergencies.start_care
+emergencies.decide
+emergencies.close
+
+laboratory.view
+laboratory.collect
+laboratory.validate
+
+imaging.view
+imaging.perform
+imaging.interpret
+
+pharmacy.view
+pharmacy.prepare
+pharmacy.dispense
+
+admissions.view
+admissions.create
+admissions.transfer
+admissions.discharge
+
+icu.view
+icu.admit
+icu.transfer
+icu.discharge
+
+operating_room.view
+operating_room.schedule
+operating_room.start
+operating_room.complete
+
+audit.view
+users.manage
+roles.manage
+settings.manage
+
+==================================================
+الجزء الخامس — Backend Authorization
+==================================================
+
+أنشئ Middleware:
+
+requireAuth
+requirePermission(permission)
+requireAnyPermission([...])
+requireRole(role)
+
+مهم جدًا:
+
+- لا تعتمد على إخفاء الزر في Frontend فقط.
+- كل Endpoint حساس يجب أن يتحقق من Permission في Backend.
+- المستخدم لا يستطيع الوصول إلى بيانات Site أو Department غير المسموح له بها.
+- Super Admin فقط يستطيع إدارة Roles وPermissions.
+- سجل كل رفض وصول داخل UserActivityLogs.
+
+أمثلة:
+
+POST /api/patients
+→ patients.create
+
+POST /api/lab-orders/:id/result
+→ laboratory.validate
+
+POST /api/prescriptions/:id/dispense
+→ pharmacy.dispense
+
+POST /api/admissions/:id/discharge
+→ admissions.discharge
+
+POST /api/surgical-requests/:id/start
+→ operating_room.start
+
+==================================================
+الجزء السادس — Frontend Auth
+==================================================
+
+استبدل Mock Auth الحالي.
+
+AuthContext يجب أن يعتمد على:
+
+GET /api/auth/me
+POST /api/auth/login
+POST /api/auth/logout
+POST /api/auth/refresh
+
+المطلوب:
+
+- ProtectedRoute حقيقي.
+- إعادة المستخدم إلى /login إذا Session منتهية.
+- محاولة Refresh واحدة تلقائيًا عند 401.
+- منع Loop لا نهائي في Refresh.
+- Logout يمسح Session من الخادم والواجهة.
+- بيانات المستخدم والدور والصلاحيات تأتي من API.
+- usePermission() يقرأ Permissions الحقيقية من Session.
+- لا توجد Roles ثابتة داخل Frontend كمصدر حقيقة.
+- يمكن الاحتفاظ بالثوابت فقط للـTyping والـUI.
+
+==================================================
+الجزء السابع — Scope حسب الموقع والقسم
+==================================================
+
+كل User يمكن أن يكون مربوطًا بـ:
+
+- Site واحد أو أكثر.
+- Department واحد أو أكثر.
+
+الـAPI يجب أن يطبق Data Scope.
+
+مثال:
+
+- طبيب قسم القلب يرى مرضى قسمه حسب الصلاحيات.
+- مدير المستشفى يرى جميع الأقسام.
+- موظف مخبر يرى Orders المخبر فقط.
+- Super Admin يرى كل شيء.
+
+لا تعتمد على Filters الواجهة للحماية.
+
+==================================================
+الجزء الثامن — MFA Foundation
+==================================================
+
+حضّر بنية MFA بدون فرضها الآن على كل المستخدمين:
+
+- TOTP Secret مشفر.
+- Recovery Codes Hashed.
+- Endpoint إعداد MFA.
+- Endpoint تأكيد MFA.
+- Endpoint تعطيل MFA بصلاحية مناسبة.
+
+اجعل MFA إلزامية مستقبلاً لأدوار:
+
+- super_admin
+- administrator
+- director
+
+في هذه المرحلة يمكن إبقاؤها Feature Flag إذا كان تنفيذها الكامل كبيرًا.
+
+==================================================
+الجزء التاسع — Seed الصلاحيات
+==================================================
+
+أنشئ Seed Idempotent:
+
+- Roles الأساسية.
+- Permissions الأساسية.
+- Role-Permission mappings.
+- Admin user.
+- Admin role assignment.
+
+تشغيل Seed أكثر من مرة لا ينشئ Duplicates.
+
+==================================================
+الجزء العاشر — الاختبارات
+==================================================
+
+اختبار A:
+- Login صحيح → 200.
+- /auth/me يعيد المستخدم والRoles والPermissions.
+- Logout يبطل Session.
+
+اختبار B:
+- Password خاطئة عدة مرات.
+- الحساب يقفل مؤقتًا.
+- UserActivityLogs تسجل المحاولات.
+
+اختبار C:
+- مستخدم بدون patients.create يحاول POST /patients.
+- النتيجة 403.
+- العملية لا تصل إلى Service.
+
+اختبار D:
+- Pharmacist يقدر يصرف Prescription.
+- Doctor لا يقدر يصرفها بدون Permission.
+
+اختبار E:
+- Doctor يرى بيانات Site/Department المسموح فقط.
+- لا يستطيع تجاوز Scope بتعديل Query Parameters.
+
+اختبار F:
+- Access Token منتهي.
+- Refresh يعمل مرة واحدة.
+- Session تبقى.
+- Refresh Token قديم يصبح غير صالح بعد Rotation.
+
+اختبار G:
+- EmergencyPatientDetail يقرأ Patient من PostgreSQL.
+- لا يوجد أي Patient Mock أو Fallback.
+
+==================================================
+التقرير النهائي
+==================================================
+
+بعد الانتهاء أعطني:
+
+- الجداول أو Migrations الجديدة.
+- Auth Endpoints.
+- Middleware الجديدة.
+- عدد Roles وPermissions.
+- نتائج الاختبارات A–G.
+- إثبات أن Passwords وRefresh Tokens مخزنة Hash.
+- إثبات أن Backend يطبق Permissions.
+- عدد الاستعمالات المتبقية لـMock Auth.
+- عدد Patient Mock lookups المتبقية داخل المسار السريري.
+- صفر أخطاء TypeScript.
+- صفر Runtime SQL Errors.
+
+لا تبدأ Facturation.
+لا تضف Features خارج هذا النطاق.
+```
+
+بعد نجاح هذي المرحلة، نروح لـ **Facturation + Paiements + Assurance**، لأنها أكبر فجوة وظيفية باقية حسب تقرير الـValidation.

@@ -9,3 +9,4 @@
 - [Task 84 DB Migration](task84-db-migration.md) — migration bugs, enum values, safeUuid(), audit_logs columns, seed fix, missing admissions route
 - [Encounter Unification](encounter-unification.md) — NO fallback: encounterStatus blocks clinical ops; jsonb_append→||; full clinical API (lab/imaging/rx/timeline)
 - [Admissions/ICU/Bloc API](admissions-icu-bloc-api.md) — discharge_type enum values; encounterId reuse in admit(); separate operating-rooms router; SSE broadcast pattern
+- [Auth + RBAC Architecture](auth-rbac.md) — JWT 15min + HttpOnly refresh cookie 7d; permissions in JWT payload; brute-force lock; 11 roles + 99 permissions in DB; requirePermission middleware

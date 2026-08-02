@@ -23,6 +23,7 @@ import operatingRoomsRouter   from "./operating-rooms";
 import notificationsRouter    from "./notifications";
 import occupancyBedsRouter    from "./occupancy-beds";
 import { requireAuth } from "../middleware/requireAuth";
+import { requirePermission } from "../middleware/requirePermission";
 
 const router: IRouter = Router();
 

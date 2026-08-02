@@ -7,6 +7,14 @@ import { useState, useRef, useEffect } from "react";
 import type { UserRole } from "@/types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
+  super_admin:    "Super Administrateur",
+  administrator:  "Administrateur",
+  director:       "Directeur",
+  doctor:         "Médecin",
+  nurse:          "Infirmier",
+  pharmacist:     "Pharmacien",
+  laboratory:     "Laboratoire",
+  radiology:      "Radiologie",
   administrateur: "Administrateur",
   directeur: "Directeur",
   medecin: "Médecin",
@@ -20,6 +28,14 @@ const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 const ROLE_COLORS: Record<UserRole, string> = {
+  super_admin:    "bg-red-100 text-red-700",
+  administrator:  "bg-blue-100 text-blue-700",
+  director:       "bg-indigo-100 text-indigo-700",
+  doctor:         "bg-emerald-100 text-emerald-700",
+  nurse:          "bg-teal-100 text-teal-700",
+  pharmacist:     "bg-yellow-100 text-yellow-700",
+  laboratory:     "bg-purple-100 text-purple-700",
+  radiology:      "bg-pink-100 text-pink-700",
   administrateur: "bg-blue-100 text-blue-700",
   directeur: "bg-indigo-100 text-indigo-700",
   medecin: "bg-emerald-100 text-emerald-700",
@@ -33,6 +49,14 @@ const ROLE_COLORS: Record<UserRole, string> = {
 };
 
 const AVATAR_BG: Record<UserRole, string> = {
+  super_admin:    "bg-red-600",
+  administrator:  "bg-blue-600",
+  director:       "bg-indigo-600",
+  doctor:         "bg-emerald-600",
+  nurse:          "bg-teal-600",
+  pharmacist:     "bg-yellow-500",
+  laboratory:     "bg-purple-600",
+  radiology:      "bg-pink-600",
   administrateur: "bg-blue-600",
   directeur: "bg-indigo-600",
   medecin: "bg-emerald-600",
@@ -238,7 +262,7 @@ export function Topbar({ collapsed, setCollapsed }: { collapsed: boolean, setCol
                   </button>
                   <div className="border-t border-gray-100 my-1" />
                   <button
-                    onClick={() => { setProfileOpen(false); logout(); }}
+                    onClick={() => { setProfileOpen(false); void logout(); }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />

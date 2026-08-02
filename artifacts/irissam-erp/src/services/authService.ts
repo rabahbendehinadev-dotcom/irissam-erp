@@ -7,14 +7,16 @@ export interface LoginCredentials {
 }
 
 export interface AuthServiceInterface {
-  login(credentials: LoginCredentials): Promise<{ user: User; token: string }>;
+  login(credentials: LoginCredentials): Promise<{ user: User; accessToken: string }>;
   logout(): Promise<void>;
+  refresh(): Promise<{ user: User; accessToken: string } | null>;
   getMe(): Promise<User | null>;
+  changePassword(current: string, next: string): Promise<void>;
 }
 
 export const authService: AuthServiceInterface = {
-  async login(credentials: LoginCredentials) {
-    const data = await apiClient.post<{ user: User; token: string }>(
+  async login(credentials) {
+    const data = await apiClient.post<{ user: User; accessToken: string }>(
       '/auth/login',
       credentials,
     );
@@ -22,7 +24,25 @@ export const authService: AuthServiceInterface = {
   },
 
   async logout() {
-    // Stateless JWT — nothing to call server-side
+    try {
+      // Server revokes the HttpOnly refresh-token cookie
+      await apiClient.post('/auth/logout', {});
+    } catch {
+      // Best-effort — still clear the client-side session
+    }
+  },
+
+  async refresh() {
+    try {
+      // The HttpOnly cookie is sent automatically; no body needed
+      const data = await apiClient.post<{ user: User; accessToken: string }>(
+        '/auth/refresh',
+        {},
+      );
+      return data;
+    } catch {
+      return null;
+    }
   },
 
   async getMe() {
@@ -32,5 +52,9 @@ export const authService: AuthServiceInterface = {
     } catch {
       return null;
     }
+  },
+
+  async changePassword(currentPassword, newPassword) {
+    await apiClient.post('/auth/change-password', { currentPassword, newPassword });
   },
 };

@@ -18,6 +18,7 @@ import { db, patientsTable } from "@workspace/db";
 import { patientService } from "../services/patient";
 import { repos } from "../repositories";
 import type { AuthenticatedRequest } from "../middleware/requireAuth";
+import { requirePermission } from "../middleware/requirePermission";
 import type { ActorCtx } from "../repositories/types";
 import type { DbPatient } from "../repositories/patient";
 
@@ -160,8 +161,8 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-/** POST /patients — create a new patient */
-router.post("/", async (req: AuthenticatedRequest, res, next) => {
+/** POST /patients — create a new patient (requires patients.create) */
+router.post("/", requirePermission("patients.create"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const body = req.body as PatientPayload;
 
@@ -235,8 +236,8 @@ router.post("/", async (req: AuthenticatedRequest, res, next) => {
   }
 });
 
-/** PUT /patients/:id — update patient */
-router.put("/:id", async (req: AuthenticatedRequest, res, next) => {
+/** PUT /patients/:id — update patient (requires patients.edit) */
+router.put("/:id", requirePermission("patients.edit"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const id = String(req.params.id);
     const body = req.body as PatientPayload;

@@ -13,6 +13,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db } from "@workspace/db";
 import { admissionsTable } from "@workspace/db/schema";
+import { requirePermission } from "../middleware/requirePermission";
 import {
   eq,
   isNull,
@@ -234,8 +235,8 @@ router.patch("/:id", async (req: AuthenticatedRequest, res: Response, next: Next
   }
 });
 
-/** POST /admissions/:id/transfer */
-router.post("/:id/transfer", async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+/** POST /admissions/:id/transfer (requires admissions.transfer) */
+router.post("/:id/transfer", requirePermission("admissions.transfer"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id   = String(req.params.id);
     const body = req.body as { newBedId?: string; notes?: string };
@@ -248,8 +249,8 @@ router.post("/:id/transfer", async (req: AuthenticatedRequest, res: Response, ne
   }
 });
 
-/** POST /admissions/:id/cancel */
-router.post("/:id/cancel", async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+/** POST /admissions/:id/cancel (requires admissions.cancel) */
+router.post("/:id/cancel", requirePermission("admissions.cancel"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = String(req.params.id);
     const [updated] = await db
@@ -264,8 +265,8 @@ router.post("/:id/cancel", async (req: AuthenticatedRequest, res: Response, next
   }
 });
 
-/** POST /admissions/:id/discharge */
-router.post("/:id/discharge", async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+/** POST /admissions/:id/discharge (requires admissions.discharge) */
+router.post("/:id/discharge", requirePermission("admissions.discharge"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = String(req.params.id);
     const body = req.body as {

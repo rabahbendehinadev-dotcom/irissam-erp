@@ -1,7 +1,17 @@
 /**
- * Base API client — no backend yet.
- * This will be wired to the real API server when modules are built.
- * All methods are stubs that return typed mock data.
+ * Central API client.
+ *
+ * Token strategy
+ * ──────────────
+ *  • Access token (15 min JWT) — stored in memory, sent as Bearer header.
+ *  • Refresh token (7 days) — HttpOnly SameSite=Strict cookie, never readable by JS.
+ *
+ * 401 handling
+ * ────────────
+ *  On a 401 response, the client calls onUnauthorized() (registered by AuthContext).
+ *  If it returns a new access token, the original request is retried once.
+ *  If it returns null (refresh also failed), the client emits an "auth:logout" event
+ *  so AuthContext can clear the session.
  */
 
 export interface RequestOptions {
@@ -9,11 +19,15 @@ export interface RequestOptions {
   body?: unknown;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  /** Skip the 401 auto-refresh retry (used internally for the /auth/refresh call). */
+  _skipRefresh?: boolean;
 }
 
 class ApiClient {
   private baseUrl: string;
   private authToken: string | null = null;
+  /** Registered by AuthContext on mount. Returns the new accessToken or null on failure. */
+  private onUnauthorized: (() => Promise<string | null>) | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -21,6 +35,10 @@ class ApiClient {
 
   setAuthToken(token: string | null) {
     this.authToken = token;
+  }
+
+  registerUnauthorizedHandler(handler: (() => Promise<string | null>) | null) {
+    this.onUnauthorized = handler;
   }
 
   private buildHeaders(extra?: Record<string, string>): Record<string, string> {
@@ -35,13 +53,45 @@ class ApiClient {
   }
 
   async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-    const { method = 'GET', body, headers, signal } = options;
+    const { method = 'GET', body, headers, signal, _skipRefresh } = options;
+
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method,
       headers: this.buildHeaders(headers),
-      body: body ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      credentials: 'include',   // send HttpOnly refresh cookie automatically
       signal,
     });
+
+    if (response.status === 401 && !_skipRefresh && this.onUnauthorized) {
+      // Try to refresh once
+      const newToken = await this.onUnauthorized();
+      if (newToken) {
+        // Retry with new token
+        const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {
+          method,
+          headers: this.buildHeaders(headers),
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+          credentials: 'include',
+          signal,
+        });
+        if (retryResponse.ok) {
+          return retryResponse.json() as Promise<T>;
+        }
+        const errRetry = await retryResponse.json().catch(() => ({ message: retryResponse.statusText }));
+        throw Object.assign(new Error(errRetry.message || 'API Error'), {
+          status: retryResponse.status,
+          data: errRetry,
+        });
+      }
+      // Refresh failed — emit logout event
+      window.dispatchEvent(new CustomEvent('auth:logout'));
+      const err = await response.json().catch(() => ({ message: 'Session expirée.' }));
+      throw Object.assign(new Error(err.message || 'Session expirée.'), {
+        status: 401,
+        data: err,
+      });
+    }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: response.statusText }));
@@ -50,6 +100,9 @@ class ApiClient {
         data: error,
       });
     }
+
+    // 204 No Content
+    if (response.status === 204) return undefined as unknown as T;
 
     return response.json() as Promise<T>;
   }

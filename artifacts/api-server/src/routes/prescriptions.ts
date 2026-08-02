@@ -13,6 +13,7 @@ import { repos } from "../repositories";
 import { safeUuid } from "../repositories/types";
 import { auditService } from "../services/audit";
 import type { AuthenticatedRequest } from "../middleware/requireAuth";
+import { requirePermission } from "../middleware/requirePermission";
 import type { ActorCtx } from "../repositories/types";
 import type { DbPrescription } from "../repositories/prescription";
 
@@ -153,8 +154,8 @@ router.patch("/:id/status", async (req: AuthenticatedRequest, res, next) => {
   } catch (err) { next(err); }
 });
 
-/** POST /prescriptions/:id/dispense */
-router.post("/:id/dispense", async (req: AuthenticatedRequest, res, next) => {
+/** POST /prescriptions/:id/dispense (requires pharmacy.dispense) */
+router.post("/:id/dispense", requirePermission("pharmacy.dispense"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const id   = String(req.params.id);
     const body = req.body as { dispensedByName?: string; dispenserComment?: string };

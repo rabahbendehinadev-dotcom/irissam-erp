@@ -1,19 +1,25 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import type { JwtPayload } from "../routes/auth";
 
 export interface AuthenticatedRequest extends Request {
-  auth?: { userId: string; role: string };
+  auth?: {
+    userId: string;
+    role: string;
+    permissions: string[];
+    siteId: string | null;
+  };
 }
 
 /**
  * JWT authentication middleware.
- * Attaches decoded payload to req.auth when a valid Bearer token is present.
- * Returns 401 if the token is missing, malformed, or expired.
+ * Verifies the Bearer token and attaches the decoded payload (including
+ * permissions) to req.auth.  Returns 401 on missing / invalid / expired token.
  */
 export function requireAuth(
   req: AuthenticatedRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
   const secret = process.env.SESSION_SECRET;
   if (!secret) {
@@ -29,8 +35,13 @@ export function requireAuth(
 
   const token = authHeader.slice(7);
   try {
-    const payload = jwt.verify(token, secret) as { userId: string; role: string };
-    req.auth = payload;
+    const payload = jwt.verify(token, secret) as JwtPayload;
+    req.auth = {
+      userId:      payload.userId,
+      role:        payload.role,
+      permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
+      siteId:      payload.siteId ?? null,
+    };
     next();
   } catch {
     res.status(401).json({ message: "Token invalide ou expiré." });
