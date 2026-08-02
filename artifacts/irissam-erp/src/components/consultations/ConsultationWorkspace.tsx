@@ -15,7 +15,8 @@ import { MedicalDocumentBuilder } from './MedicalDocumentBuilder';
 import { FollowUpPlanForm } from './FollowUpPlanForm';
 import { ConsultationHistoryPanel } from './ConsultationHistoryPanel';
 import { MOCK_PATIENTS } from '@/mock';
-import type { Consultation, ConsultationStatus, VitalSigns } from '@/types/consultation';
+import type { Consultation, ConsultationStatus, VitalSigns, AuditEntry } from '@/types/consultation';
+import { useAuth } from '@/store/AuthContext';
 
 // ─── VitalSigns display + edit ────────────────────────────────────────────────
 
@@ -306,55 +307,116 @@ function ContextTab({ consultation: c, readOnly, onChange }: {
   );
 }
 
+// ─── Audit helpers ────────────────────────────────────────────────────────────
+
+/** Returns a short "Browser / OS" string from the current User-Agent. */
+function getDeviceInfo(): string {
+  const ua = navigator.userAgent;
+  let browser = 'Navigateur';
+  let os = 'OS inconnu';
+
+  if (ua.includes('Firefox')) browser = 'Firefox';
+  else if (ua.includes('Edg/')) browser = 'Edge';
+  else if (ua.includes('OPR/') || ua.includes('Opera')) browser = 'Opera';
+  else if (ua.includes('Chrome')) browser = 'Chrome';
+  else if (ua.includes('Safari')) browser = 'Safari';
+
+  if (ua.includes('Windows NT 10') || ua.includes('Windows NT 11')) os = 'Windows';
+  else if (ua.includes('Windows')) os = 'Windows';
+  else if (ua.includes('Mac OS X')) os = 'macOS';
+  else if (ua.includes('Linux')) os = 'Linux';
+  else if (ua.includes('Android')) os = 'Android';
+  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+
+  return `${browser} / ${os}`;
+}
+
+/** Maps a set of changed keys to a human-readable French action label. */
+function inferAction(changedKeys: string[]): string {
+  if (changedKeys.includes('vitalSigns'))              return 'Saisie des signes vitaux';
+  if (changedKeys.includes('clinicalExam'))            return 'Examen clinique mis à jour';
+  if (changedKeys.includes('diagnoses'))               return 'Diagnostic modifié';
+  if (changedKeys.includes('prescriptions'))           return 'Prescription modifiée';
+  if (changedKeys.includes('labOrders'))               return 'Demande d\'analyses modifiée';
+  if (changedKeys.includes('imagingOrders'))           return 'Demande d\'imagerie modifiée';
+  if (changedKeys.includes('documents'))               return 'Document médical modifié';
+  if (changedKeys.includes('followUp'))                return 'Plan de suivi mis à jour';
+  if (changedKeys.includes('chiefComplaint') ||
+      changedKeys.includes('historyOfPresentIllness') ||
+      changedKeys.includes('reason'))                  return 'Contexte clinique mis à jour';
+  return 'Consultation mise à jour';
+}
+
+/** Generates a collision-resistant ID without crypto dependency. */
+function makeAuditId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 // ─── Audit tab ────────────────────────────────────────────────────────────────
 
-const MOCK_AUDIT_ENTRIES = [
-  { id: '1', user: 'Meziane Farid',  role: 'Médecin',      action: 'Ouverture de la consultation', at: '09:02', device: 'Chrome / Win11' },
-  { id: '2', user: 'Belkacemi Riad', role: 'Infirmier',    action: 'Saisie des signes vitaux',     at: '09:05', device: 'Firefox / Ubuntu' },
-  { id: '3', user: 'Meziane Farid',  role: 'Médecin',      action: 'Examen clinique complété',     at: '09:18', device: 'Chrome / Win11' },
-  { id: '4', user: 'Meziane Farid',  role: 'Médecin',      action: 'Diagnostic ajouté (CIM-10)',   at: '09:24', device: 'Chrome / Win11' },
-  { id: '5', user: 'Meziane Farid',  role: 'Médecin',      action: 'Ordonnance générée',           at: '09:31', device: 'Chrome / Win11' },
-  { id: '6', user: 'Admin Système',  role: 'Administrateur',action: 'Auto-sauvegarde',             at: '09:33', device: 'Système' },
-  { id: '7', user: 'Meziane Farid',  role: 'Médecin',      action: 'Consultation terminée',        at: '09:45', device: 'Chrome / Win11' },
-];
+function AuditTab({ consultationNumber, entries }: {
+  consultationNumber: string;
+  entries: AuditEntry[];
+}) {
+  const sorted = [...entries].sort((a, b) => a.at.localeCompare(b.at));
 
-function AuditTab({ consultation }: { consultation: Consultation }) {
+  const formatTime = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch {
+      return iso;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-800">Journal d'audit — {consultation.number}</h3>
-        <span className="text-xs text-gray-400">{MOCK_AUDIT_ENTRIES.length} entrées</span>
+        <h3 className="font-semibold text-gray-800">Journal d'audit — {consultationNumber}</h3>
+        <span className="text-xs text-gray-400">{entries.length} entrée{entries.length !== 1 ? 's' : ''}</span>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-gray-200">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              {['Heure', 'Utilisateur', 'Rôle', 'Action', 'Appareil'].map(h => (
-                <th key={h} className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-xs whitespace-nowrap">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {MOCK_AUDIT_ENTRIES.map(entry => (
-              <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-2.5 font-mono text-gray-500 whitespace-nowrap">{entry.at}</td>
-                <td className="px-4 py-2.5 font-medium text-gray-800 whitespace-nowrap">{entry.user}</td>
-                <td className="px-4 py-2.5">
-                  <span className="bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded-full text-xs whitespace-nowrap">
-                    {entry.role}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-gray-700">{entry.action}</td>
-                <td className="px-4 py-2.5 font-mono text-gray-400 whitespace-nowrap">{entry.device}</td>
+
+      {entries.length === 0 ? (
+        <div className="text-center py-10 text-gray-400 text-sm">Aucune action enregistrée pour cette session.</div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                {['Heure', 'Utilisateur', 'Rôle', 'Action', 'Appareil', 'Sync'].map(h => (
+                  <th key={h} className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-xs whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {sorted.map(entry => (
+                <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-gray-500 whitespace-nowrap">{formatTime(entry.at)}</td>
+                  <td className="px-4 py-2.5 font-medium text-gray-800 whitespace-nowrap">{entry.userName}</td>
+                  <td className="px-4 py-2.5">
+                    <span className="bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded-full text-xs whitespace-nowrap">
+                      {entry.userRole}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-gray-700">{entry.action}</td>
+                  <td className="px-4 py-2.5 font-mono text-gray-400 whitespace-nowrap">{entry.device}</td>
+                  <td className="px-4 py-2.5">
+                    {entry.syncStatus === 'synced' ? (
+                      <span className="text-green-600 font-medium">✓ Sync</span>
+                    ) : (
+                      <span className="text-amber-500 font-medium">⏳ En attente</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <p className="text-xs text-gray-400 text-center">
-        Données mock — l'audit complet sera connecté à l'API dans une prochaine version.
+        Les entrées en attente seront envoyées à l'API lors de la prochaine synchronisation.
       </p>
     </div>
   );
@@ -394,11 +456,52 @@ interface Props {
 }
 
 export function ConsultationWorkspace({ consultation, onChange, onStatusChange }: Props) {
+  const { user } = useAuth();
   const [activeTab, setActiveTab]   = useState('context');
   const [showSummary, setShowSummary] = useState(false);
   const [showPrint, setShowPrint]   = useState(false);
   const [saving, setSaving]         = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Audit log: seed from existing consultation data then grow locally ──────
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>(
+    () => consultation.auditLog ?? []
+  );
+
+  const deviceInfo = useRef<string>(getDeviceInfo());
+
+  /** Builds an AuditEntry for the current user/device. */
+  const makeEntry = useCallback((action: string): AuditEntry => {
+    const userName = user
+      ? `${user.firstName} ${user.lastName}`.trim()
+      : 'Utilisateur inconnu';
+    const userRole = user?.role ?? 'Inconnu';
+    const userId   = user?.id ?? 'anonymous';
+    return {
+      id: makeAuditId(),
+      at: new Date().toISOString(),
+      userId,
+      userName,
+      userRole,
+      action,
+      device: deviceInfo.current,
+      syncStatus: 'pending',
+    };
+  }, [user]);
+
+  // Record "workspace opened" once per mount
+  const openedRef = useRef(false);
+  useEffect(() => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    const entry = makeEntry('Ouverture de la consultation');
+    setAuditLog(prev => {
+      const updated = [...prev, entry];
+      onChange({ ...consultation, auditLog: updated, updatedAt: new Date().toISOString() });
+      return updated;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Patient lookup for allergies (PrescriptionBuilder conflict detection)
   const patient = MOCK_PATIENTS.find(p => p.id === consultation.patientId);
@@ -408,11 +511,25 @@ export function ConsultationWorkspace({ consultation, onChange, onStatusChange }
 
   // Debounced auto-save: shows "Enregistrement…" for 2s after last edit
   const update = useCallback((partial: Partial<Consultation>) => {
-    onChange({ ...consultation, ...partial, updatedAt: new Date().toISOString() });
+    const changedKeys = Object.keys(partial);
+    const action = inferAction(changedKeys);
+    const entry  = makeEntry(action);
+
+    setAuditLog(prev => {
+      const updated = [...prev, entry];
+      onChange({
+        ...consultation,
+        ...partial,
+        auditLog: updated,
+        updatedAt: new Date().toISOString(),
+      });
+      return updated;
+    });
+
     setSaving(true);
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => setSaving(false), 2000);
-  }, [consultation, onChange]);
+  }, [consultation, onChange, makeEntry]);
 
   // Cleanup on unmount
   useEffect(() => () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); }, []);
@@ -500,7 +617,7 @@ export function ConsultationWorkspace({ consultation, onChange, onStatusChange }
             <ConsultationHistoryPanel consultation={consultation} />
           </div>
           <div className={activeTab === 'audit'        ? '' : 'hidden'}>
-            <AuditTab consultation={consultation} />
+            <AuditTab consultationNumber={consultation.number} entries={auditLog} />
           </div>
 
         </div>

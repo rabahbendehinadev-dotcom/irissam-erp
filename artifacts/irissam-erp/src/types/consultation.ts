@@ -138,6 +138,21 @@ export interface ConsultationVersion {
   snapshot: string; // JSON snapshot of previous state
 }
 
+/** A single immutable audit entry generated locally on every clinical action. */
+export interface AuditEntry {
+  id: string;
+  /** ISO-8601 timestamp */
+  at: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  /** e.g. "Chrome 126 / Windows 11" */
+  device: string;
+  /** pending = not yet sent to API; synced = confirmed by server */
+  syncStatus: 'pending' | 'synced';
+}
+
 export interface Consultation {
   id: string;
   number: string;           // CON-2026-0001
@@ -189,6 +204,7 @@ export interface Consultation {
 
   // Audit
   versions?: ConsultationVersion[];
+  auditLog?: AuditEntry[];
   createdAt: string;
   updatedAt: string;
   createdById: string;
