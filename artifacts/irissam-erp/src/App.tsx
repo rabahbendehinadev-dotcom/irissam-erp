@@ -5,6 +5,7 @@ import { AppProvider } from '@/store/AppProvider';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useLanguage } from '@/i18n';
 import { useAuth } from '@/store/AuthContext';
+import { IOSInstallBanner } from '@/components/pwa/IOSInstallBanner';
 
 // Lazy-loaded page modules — each produces its own JS chunk
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -206,6 +207,7 @@ function App() {
     <AppProvider>
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <Router />
+        <IOSInstallBanner />
       </WouterRouter>
     </AppProvider>
   );

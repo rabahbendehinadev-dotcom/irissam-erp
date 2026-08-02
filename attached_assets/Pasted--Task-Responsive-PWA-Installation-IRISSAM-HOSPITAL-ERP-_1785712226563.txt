@@ -1,0 +1,444 @@
+ابدأ الآن Task عاجلة: Responsive كامل + PWA Installation لتطبيق IRISSAM HOSPITAL ERP.
+
+مهم جدًا:
+- لا تضف أي Module جديد.
+- لا تغيّر منطق الـBackend.
+- لا تغيّر قاعدة البيانات.
+- لا تغيّر الهوية البصرية أو الألوان الرئيسية.
+- لا تحذف أي Feature.
+- أصلح فقط Responsive / Mobile UX / Tablet UX / PWA.
+- راجع جميع الصفحات، وليس Dashboard فقط.
+- الهدف أن يكون المشروع صالحًا للعرض غدًا على iPhone وAndroid وTablet وDesktop.
+
+==================================================
+1. المشكلة الحالية
+==================================================
+
+على الهاتف:
+- الـSidebar تبقى مفتوحة وتأخذ نصف الشاشة.
+- محتوى Dashboard يخرج خلفها.
+- Cards وCharts تتداخل فوق بعضها.
+- النصوص والجداول غير مقروءة.
+- Topbar غير متكيفة.
+- الصفحة ليست قابلة للاستعمال عمليًا.
+
+اعتبر Screenshot الحالية مرجعًا للمشكلة.
+
+==================================================
+2. Breakpoints الرسمية
+==================================================
+
+اعتمد Breakpoints واضحة:
+
+- Mobile صغير: 320px → 479px
+- Mobile: 480px → 767px
+- Tablet: 768px → 1023px
+- Laptop: 1024px → 1439px
+- Desktop كبير: 1440px+
+
+اختبر خصوصًا:
+
+- iPhone SE
+- iPhone 13 / 14 / 15
+- iPhone Pro Max
+- Android 360×800
+- Android 412×915
+- iPad Mini
+- iPad Air
+- Tablet Android
+- Desktop 1366×768
+- Desktop 1920×1080
+
+==================================================
+3. Sidebar Mobile
+==================================================
+
+على Mobile وTablet:
+
+- الـSidebar تكون مغلقة افتراضيًا.
+- تفتح كـDrawer فوق المحتوى.
+- Overlay داكن خلفها.
+- زر Hamburger واضح في Topbar.
+- الضغط خارجها يغلقها.
+- الضغط على أي Route يغلقها تلقائيًا.
+- تمنع Scroll الخلفية وهي مفتوحة.
+- عرضها:
+  - Mobile: min(85vw, 320px)
+  - Tablet: 300px
+- لا يبقى أي جزء من المحتوى مزاحًا لليمين.
+- Desktop فقط تبقى Sidebar ثابتة.
+
+==================================================
+4. Topbar Responsive
+==================================================
+
+على الهاتف:
+
+أظهر فقط:
+- Hamburger
+- Logo مختصر
+- Notifications
+- User avatar
+
+اخفِ أو اجمع داخل Menu:
+- Site
+- Building
+- Floor
+- Department
+- Language
+- Sync status
+- Search الطويل
+
+أضف زر Filters يفتح Bottom Sheet أو Drawer يحتوي:
+- Site
+- Bâtiment
+- Étage
+- Service
+- Langue
+- Statut en ligne
+
+Search:
+- تتحول إلى Search icon.
+- عند الضغط تفتح Search Overlay كامل العرض.
+
+==================================================
+5. Dashboard Responsive
+==================================================
+
+كل Dashboard يجب أن يعاد ترتيبه:
+
+Mobile:
+- Cards عمود واحد.
+- كل Card بعرض 100%.
+- Charts واحد تحت الآخر.
+- لا يوجد أي overlap.
+- ارتفاع charts مناسب 240–300px.
+- legends تحت chart وليس فوقه.
+- tables تتحول إلى cards أو scroll أفقي مضبوط.
+- padding أفقي 12–16px.
+
+Tablet:
+- Cards عمودين.
+- Charts عمود واحد أو عمودين حسب العرض.
+- لا يوجد نص مقطوع.
+
+Desktop:
+- حافظ على الشكل الحالي.
+
+ممنوع:
+- position absolute في layout الرئيسي.
+- widths ثابتة كبيرة.
+- min-width تمنع التصغير.
+- overflow مخفي يخفي المحتوى.
+
+==================================================
+6. Responsive لجميع الصفحات
+==================================================
+
+راجع كل الصفحات الفعلية:
+
+- Login
+- Dashboard
+- Patients
+- PatientDetail
+- Appointments
+- Admissions
+- AdmissionDetail
+- Emergencies
+- EmergencyPatientDetail
+- Consultations
+- ConsultationWorkspace
+- Hospitalization
+- ICU
+- Operating Room
+- Laboratory
+- Imaging
+- Pharmacy
+- Blood Bank
+- Stock
+- Alerts
+- Facturation
+- Invoice Wizard
+- Payment Modal
+- Patient Invoices
+- Patient Payments
+- Patient Billing
+- Notifications
+- Settings
+- Administration
+
+لكل صفحة:
+- لا horizontal overflow غير مقصود.
+- لا white screen.
+- لا overlap.
+- الأزرار قابلة للضغط باللمس.
+- modals لا تتجاوز الشاشة.
+- drawers بعرض مناسب.
+- forms تتحول من صفين/ثلاثة إلى عمود واحد على الهاتف.
+- wizard يكون scrollable وfooter ثابت.
+- tables تتحول إلى responsive cards أو horizontal scroll مع sticky first column عند الحاجة.
+- tabs تكون horizontal scroll بدون كسر الصفحة.
+
+==================================================
+7. Modals / Drawers / Wizards
+==================================================
+
+Mobile:
+- Modal تتحول إلى Full Screen Sheet.
+- header ثابت.
+- footer ثابت.
+- content scrollable.
+- أزرار action بعرض مناسب.
+- لا يختفي زر Enregistrer أو Suivant تحت Safari toolbar.
+- استخدم safe-area-inset-bottom.
+
+أصلح خصوصًا:
+- Nouveau patient
+- Nouvelle consultation
+- Admission
+- Invoice Wizard
+- Payment Modal
+- Invoice detail slide-over
+- Patient document preview
+
+==================================================
+8. iPhone / Safari
+==================================================
+
+دعم كامل لـSafari iOS:
+
+- viewport-fit=cover
+- safe-area-inset-top
+- safe-area-inset-bottom
+- منع zoom غير المقصود عند التركيز على input
+- font-size inputs لا يقل عن 16px
+- دعم 100dvh بدل 100vh عند الحاجة
+- لا يعتمد layout على hover
+- buttons touch target minimum 44×44px
+
+أضف meta tags الصحيحة:
+
+- apple-mobile-web-app-capable=yes
+- apple-mobile-web-app-status-bar-style=default أو black-translucent
+- apple-mobile-web-app-title=IRISSAM ERP
+- theme-color
+- mobile-web-app-capable=yes
+
+==================================================
+9. PWA
+==================================================
+
+حوّل المشروع إلى PWA قابلة للتثبيت.
+
+أنشئ أو راجع:
+
+- manifest.webmanifest
+- service worker
+- icons:
+  - 192x192
+  - 512x512
+  - maskable 512x512
+  - apple-touch-icon 180x180
+- start_url
+- scope
+- display=standalone
+- orientation=any
+- background_color
+- theme_color
+- short_name=IRISSAM ERP
+- name=IRISSAM HOSPITAL ERP
+
+==================================================
+10. Install App — Android وDesktop
+==================================================
+
+أنشئ Install App Manager مشترك.
+
+على Android وDesktop:
+- استمع إلى beforeinstallprompt.
+- خزّن الـevent.
+- أظهر زر:
+  "Installer l’application"
+- الزر يظهر في:
+  - Topbar
+  - User menu
+  - Settings
+  - Login page بشكل صغير وغير مزعج
+- عند الضغط:
+  - prompt()
+  - تتبع userChoice
+  - اخفِ الزر بعد install
+- استمع إلى appinstalled.
+- لا يظهر الزر إذا التطبيق مثبت بالفعل.
+- لا يظهر داخل standalone mode.
+
+على Desktop:
+- أظهر Install App في أعلى Topbar قرب notifications أو داخل User Menu.
+- يكون واضحًا لكن غير مزعج.
+
+==================================================
+11. Install App — iPhone / iPad
+==================================================
+
+Safari iOS لا يدعم beforeinstallprompt.
+
+لذلك:
+- اكتشف iOS Safari.
+- إذا ليس في standalone:
+  - أظهر banner أو bottom sheet:
+    "Installer IRISSAM ERP"
+  - اشرح بصريًا:
+    1. اضغط زر مشاركة Safari
+    2. اختر "Sur l’écran d’accueil"
+    3. اضغط "Ajouter"
+- أضف زر "Compris".
+- لا يظهر كل مرة:
+  - خزّن dismissedAt في localStorage لمدة 7 أيام.
+- أظهر التعليمات أيضًا داخل Settings > Installer l’application.
+
+مهم:
+- لا تقل إن iPhone يثبت تلقائيًا.
+- أعطِ تعليمات Add to Home Screen الصحيحة.
+- بعد التثبيت يفتح التطبيق standalone بدون Safari chrome.
+
+==================================================
+12. Offline Shell
+==================================================
+
+فعّل Offline Shell آمن:
+
+- cache للـassets الثابتة فقط.
+- لا cache للبيانات الطبية الحساسة بشكل عشوائي.
+- API network-first.
+- عند انقطاع الإنترنت:
+  - اعرض Offline Banner.
+  - لا تعرض بيانات قديمة دون توضيح.
+  - لا تسمح بإرسال عمليات حساسة إذا لم يكن عندك queue موثوقة.
+- لا تبدأ Offline Editing كامل الآن.
+
+==================================================
+13. Navigation PWA
+==================================================
+
+عند فتح التطبيق من Home Screen:
+
+- يفتح Login إذا غير مسجل.
+- يفتح آخر route آمنة أو Dashboard إذا مسجل.
+- Refresh على أي route يعمل.
+- لا 404.
+- back button يعمل.
+- لا redirect loop.
+- لا loading loop.
+
+==================================================
+14. Responsive Tables
+==================================================
+
+أنشئ نمطين:
+
+Desktop:
+- table عادية.
+
+Mobile:
+- Card List لكل سطر، مع:
+  - العنوان الرئيسي
+  - أهم 3–5 قيم
+  - status badge
+  - menu actions
+- أو horizontal scroll فقط للجداول المعقدة جدًا.
+
+طبق هذا خصوصًا على:
+- Patients
+- Admissions
+- Consultations
+- Laboratory
+- Imaging
+- Pharmacy
+- Invoices
+- Payments
+- Audit logs
+
+==================================================
+15. Performance Mobile
+==================================================
+
+- Lazy load للصفحات الثقيلة.
+- لا ترسم جميع Charts دفعة واحدة إذا خارج viewport.
+- ResponsiveContainer لكل Recharts.
+- debounce للبحث.
+- تقليل إعادة render.
+- Skeleton مناسب.
+- لا layout shift كبير.
+- الصور والـicons محسنة.
+
+==================================================
+16. اختبارات القبول
+==================================================
+
+TEST A — iPhone:
+فتح Login → Dashboard → Patient → Factures
+لا overlap ولا horizontal overflow.
+
+TEST B — Android:
+يظهر Install App.
+التثبيت ينجح.
+يفتح standalone.
+
+TEST C — iPhone Safari:
+تظهر تعليمات Add to Home Screen.
+بعد الإضافة يفتح standalone.
+
+TEST D — Desktop Chrome:
+يظهر Install App في Topbar/User menu.
+التثبيت ينجح.
+
+TEST E — Sidebar:
+Mobile مغلقة افتراضيًا، Drawer تعمل، وتغلق بعد navigation.
+
+TEST F — Dashboard:
+Cards وCharts لا تتداخل على 360px.
+
+TEST G — Modals:
+InvoiceWizard وPaymentModal وNewPatient صالحين للاستعمال على الهاتف.
+
+TEST H — Tables:
+Patients وInvoices وAdmissions مقروءة على الهاتف.
+
+TEST I — Direct Refresh:
+كل route تفتح مباشرة بدون 404.
+
+TEST J — PWA:
+Manifest valid + Service Worker registered + icons موجودة.
+
+TEST K — Offline:
+Offline banner يظهر، ولا يحدث crash.
+
+TEST L — Console:
+0 Runtime Errors.
+
+TEST M — TypeScript:
+0 errors.
+
+==================================================
+17. تقرير نهائي
+==================================================
+
+أعطني تقريرًا مفصلًا يتضمن:
+
+- جميع الملفات المعدلة.
+- Breakpoints المستعملة.
+- عدد الصفحات التي تم فحصها.
+- الصفحات التي تحولت إلى Mobile Cards.
+- الـmodals التي أصبحت Full Screen على الهاتف.
+- حالة PWA manifest.
+- حالة Service Worker.
+- نتيجة Android install.
+- نتيجة iOS Add to Home Screen.
+- نتيجة Desktop install.
+- نتائج TEST A–M.
+- عدد حالات horizontal overflow المتبقية.
+- عدد white screens.
+- TypeScript errors = 0.
+- Runtime errors = 0.
+
+لا تبدأ Assurance أو أي Module آخر قبل إنهاء هذه المهمة بالكامل.

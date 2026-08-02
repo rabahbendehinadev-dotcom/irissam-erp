@@ -121,38 +121,38 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[300px]">
-          <div className="lg:col-span-5 h-full">
+        {/* Charts Row — fixed height on desktop, auto on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[300px]">
+          <div className="lg:col-span-5 h-[260px] lg:h-full">
             <WidgetErrorBoundary label="ChartConsultations">
               <ChartConsultations />
             </WidgetErrorBoundary>
           </div>
-          <div className="lg:col-span-4 h-full">
+          <div className="lg:col-span-4 h-[260px] lg:h-full">
             <WidgetErrorBoundary label="ChartAdmissions">
               <ChartAdmissions />
             </WidgetErrorBoundary>
           </div>
-          <div className="lg:col-span-3 h-full">
+          <div className="lg:col-span-3 h-[260px] lg:h-full">
             <WidgetErrorBoundary label="ChartServices">
               <ChartServices />
             </WidgetErrorBoundary>
           </div>
         </div>
 
-        {/* Lists Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[320px]">
-          <div className="h-full">
+        {/* Lists Row — fixed height on desktop, auto on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:h-[320px]">
+          <div className="h-[280px] lg:h-full">
             <WidgetErrorBoundary label="AlertsPanel">
               <AlertsPanel />
             </WidgetErrorBoundary>
           </div>
-          <div className="h-full">
+          <div className="h-[280px] lg:h-full">
             <WidgetErrorBoundary label="RecentPatients">
               <RecentPatients onPatientClick={setSelectedPatientId} />
             </WidgetErrorBoundary>
           </div>
-          <div className="h-full">
+          <div className="h-[280px] lg:h-full">
             <WidgetErrorBoundary label="UpcomingAppointments">
               <UpcomingAppointments onPatientClick={setSelectedPatientId} />
             </WidgetErrorBoundary>

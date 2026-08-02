@@ -296,8 +296,8 @@ export function InvoiceWizard({ onClose, onCreate, loading }: WizardProps) {
   ).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 sm:p-4">
+      <div className="bg-white sm:rounded-xl shadow-2xl w-full sm:max-w-3xl h-full sm:h-auto sm:max-h-[90vh] max-h-[100dvh] flex flex-col rounded-t-2xl">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b shrink-0">
