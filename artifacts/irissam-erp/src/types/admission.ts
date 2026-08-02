@@ -87,6 +87,7 @@ export interface Bed {
 export interface Admission {
   id: string;
   admissionNumber: string;    // ADM-2026-0001
+  encounterId?: string;       // linked PostgreSQL encounter UUID
   patientId: string;
   patientMpiId: string;
   patientName: string;        // denormalized for display

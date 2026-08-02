@@ -2,8 +2,7 @@ import {
   createContext, useContext, useState, useEffect, useCallback, useRef,
 } from 'react';
 import { useAuth } from '@/store/AuthContext';
-import { useMockRepository } from '@/store/MockRepository';
-import { useAdmissions } from '@/store/AdmissionsContext';
+import type { EmergencyPatient } from '@/types/emergency';
 import { useToast } from '@/hooks/use-toast';
 import { getMockDossier } from '@/mock/emergencyDossier';
 import { apiClient } from '@/services/api/client';
@@ -18,7 +17,7 @@ import type {
   Prescription, Procedure, ClinicalNote, FinalDecision, AuditEntry,
   ObservationEntry, ClinicalExamination,
 } from '@/types/emergencyDossier';
-import type { EmergencyPatient } from '@/types/emergency';
+// EmergencyPatient imported above (line 5)
 
 // ─── Context Shape ────────────────────────────────────────────────────────────
 
@@ -81,14 +80,15 @@ const EmergencyDossierContext = createContext<EmergencyDossierContextType | unde
 
 export function EmergencyDossierProvider({
   patientId,
+  patient: propPatient,
   children,
 }: {
   patientId: string;
+  /** Pass the EmergencyPatient from the waiting-room list so DossierHeader can show real patient info. */
+  patient?: EmergencyPatient | null;
   children: React.ReactNode;
 }) {
   const { user } = useAuth();
-  const repo = useMockRepository();
-  const { addAdmission: admissionsAddAdmission } = useAdmissions();
   const { toast } = useToast();
   const [dossier, setDossier] = useState<EmergencyDossier>(() => getMockDossier(patientId));
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -105,8 +105,8 @@ export function EmergencyDossierProvider({
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Live patient from repository — updates when startCare / decisions mutate status
-  const patient = repo.getPatient(patientId);
+  // Patient object — provided by the caller (EmergencyPatientDetail) via prop
+  const patient = propPatient ?? null;
 
   // ── Auto-save on every dossier change (2-second debounce) ─────────────────
   useEffect(() => {
@@ -285,8 +285,7 @@ export function EmergencyDossierProvider({
     setDossier(d => ({ ...d, labRequests: [...d.labRequests, r] }));
     pushAudit({ action: 'Analyse demandée', category: 'lab', details: r.test });
     // Persist to PostgreSQL via API — fire-and-forget with error feedback
-    const pt = repo.getPatient(patientId);
-    const patientName = pt ? `${pt.lastName} ${pt.firstName}` : patientId;
+    const patientName = patient ? `${patient.lastName} ${patient.firstName}` : patientId;
     apiClient.post('/lab-orders', {
       patientId,
       encounterId: realEncounterId,
@@ -301,7 +300,7 @@ export function EmergencyDossierProvider({
       console.error('[EmergencyDossier] lab order API failed:', err);
       toast({ title: 'Erreur réseau', description: 'L\'analyse a été enregistrée localement. Réessayez si elle n\'apparaît pas.', variant: 'destructive' });
     });
-  }, [who, whoId, realEncounterId, pushAudit, repo, patientId, toast]);
+  }, [who, whoId, realEncounterId, pushAudit, patient, patientId, toast]);
 
   const updateLabStatus = useCallback((id: string, status: LabRequest['status'], result?: string, isCritical?: boolean) => {
     setDossier(d => ({
@@ -340,8 +339,7 @@ export function EmergencyDossierProvider({
     setDossier(d => ({ ...d, imagingRequests: [...d.imagingRequests, r] }));
     pushAudit({ action: 'Imagerie demandée', category: 'imaging', details: `${r.exam} — ${r.region}` });
     // Persist to PostgreSQL via API — fire-and-forget with error feedback
-    const pt = repo.getPatient(patientId);
-    const patientName = pt ? `${pt.lastName} ${pt.firstName}` : patientId;
+    const patientName = patient ? `${patient.lastName} ${patient.firstName}` : patientId;
     apiClient.post('/imaging-orders', {
       patientId,
       encounterId: realEncounterId,
@@ -357,7 +355,7 @@ export function EmergencyDossierProvider({
       console.error('[EmergencyDossier] imaging order API failed:', err);
       toast({ title: 'Erreur réseau', description: 'L\'imagerie a été enregistrée localement. Réessayez si elle n\'apparaît pas.', variant: 'destructive' });
     });
-  }, [who, whoId, realEncounterId, pushAudit, repo, patientId, toast]);
+  }, [who, whoId, realEncounterId, pushAudit, patient, patientId, toast]);
 
   const updateImagingStatus = useCallback((id: string, status: ImagingRequest['status'], result?: string) => {
     setDossier(d => ({
@@ -390,8 +388,7 @@ export function EmergencyDossierProvider({
     setDossier(d => ({ ...d, prescriptions: [...d.prescriptions, p] }));
     pushAudit({ action: 'Prescription', category: 'prescription', details: `${p.drug} ${p.dosage} ${p.route}` });
     // Persist to PostgreSQL via API — fire-and-forget with error feedback
-    const pt = repo.getPatient(patientId);
-    const patientName = pt ? `${pt.lastName} ${pt.firstName}` : patientId;
+    const patientName = patient ? `${patient.lastName} ${patient.firstName}` : patientId;
     apiClient.post('/prescriptions', {
       patientId,
       encounterId: realEncounterId,
@@ -407,7 +404,7 @@ export function EmergencyDossierProvider({
       console.error('[EmergencyDossier] prescription API failed:', err);
       toast({ title: 'Erreur réseau', description: 'La prescription a été enregistrée localement. Réessayez si elle n\'apparaît pas.', variant: 'destructive' });
     });
-  }, [who, whoId, realEncounterId, pushAudit, repo, patientId, toast]);
+  }, [who, whoId, realEncounterId, pushAudit, patient, patientId, toast]);
 
   const updatePrescriptionStatus = useCallback((id: string, status: Prescription['status'], adminAt?: string, by?: string) => {
     setDossier(d => ({
@@ -524,10 +521,7 @@ export function EmergencyDossierProvider({
     }
 
     const now = new Date().toISOString();
-    const auditCtx = { userId: whoId, userName: who, userRole: whoRole };
-    const visitId = realEncounterId ?? `visit-${patientId}`;
-    const pt = repo.getPatient(patientId);
-    const patientName = pt ? `${pt.lastName} ${pt.firstName}` : patientId;
+    const patientName = patient ? `${patient.lastName} ${patient.firstName}` : patientId;
 
     setDossier(prev => ({
       ...prev,
@@ -539,70 +533,65 @@ export function EmergencyDossierProvider({
       },
     }));
 
-    // ── Cross-module actions based on decision ─────────────────────────────
+    // ── Cross-module actions via real PostgreSQL API ────────────────────────
     if (decision === 'domicile') {
-      repo.closeVisitDischarged(patientId, auditCtx, realEncounterId ?? undefined);
+      // Close the encounter in the DB
+      if (realEncounterId) {
+        apiClient.patch(`/encounters/${realEncounterId}/status`, { status: 'closed', reason: 'Retour à domicile' })
+          .catch((err: Error) => console.error('[EmergencyDossier] encounter close failed:', err));
+      }
 
     } else if (decision === 'hospitalisation') {
-      const admId = `adm-urg-${Date.now()}`;
-      admissionsAddAdmission({
-        id: admId,
-        admissionNumber: `URG-${now.replace(/\D/g, '').slice(0, 12)}`,
+      // Create a real admission record linked to this encounter
+      apiClient.post('/admissions', {
         patientId,
-        patientMpiId: pt?.mpiId ?? '',
+        encounterId: realEncounterId,
         patientName,
-        type: 'urgence' as const,
-        status: 'active' as const,
-        priority: 'urgent' as const,
-        serviceId: d.finalDecision.ward ?? 'service-inconnu',
+        type: 'urgence',
         serviceName: d.finalDecision.ward ?? 'À déterminer',
         doctorId: whoId,
         doctorName: who,
         motif: d.chiefComplaint,
-        diagnosis: d.finalDecision.medicalSummary,
+        notes: d.finalDecision.medicalSummary ?? '',
         admissionDate: now.split('T')[0],
         admissionTime: now.split('T')[1].slice(0, 5),
-        notes: d.finalDecision.medicalSummary ?? '',
-        siteId: user?.siteId ?? 'default',
-        createdAt: now,
-        updatedAt: now,
-        createdById: whoId,
-      });
-      repo.closeVisitHospitalized(patientId, admId, auditCtx, realEncounterId ?? undefined);
+        priority: 'urgent',
+      }).catch((err: Error) => console.error('[EmergencyDossier] admission create failed:', err));
 
     } else if (decision === 'bloc') {
-      const surgId = repo.createSurgicalRequest({
-        visitId, patientId, patientName,
+      // Create a surgical request in the real DB
+      apiClient.post('/surgical-requests', {
+        patientId,
+        encounterId: realEncounterId,
+        patientName,
         intervention: d.finalDecision.intervention ?? 'À déterminer',
-        surgeon: d.finalDecision.surgeon,
-        anesthesist: d.finalDecision.anesthesist,
+        surgeonName: d.finalDecision.surgeon,
         urgencyDegree: d.finalDecision.urgencyDegree ?? 'urgent',
-        preOpPrep: d.finalDecision.preOpPrep,
-        consentSigned: d.finalDecision.consentSigned ?? false,
-        status: 'demande' as const,
-        requestedBy: who,
-        requestedById: whoId,
-      });
-      repo.closeVisitBloc(patientId, surgId, auditCtx, realEncounterId ?? undefined);
+        sourceModule: 'urgences',
+      }).catch((err: Error) => console.error('[EmergencyDossier] surgical request failed:', err));
 
     } else if (decision === 'reanimation') {
-      const icuId = repo.createICUAdmission({
-        visitId, patientId, patientName,
+      // Create an ICU admission in the real DB
+      apiClient.post('/icu/admissions', {
+        patientId,
+        encounterId: realEncounterId,
+        patientName,
         motif: d.finalDecision.icuMotif ?? d.chiefComplaint,
-        priority: d.finalDecision.icuPriority ?? 'urgent',
+        priority: d.finalDecision.icuPriority ?? 'P1',
         icuBed: d.finalDecision.icuBed,
-        teamNotified: d.finalDecision.icuTeamNotified ?? false,
-        status: 'demande' as const,
-        requestedBy: who,
-        requestedById: whoId,
-      });
-      repo.closeVisitICU(patientId, icuId, auditCtx, realEncounterId ?? undefined);
+      }).catch((err: Error) => console.error('[EmergencyDossier] ICU admission failed:', err));
 
     } else if (decision === 'transfert') {
-      repo.closeVisitTransferred(patientId, auditCtx, d.finalDecision.destEtablissement, realEncounterId ?? undefined);
+      if (realEncounterId) {
+        apiClient.patch(`/encounters/${realEncounterId}/status`, { status: 'closed', reason: `Transfert → ${d.finalDecision.destEtablissement ?? 'autre établissement'}` })
+          .catch((err: Error) => console.error('[EmergencyDossier] encounter close failed:', err));
+      }
 
     } else if (decision === 'deces') {
-      repo.closeVisitDeceased(patientId, auditCtx, d.finalDecision.provisionalCause, realEncounterId ?? undefined);
+      if (realEncounterId) {
+        apiClient.patch(`/encounters/${realEncounterId}/status`, { status: 'closed', reason: 'Décès' })
+          .catch((err: Error) => console.error('[EmergencyDossier] encounter close failed:', err));
+      }
     }
 
     // Auto-transition dossier workflow
@@ -617,7 +606,7 @@ export function EmergencyDossierProvider({
     const nextStatus = statusMap[decision];
     if (nextStatus) transitionStatus(nextStatus, `Décision: ${decision}`);
     pushAudit({ action: 'Décision finale', category: 'decision', details: decision });
-  }, [dossier, who, whoId, whoRole, patientId, user, repo, admissionsAddAdmission, transitionStatus, pushAudit]);
+  }, [dossier, who, whoId, whoRole, patientId, patient, realEncounterId, transitionStatus, pushAudit, toast]);
 
   // ── Manual save & audit ───────────────────────────────────────────────────
   const triggerSave = useCallback(() => {

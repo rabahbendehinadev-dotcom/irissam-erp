@@ -42,10 +42,8 @@ function mapApiAdmission(a: any): Admission {
     notes:               a.notes           ?? '',
     createdAt:           a.createdAt       ?? new Date().toISOString(),
     updatedAt:           a.updatedAt       ?? new Date().toISOString(),
-    // UI-only fields (timeline / audit) — empty when from real API
-    timeline:            [],
-    auditTrail:          [],
     siteId:              a.siteId          ?? '',
+    createdById:         a.createdById     ?? '',
   };
 }
 

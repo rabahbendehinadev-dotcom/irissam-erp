@@ -1,0 +1,195 @@
+ممتاز، هذي المرحلة نجحت مليح. دك ما بقى غير **ننظفو آخر الاعتماد على MockRepository** قبل Task #85.
+
+عندك 3 ملفات مهمين مازالو مربوطين بالـMock:
+
+* `BedSelector.tsx`
+* `AdmissionMiniDashboard`
+* `EmergencyDossierContext` بالنسبة لإحصائيات الأسرة
+
+هاذو لازم نربطوهم بالـAPI الحقيقي باش ما يبقاش عندك جزء Live وجزء Mock في نفس الـWorkflow.
+
+ابعثلو هذا البرومبت:
+
+```text
+لا تبدأ Task #85 الآن.
+
+نفّذ الآن مرحلة إزالة آخر اعتماد مباشر على MockRepository من Workflow الخاص بالأسرة والدخول والاستعجالات.
+
+مهم جدًا:
+- لا تغيّر التصميم.
+- لا تضف Features جديدة.
+- لا تغيّر الـUX.
+- لا تستعمل بيانات محلية ثابتة.
+- استعمل APIs الحالية فقط.
+- جميع التحديثات تظهر بدون Refresh.
+
+==================================================
+1. BedSelector.tsx
+==================================================
+
+استبدل القراءة من MockRepository بـ:
+
+GET /api/occupancy-beds/available
+
+المطلوب:
+
+- عرض الأسرة المتاحة فقط.
+- دعم الفلاتر:
+  - siteId
+  - buildingId
+  - floorId
+  - departmentId
+  - roomType
+- كل خيار يعرض:
+  - رقم السرير
+  - الغرفة
+  - القسم
+  - الطابق
+  - الحالة
+- عند تغير الفلاتر أعد جلب القائمة.
+- أظهر Loading وEmpty State وError State.
+- لا تسمح باختيار سرير لم يعد متاحًا.
+- قبل تأكيد Admission أعد التحقق من توفر السرير.
+- إذا أصبح السرير مشغولًا، اعرض رسالة وحدث القائمة.
+
+==================================================
+2. AdmissionMiniDashboard
+==================================================
+
+استبدل جميع الإحصائيات المحلية بـAPI حقيقية.
+
+استعمل:
+
+GET /api/occupancy-beds
+GET /api/admissions
+
+احسب واعرض:
+
+- Total beds
+- Occupied
+- Available
+- Cleaning
+- Maintenance
+- Out of service
+- Admissions today
+- Discharges today
+- Occupancy rate
+
+الإحصائيات تتأثر بفلاتر:
+- Site
+- Building
+- Floor
+- Department
+
+تتحدث مباشرة عند:
+- Admission
+- Transfer
+- Discharge
+- Cleaning started
+- Cleaning completed
+
+استعمل Query Cache أو SSE لتحديث الواجهة دون Refresh.
+
+==================================================
+3. EmergencyDossierContext
+==================================================
+
+احذف أي قراءة لإحصائيات الأسرة من MockRepository.
+
+استعمل:
+
+GET /api/occupancy-beds
+GET /api/occupancy-beds/available
+
+المطلوب:
+
+- Badge الأسرة داخل Dossier Urgence يعرض الأرقام الحقيقية.
+- عند Hospitaliser:
+  - يعاد جلب الأسرة المتاحة.
+  - يُمرر نفس encounterId الحقيقي.
+  - بعد نجاح Admission تتحدث الإحصائيات.
+- عند ICU:
+  - استعمل /api/icu/beds.
+- لا تخزن Bed State محليًا إلا كـUI cache مؤقت.
+- الـAPI هي مصدر الحقيقة الوحيد.
+
+==================================================
+4. Dashboard Widgets
+==================================================
+
+راجع فقط Widgets المرتبطة بـ:
+- Beds
+- Admissions
+- ICU
+- Operating Rooms
+
+تأكد أنها تقرأ من API الحقيقي.
+
+لا تصلح أخطاء TypeScript القديمة غير المرتبطة بهذه المرحلة إلا إذا تمنع التشغيل.
+
+==================================================
+5. إزالة الاعتماد
+==================================================
+
+ابحث في كامل المشروع عن:
+
+useMockRepository()
+
+داخل:
+
+- Admissions
+- Hospitalisation
+- EmergencyDossier
+- Resuscitation
+- OperatingRoom
+- BedSelector
+- AdmissionMiniDashboard
+
+في PostgreSQL mode يجب أن تكون النتيجة صفر.
+
+إذا بقي MockRepository، يجب أن يكون فقط في DEV mode أو Test Runner.
+
+==================================================
+6. اختبارات القبول
+==================================================
+
+اختبار A:
+- افتح AdmissionForm.
+- تأكد أن BedSelector يعرض الأسرة الحقيقية المتاحة.
+- احجز سريرًا.
+- افتح الفورم مرة أخرى.
+- يجب ألا يظهر السرير المحجوز.
+
+اختبار B:
+- نفّذ Transfer.
+- السرير القديم يظهر Available أو Cleaning حسب الـWorkflow.
+- السرير الجديد لا يظهر ضمن Available.
+
+اختبار C:
+- نفّذ Discharge.
+- AdmissionMiniDashboard يتحدث فورًا.
+- Cleaning ثم Available يظهران بدون Refresh.
+
+اختبار D:
+- افتح Dossier Urgence.
+- Badge الأسرة يطابق بيانات PostgreSQL.
+- Hospitaliser يحدث الأرقام مباشرة.
+
+اختبار E:
+- ابحث عن useMockRepository داخل الملفات المذكورة.
+- النتيجة صفر في PostgreSQL mode.
+
+في النهاية أعطني:
+
+- الملفات المعدلة.
+- نتائج الاختبارات A–E.
+- عدد الاستعمالات المتبقية لـMockRepository.
+- قائمة الاستعمالات المتبقية ولماذا.
+- صفر أخطاء TypeScript جديدة.
+- صفر Runtime SQL Errors.
+
+لا تبدأ Task #85.
+لا تبدأ Facturation.
+```
+
+بعد ما يكمل هذي، نقدر نعتبر **Core Clinical Flow كامل على PostgreSQL**. بعدها الاختيار الصحيح يكون: **Auth الحقيقي + RBAC من قاعدة البيانات** قبل Facturation.

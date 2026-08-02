@@ -19,9 +19,8 @@ import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { useAdmissionsApi } from '@/hooks/useAdmissionsApi';
-import { useMockRepository } from '@/store/MockRepository';
+import { apiClient } from '@/services/api/client';
 import { useAuth } from '@/store/AuthContext';
-import type { AuditCtx } from '@/types/repository';
 import { formatDate } from '@/utils/format';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
 import { PatientDrawer } from '@/components/shared/PatientDrawer';
@@ -203,15 +202,8 @@ export default function AdmissionsPage() {
   const { log } = useAuditLog();
   const [, navigate] = useLocation();
   const { admissions, discharge, transfer, cancel, loading: admLoading } = useAdmissionsApi();
-  const repo = useMockRepository();
   const { user } = useAuth();
-
-  /** AuditCtx forwarded to bed-lifecycle mutations */
-  const repoCtx: AuditCtx = {
-    userId:   user?.id ?? 'admissions-page',
-    userName: user ? `${user.firstName} ${user.lastName}` : 'Admissions',
-    userRole: user?.role ?? 'admin',
-  };
+  const [bedRefreshKey, setBedRefreshKey] = useState(0);
 
   const [filters, setFilters] = useState<AdmissionFiltersState>(DEFAULT_ADM_FILTERS);
   const [page, setPage]       = useState(1);
@@ -307,8 +299,8 @@ export default function AdmissionsPage() {
           }
         />
 
-        {/* Mini-dashboard */}
-        <AdmissionMiniDashboard />
+        {/* Mini-dashboard — refreshKey increments after any bed-lifecycle operation */}
+        <AdmissionMiniDashboard refreshKey={bedRefreshKey} />
 
         {/* Filters */}
         <AdmissionFilters
@@ -392,8 +384,9 @@ export default function AdmissionsPage() {
             await discharge(discharging.id, type, date, time, notes).catch(() => {});
             log('archive', 'admission', discharging.id, `Sortie ${type}`);
             if (discharging.bedId) {
-              repo.startBedCleaning(discharging.bedId, repoCtx);
+              apiClient.post(`/occupancy-beds/${discharging.bedId}/start-cleaning`, {}).catch(() => {});
             }
+            setBedRefreshKey(k => k + 1);
             setDischarging(null);
           }}
           onCancel={() => setDischarging(null)}
@@ -407,8 +400,9 @@ export default function AdmissionsPage() {
             await transfer(transferring.id, to, date, notes).catch(() => {});
             log('update', 'admission', transferring.id, `Transfert → ${to}`);
             if (transferring.bedId) {
-              repo.startBedCleaning(transferring.bedId, repoCtx);
+              apiClient.post(`/occupancy-beds/${transferring.bedId}/start-cleaning`, {}).catch(() => {});
             }
+            setBedRefreshKey(k => k + 1);
             setTransferring(null);
           }}
           onCancel={() => setTransferring(null)}
@@ -434,8 +428,9 @@ export default function AdmissionsPage() {
                 await cancel(cancelling.id).catch(() => {});
                 log('archive', 'admission', cancelling.id);
                 if (cancelling.bedId) {
-                  repo.freeBed(cancelling.bedId, repoCtx);
+                  apiClient.post(`/occupancy-beds/${cancelling.bedId}/release`, {}).catch(() => {});
                 }
+                setBedRefreshKey(k => k + 1);
                 setCancelling(null);
               }}
                 className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">

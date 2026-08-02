@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmergencyDossierProvider } from '@/contexts/EmergencyDossierContext';
+import { useMockRepository } from '@/store/MockRepository';
 import { DossierHeader } from '@/components/emergencies/dossier/DossierHeader';
 import { DossierAlertBanner } from '@/components/emergencies/dossier/DossierAlertBanner';
 import { DossierTimeline } from '@/components/emergencies/dossier/DossierTimeline';
@@ -104,9 +105,11 @@ function DossierPage() {
 export default function EmergencyPatientDetail() {
   const [, params] = useRoute('/emergencies/:id');
   const patientId = params?.id ?? 'ep-01';
+  const { getPatient } = useMockRepository();
+  const patient = getPatient(patientId);
 
   return (
-    <EmergencyDossierProvider patientId={patientId}>
+    <EmergencyDossierProvider patientId={patientId} patient={patient}>
       <DossierPage />
     </EmergencyDossierProvider>
   );
