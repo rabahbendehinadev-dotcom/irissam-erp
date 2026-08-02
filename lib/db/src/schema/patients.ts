@@ -20,8 +20,9 @@ import { usersTable } from "./users";
 
 export const patientsTable = pgTable("patients", {
   id:             uuid("id").primaryKey().defaultRandom(),
-  mpiId:          text("mpi_id").notNull(),           // Master Patient Index
-  fileNumber:     text("file_number").notNull(),       // Hospital file number
+  mrn:            text("mrn").notNull(),               // Medical Record Number — permanent, hospital-scoped, e.g. MRN-2026-00001
+  mpiId:          text("mpi_id").notNull(),            // Master Patient Index — cross-facility
+  fileNumber:     text("file_number").notNull(),       // Hospital file number (administrative)
   internalNumber: text("internal_number"),             // Internal reference
 
   // Identity
@@ -89,6 +90,7 @@ export const patientsTable = pgTable("patients", {
   updatedBy:  uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
   deletedBy:  uuid("deleted_by").references(() => usersTable.id, { onDelete: "set null" }),
 }, (t) => [
+  uniqueIndex("patients_mrn_idx").on(t.mrn),
   uniqueIndex("patients_mpi_idx").on(t.mpiId),
   uniqueIndex("patients_file_number_idx").on(t.fileNumber),
   index("patients_name_idx").on(t.lastName, t.firstName),

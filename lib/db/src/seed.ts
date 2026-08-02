@@ -221,7 +221,7 @@ async function seed() {
   await db.delete(patientsTable);
   const patients = await db.insert(patientsTable).values([
     {
-      mpiId: "MPI-2026-000001", fileNumber: "2026-1258", internalNumber: "INT-001",
+      mrn: "MRN-2026-00001", mpiId: "MPI-2026-000001", fileNumber: "2026-1258", internalNumber: "INT-001",
       firstName: "Mohamed",   lastName: "Ali",       gender: "M", dateOfBirth: "1981-03-15",
       phone: "0555 12 34 56", bloodType: "B+",        rhesus: "+",
       status: "active",       syncStatus: "synced",  isIncomplete: false, potentialDuplicate: false,
@@ -229,7 +229,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000002", fileNumber: "2026-1257", internalNumber: "INT-002",
+      mrn: "MRN-2026-00002", mpiId: "MPI-2026-000002", fileNumber: "2026-1257", internalNumber: "INT-002",
       firstName: "Fatima",    lastName: "Zahra",     gender: "F", dateOfBirth: "1992-07-22",
       phone: "0555 23 45 67", bloodType: "A+",        rhesus: "+",
       status: "active",       syncStatus: "synced",  isIncomplete: false, potentialDuplicate: false,
@@ -237,7 +237,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000003", fileNumber: "2026-1256", internalNumber: "INT-003",
+      mrn: "MRN-2026-00003", mpiId: "MPI-2026-000003", fileNumber: "2026-1256", internalNumber: "INT-003",
       firstName: "Ahmed",     lastName: "Benali",    gender: "M", dateOfBirth: "1964-11-08",
       phone: "0555 34 56 78", bloodType: "O+",        rhesus: "+",
       status: "active",       syncStatus: "pending", isIncomplete: false, potentialDuplicate: false,
@@ -246,7 +246,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000004", fileNumber: "2026-1255", internalNumber: "INT-004",
+      mrn: "MRN-2026-00004", mpiId: "MPI-2026-000004", fileNumber: "2026-1255", internalNumber: "INT-004",
       firstName: "Amina",     lastName: "Kherfi",    gender: "F", dateOfBirth: "1999-05-30",
       phone: "0555 45 67 89", bloodType: "A-",        rhesus: "-",
       status: "active",       syncStatus: "synced",  isIncomplete: true,  potentialDuplicate: false,
@@ -254,7 +254,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000005", fileNumber: "2026-1254", internalNumber: "INT-005",
+      mrn: "MRN-2026-00005", mpiId: "MPI-2026-000005", fileNumber: "2026-1254", internalNumber: "INT-005",
       firstName: "Yacine",    lastName: "Hamdi",     gender: "M", dateOfBirth: "1988-09-12",
       phone: "0555 56 78 90", bloodType: "B-",        rhesus: "-",
       status: "active",       syncStatus: "synced",  isIncomplete: false, potentialDuplicate: false,
@@ -262,7 +262,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000006", fileNumber: "2026-1253", internalNumber: "INT-006",
+      mrn: "MRN-2026-00006", mpiId: "MPI-2026-000006", fileNumber: "2026-1253", internalNumber: "INT-006",
       firstName: "Rachid",    lastName: "Tlemcani",  gender: "M", dateOfBirth: "1974-02-20",
       phone: "0555 67 89 01", bloodType: "O-",        rhesus: "-",
       status: "active",       syncStatus: "synced",  isIncomplete: false, potentialDuplicate: false,
@@ -270,7 +270,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000007", fileNumber: "2026-1252", internalNumber: "INT-007",
+      mrn: "MRN-2026-00007", mpiId: "MPI-2026-000007", fileNumber: "2026-1252", internalNumber: "INT-007",
       firstName: "Nadia",     lastName: "Boudjemaa", gender: "F", dateOfBirth: "1983-06-14",
       phone: "0555 78 90 12", bloodType: "AB+",       rhesus: "+",
       status: "active",       syncStatus: "pending", isIncomplete: false, potentialDuplicate: false,
@@ -278,7 +278,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000008", fileNumber: "2026-1251", internalNumber: "INT-008",
+      mrn: "MRN-2026-00008", mpiId: "MPI-2026-000008", fileNumber: "2026-1251", internalNumber: "INT-008",
       firstName: "Karim",     lastName: "Meziane",   gender: "M", dateOfBirth: "1998-12-03",
       phone: "0555 89 01 23", bloodType: null,        rhesus: null,
       status: "active",       syncStatus: "synced",  isIncomplete: true,  potentialDuplicate: false,
@@ -286,7 +286,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000009", fileNumber: "2026-1250", internalNumber: "INT-009",
+      mrn: "MRN-2026-00009", mpiId: "MPI-2026-000009", fileNumber: "2026-1250", internalNumber: "INT-009",
       firstName: "Souad",     lastName: "Ferhat",    gender: "F", dateOfBirth: "1959-04-18",
       phone: "0555 90 12 34", bloodType: "A+",        rhesus: "+",
       status: "active",       syncStatus: "synced",  isIncomplete: false, potentialDuplicate: false,
@@ -294,7 +294,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000010", fileNumber: "2026-1249", internalNumber: "INT-010",
+      mrn: "MRN-2026-00010", mpiId: "MPI-2026-000010", fileNumber: "2026-1249", internalNumber: "INT-010",
       firstName: "Omar",      lastName: "Hadjadj",   gender: "M", dateOfBirth: "2007-01-25",
       phone: "0555 01 23 45", bloodType: "O+",        rhesus: "+",
       status: "active",       syncStatus: "synced",  isIncomplete: false, potentialDuplicate: false,
@@ -302,7 +302,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000011", fileNumber: "2026-1248", internalNumber: "INT-011",
+      mrn: "MRN-2026-00011", mpiId: "MPI-2026-000011", fileNumber: "2026-1248", internalNumber: "INT-011",
       firstName: "Houria",    lastName: "Mansouri",  gender: "F", dateOfBirth: "1986-08-07",
       phone: "0555 12 34 00", bloodType: "B+",        rhesus: "+",
       status: "active",       syncStatus: "synced",  isIncomplete: false, potentialDuplicate: false,
@@ -310,7 +310,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000012", fileNumber: "2026-1247", internalNumber: "INT-012",
+      mrn: "MRN-2026-00012", mpiId: "MPI-2026-000012", fileNumber: "2026-1247", internalNumber: "INT-012",
       firstName: "Abdelkader", lastName: "Ziani",    gender: "M", dateOfBirth: "1952-10-30",
       phone: "0555 23 45 11", bloodType: "AB-",       rhesus: "-",
       status: "inactive",     syncStatus: "conflict", isIncomplete: false, potentialDuplicate: true,
@@ -319,7 +319,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000013", fileNumber: "2026-1246", internalNumber: "INT-013",
+      mrn: "MRN-2026-00013", mpiId: "MPI-2026-000013", fileNumber: "2026-1246", internalNumber: "INT-013",
       firstName: "Samira",    lastName: "Bouchama",  gender: "F", dateOfBirth: "1980-03-22",
       phone: "0555 34 56 22", bloodType: "A-",        rhesus: "-",
       status: "active",       syncStatus: "synced",  isIncomplete: false, potentialDuplicate: false,
@@ -328,7 +328,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000014", fileNumber: "2026-1245", internalNumber: "INT-014",
+      mrn: "MRN-2026-00014", mpiId: "MPI-2026-000014", fileNumber: "2026-1245", internalNumber: "INT-014",
       firstName: "Farid",     lastName: "Aissaoui",  gender: "M", dateOfBirth: "1969-07-11",
       phone: "0555 45 67 33", bloodType: "O+",        rhesus: "+",
       status: "active",       syncStatus: "synced",  isIncomplete: false, potentialDuplicate: false,
@@ -337,7 +337,7 @@ async function seed() {
       siteId: seedSiteId,     createdBy: adminUser.id, updatedBy: adminUser.id,
     },
     {
-      mpiId: "MPI-2026-000015", fileNumber: "2026-1244", internalNumber: "INT-015",
+      mrn: "MRN-2026-00015", mpiId: "MPI-2026-000015", fileNumber: "2026-1244", internalNumber: "INT-015",
       firstName: "Lynda",     lastName: "Chibane",   gender: "F", dateOfBirth: "1993-11-19",
       phone: "0555 56 78 44", bloodType: "B+",        rhesus: "+",
       status: "archived",     syncStatus: "synced",  isIncomplete: false, potentialDuplicate: false,
@@ -445,19 +445,22 @@ async function seed() {
   ];
 
   let bedCounter = 101;
+  let encCounter = 1;
   for (const { p, doctor, service, motif, daysIn } of admissionPatients) {
     const [encounter] = await db.insert(encountersTable).values({
-      patientId:      p.id,
-      patientName:    `${p.firstName} ${p.lastName}`,
-      type:           "admission",
-      status:         "open",
-      chiefComplaint: motif,
-      sourceModule:   "admissions",
+      encounterNumber:  `ENC-2026-${String(encCounter++).padStart(5, "0")}`,
+      patientId:        p.id,
+      patientName:      `${p.firstName} ${p.lastName}`,
+      patientMrn:       p.mrn,
+      type:             "admission",
+      status:           "open",
+      chiefComplaint:   motif,
+      sourceModule:     "admissions",
       primaryDoctorId:   doctor.id,
       primaryDoctorName: `Dr. ${doctor.lastName}`,
-      siteId:         seedSiteId,
-      openedAt:       daysAgo(daysIn, 8, 0),
-      createdBy:      adminUser.id,
+      siteId:           seedSiteId,
+      openedAt:         daysAgo(daysIn, 8, 0),
+      createdBy:        adminUser.id,
     }).returning();
 
     const admDate = dateStr(daysIn);

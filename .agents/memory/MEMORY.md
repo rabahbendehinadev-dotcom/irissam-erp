@@ -4,4 +4,5 @@
 - [Mock Repository](mock-repository.md) — unified cross-module store in src/store/MockRepository.tsx; swap point for PostgreSQL
 - [FinalDecision field names](final-decision-fields.md) — ward/icuMotif/icuPriority/icuBed/icuTeamNotified (not service/reanimationMotif/priority/teamNotified)
 - [Occupancy Architecture](occupancy-arch.md) — Phase 6b: OccupancyBed/ICUBed/OperatingRoom in MockRepository; AdmissionsContext no longer owns beds; BedSelector reads useMockRepository().beds
-- [Clinical Schema](clinical-schema.md) — Task #69 done: 36-table UUID schema across 13 domains; zero TS errors; migrations in lib/db/migrations/; API routes broken until Task #71
+- [Clinical Schema](clinical-schema.md) — 36-table UUID schema + MRN/encounterNumber/attachments/user_activity_logs; migrations 001-003 in lib/db/migrations/
+- [DAL Layer](dal-layer.md) — Task #70 done: repositories + services in artifacts/api-server/src/; 79 route errors are Task #71 (not DAL)

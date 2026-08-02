@@ -52,9 +52,13 @@ export * from "./appointments";
 // ─── Domain 12: Billing ───────────────────────────────────────────────────────
 export * from "./billing";
 
-// ─── Domain 13: Audit & Notifications ────────────────────────────────────────
+// ─── Domain 13: Audit, Notifications & Activity ───────────────────────────────
 export * from "./audit";
 export * from "./notifications";
+export * from "./user_activity_logs";
+
+// ─── Domain 15: Attachments (generic / polymorphic) ───────────────────────────
+export * from "./attachments";
 
 // ─── Domain 14: Blood Bank ────────────────────────────────────────────────────
 export * from "./blood_bank";

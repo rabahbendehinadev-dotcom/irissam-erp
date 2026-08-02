@@ -6,7 +6,7 @@
  * "لا يتم إنشاء أي سجل خارج Encounter"
  */
 import {
-  pgTable, uuid, text, timestamp, jsonb, index,
+  pgTable, uuid, text, timestamp, jsonb, index, uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -19,8 +19,10 @@ import { patientsTable } from "./patients";
 
 export const encountersTable = pgTable("encounters", {
   id:              uuid("id").primaryKey().defaultRandom(),
+  encounterNumber: text("encounter_number").notNull(), // Unique human-readable ID: ENC-2026-00001
   patientId:       uuid("patient_id").notNull().references(() => patientsTable.id, { onDelete: "restrict" }),
-  patientName:     text("patient_name").notNull(),  // Denormalized for query speed
+  patientName:     text("patient_name").notNull(),     // Denormalized for query speed
+  patientMrn:      text("patient_mrn"),                // Denormalized MRN for display
 
   type:            encounterTypeEnum("type").notNull(),
   status:          encounterStatusEnum("status").default("open").notNull(),
@@ -63,6 +65,7 @@ export const encountersTable = pgTable("encounters", {
   createdByName: text("created_by_name"),
   updatedBy:     uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
 }, (t) => [
+  uniqueIndex("encounters_number_idx").on(t.encounterNumber),
   index("encounters_patient_idx").on(t.patientId),
   index("encounters_status_idx").on(t.status),
   index("encounters_type_idx").on(t.type),
