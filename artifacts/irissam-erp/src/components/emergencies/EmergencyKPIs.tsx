@@ -1,11 +1,13 @@
 import { TrendingUp, Clock, LogOut, BedDouble, ArrowRightLeft, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { EmergencyPatient } from '@/types/emergency';
+import type { EmergencyTodayStats } from '@/hooks/useEmergencyData';
 
 interface Props {
   patients: EmergencyPatient[];
   tick: number;
   isDark: boolean;
+  todayStats?: EmergencyTodayStats;
 }
 
 interface KPI {
@@ -18,7 +20,7 @@ interface KPI {
   trend?: 'up' | 'down' | 'neutral';
 }
 
-function computeKPIs(patients: EmergencyPatient[]): KPI[] {
+function computeKPIs(patients: EmergencyPatient[], todayStats?: EmergencyTodayStats): KPI[] {
   const active = patients.filter(p => !['sorti', 'transfere', 'decede'].includes(p.status));
   const waiting = active.filter(p => p.status === 'attente_soins');
   const inCare  = active.filter(p => p.status === 'en_soins' || p.status === 'observation');
@@ -33,10 +35,10 @@ function computeKPIs(patients: EmergencyPatient[]): KPI[] {
     : 0;
   const avgCareMin = Math.round(avgCareMs / 60000);
 
-  // Today's totals: static mock (would come from backend in production)
-  const sortiesToday   = 8;
-  const hospitToday    = 3;
-  const transfertToday = 2;
+  // Today's totals: from live API when available, otherwise 0
+  const sortiesToday   = todayStats?.sorties          ?? 0;
+  const hospitToday    = todayStats?.hospitalisations  ?? 0;
+  const transfertToday = todayStats?.transferts        ?? 0;
 
   return [
     {
@@ -87,8 +89,8 @@ function computeKPIs(patients: EmergencyPatient[]): KPI[] {
   ];
 }
 
-export function EmergencyKPIs({ patients, tick: _, isDark }: Props) {
-  const kpis = computeKPIs(patients);
+export function EmergencyKPIs({ patients, tick: _, isDark, todayStats }: Props) {
+  const kpis = computeKPIs(patients, todayStats);
 
   return (
     <div className={cn(

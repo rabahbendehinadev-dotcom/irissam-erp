@@ -16,7 +16,7 @@ import { EmergencyAlertStrip } from '@/components/emergencies/EmergencyAlertStri
 import { EmergencyKPIs } from '@/components/emergencies/EmergencyKPIs';
 import { EmergencyAmbulanceMap } from '@/components/emergencies/EmergencyAmbulanceMap';
 import { EmergencyNotifications } from '@/components/emergencies/EmergencyNotifications';
-import { MOCK_EMERGENCY_PATIENTS } from '@/mock';
+import { useEmergencyData } from '@/hooks/useEmergencyData';
 import type {
   EmergencyPatient, EmergencyPatientStatus,
   EmergencyRoom, Ambulance, EmergencyDoctor, EmergencyNurse,
@@ -27,23 +27,6 @@ import type {
 
 /** dk(isDark, darkClasses, lightClasses?) — apply different classes in dark/light mode */
 const dk = (dark: boolean, d: string, l = '') => dark ? d : l;
-
-// ─── Mock extra patient data (blood type, allergies) ─────────────────────────
-
-const BLOOD_TYPES: Record<string, string> = {
-  'ep-01': 'A+', 'ep-02': 'O−', 'ep-03': 'B+',  'ep-04': 'AB+',
-  'ep-05': 'O+', 'ep-06': 'A−', 'ep-07': 'B+',  'ep-08': 'A+',
-  'ep-09': 'O+', 'ep-10': 'A+', 'ep-11': 'B−',  'ep-12': 'AB−',
-  'ep-13': 'O+', 'ep-14': 'A+', 'ep-15': 'O−',
-};
-
-const PATIENT_ALLERGIES: Record<string, string[]> = {
-  'ep-01': ['Pénicilline', 'AINS'],
-  'ep-03': ['Aspirine'],
-  'ep-04': ['Latex'],
-  'ep-05': ['Sulfamides'],
-  'ep-09': ['Ibuprofène'],
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -216,8 +199,8 @@ function PatientExpandedCard({ patient, isDark, onClose }: {
   patient: EmergencyPatient; isDark: boolean; onClose: () => void;
 }) {
   const [, setLocation] = useLocation();
-  const bloodType = BLOOD_TYPES[patient.id] ?? '?';
-  const allergies = PATIENT_ALLERGIES[patient.id] ?? [];
+  const bloodType = patient.bloodType ?? '?';
+  const allergies = patient.allergies ?? [];
   const v = patient.vitals;
   const { startCare: repoStartCare } = useMockRepository();
   const { user } = useAuth();
@@ -386,12 +369,16 @@ function PatientExpandedCard({ patient, isDark, onClose }: {
       {/* Start care button */}
       <button
         onClick={() => {
-          repoStartCare(patient.id, {
-            userId: user?.id ?? '',
-            userName: user ? `${user.firstName} ${user.lastName}` : 'Personnel',
-            userRole: user?.role ?? 'medecin',
-          });
-          setLocation(`/emergencies/${patient.id}`);
+          // Only call mock startCare for mock-backed patients (no real patientId)
+          if (!patient.patientId) {
+            repoStartCare(patient.id, {
+              userId: user?.id ?? '',
+              userName: user ? `${user.firstName} ${user.lastName}` : 'Personnel',
+              userRole: user?.role ?? 'medecin',
+            });
+          }
+          // Navigate using the real patient UUID for DB patients, or visit id for mock
+          setLocation(`/emergencies/${patient.patientId ?? patient.id}`);
         }}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
       >
@@ -451,7 +438,7 @@ function PatientRow({ patient, tick, isDark }: { patient: EmergencyPatient; tick
                 <AmbulanceIcon size={9} /> SMUR
               </span>
             )}
-            {(PATIENT_ALLERGIES[patient.id] ?? []).length > 0 && (
+            {(patient.allergies ?? []).length > 0 && (
               <span className="text-xs bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-full">⚠ Allergie</span>
             )}
             {patient.tags?.map(tag => (
@@ -525,14 +512,17 @@ function PatientRow({ patient, tick, isDark }: { patient: EmergencyPatient; tick
         <div className="flex-shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
           <button
             onClick={() => {
-              if (patient.status === 'attente_soins' || patient.status === 'attente_triage') {
+              const canStartCareLocally = patient.status === 'attente_soins' || patient.status === 'attente_triage';
+              // Only call mock startCare for mock-backed patients (no real patientId)
+              if (canStartCareLocally && !patient.patientId) {
                 repoStartCare(patient.id, {
                   userId: user?.id ?? '',
                   userName: user ? `${user.firstName} ${user.lastName}` : 'Personnel',
                   userRole: user?.role ?? 'medecin',
                 });
               }
-              setLocation(`/emergencies/${patient.id}`);
+              // Navigate using the real patient UUID for DB patients, or visit id for mock
+              setLocation(`/emergencies/${patient.patientId ?? patient.id}`);
             }}
             className={cn(
               'flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors whitespace-nowrap',
@@ -885,7 +875,13 @@ export default function EmergenciesPage() {
   const [, setLocation] = useLocation();
   const { isDark, toggle: toggleDark } = useDarkMode();
 
-  const { patients, rooms, ambulances, erDoctors: doctors, erNurses: nurses } = useMockRepository();
+  // Live emergency data from API
+  const {
+    patients, rooms, ambulances, todayStats, loading: emLoading, error: emError, refresh: emRefresh,
+  } = useEmergencyData();
+
+  // Staff data still served from in-memory store pending a staff API
+  const { erDoctors: doctors, erNurses: nurses } = useMockRepository();
 
   const active = patients.filter(p => !['sorti', 'transfere', 'decede'].includes(p.status));
 
@@ -964,14 +960,14 @@ export default function EmergenciesPage() {
               <Bed size={14} /> Admission
             </button>
             <button
-              onClick={() => {}}
+              onClick={emRefresh}
               className={cn(
                 'p-2 border rounded-lg transition-colors',
                 dk(isDark, 'border-gray-600 text-gray-400 hover:bg-gray-700', 'border-gray-200 text-gray-500 hover:bg-gray-50'),
               )}
               title="Actualiser"
             >
-              <RefreshCw size={14} />
+              <RefreshCw size={14} className={emLoading ? 'animate-spin' : ''} />
             </button>
             {/* Dark mode toggle */}
             <button
@@ -1002,8 +998,17 @@ export default function EmergenciesPage() {
           <StatCard icon={AmbulanceIcon} label="Ambulances en route" value={stats.ambulancesEnRoute} sub={`${ambulances.filter(a => a.status === 'disponible').length} disponibles · ${ambulances.filter(a => a.status === 'maintenance').length} maintenance`} color="bg-orange-500" isDark={isDark} />
         </div>
 
-        {/* ── KPI panel (NEW) ────────────────────────────────────────────────── */}
-        <EmergencyKPIs patients={patients} tick={tick} isDark={isDark} />
+        {/* ── API error banner ───────────────────────────────────────────────── */}
+        {emError && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+            <AlertTriangle size={13} className="flex-shrink-0" />
+            <span>Impossible de charger les données en direct : {emError}</span>
+            <button onClick={emRefresh} className="ml-auto font-semibold underline">Réessayer</button>
+          </div>
+        )}
+
+        {/* ── KPI panel ──────────────────────────────────────────────────────── */}
+        <EmergencyKPIs patients={patients} tick={tick} isDark={isDark} todayStats={todayStats} />
 
         {/* ── Quick navigation modules ────────────────────────────────────────── */}
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-2">

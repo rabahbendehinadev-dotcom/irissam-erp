@@ -51,6 +51,11 @@ export interface EmergencyPatient {
   byAmbulance?: boolean;
   isMinor?: boolean;
   tags?: string[];           // 'trauma' | 'cardiac' | 'neuro' | 'pediatric' | 'psychiatric' | 'intox'
+  // Extended fields served by the API (from the patients table)
+  bloodType?: string;        // e.g. 'A+', 'O-'
+  allergies?: string[];      // known drug / substance allergies
+  /** Real DB patient UUID — present when loaded from the API, absent for mock records. */
+  patientId?: string;
 }
 
 export interface EmergencyRoom {
