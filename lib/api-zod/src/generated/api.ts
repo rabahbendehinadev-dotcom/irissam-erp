@@ -483,6 +483,36 @@ export const GetMedicationsResponse = zod.object({
 
 
 /**
+ * @summary Create a new medication
+ */
+export const createMedicationBodyQuantityMin = 0;
+
+export const createMedicationBodyLowStockThresholdMin = 0;
+
+
+
+export const CreateMedicationBody = zod.object({
+  "name": zod.string(),
+  "unit": zod.string().optional(),
+  "quantity": zod.number().int().min(createMedicationBodyQuantityMin).optional(),
+  "lowStockThreshold": zod.number().int().min(createMedicationBodyLowStockThresholdMin).optional(),
+  "expiryDate": zod.string().nullish()
+})
+
+export const CreateMedicationResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "quantity": zod.number().int(),
+  "unit": zod.string(),
+  "lowStockThreshold": zod.number().int(),
+  "expiryDate": zod.string().nullable(),
+  "expiringSoon": zod.boolean(),
+  "status": zod.enum(['ok', 'low', 'critical', 'expired']),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary Get medications closest to or below their low-stock threshold
  */
 export const getMedicationsLowStockQueryLimitDefault = 3;
@@ -504,24 +534,47 @@ export const GetMedicationsLowStockResponse = zod.object({
 
 
 /**
- * @summary Update medication stock quantity
+ * @summary Update a medication (all fields supported)
  */
-export const UpdateMedicationStockParams = zod.object({
+export const UpdateMedicationParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
-export const updateMedicationStockBodyQuantityMin = 0;
+export const updateMedicationBodyQuantityMin = 0;
+
+export const updateMedicationBodyLowStockThresholdMin = 0;
 
 
 
-export const UpdateMedicationStockBody = zod.object({
-  "quantity": zod.number().int().min(updateMedicationStockBodyQuantityMin)
+export const UpdateMedicationBody = zod.object({
+  "name": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "quantity": zod.number().int().min(updateMedicationBodyQuantityMin).optional(),
+  "lowStockThreshold": zod.number().int().min(updateMedicationBodyLowStockThresholdMin).optional(),
+  "expiryDate": zod.string().nullish()
 })
 
-export const UpdateMedicationStockResponse = zod.object({
+export const UpdateMedicationResponse = zod.object({
   "id": zod.number().int(),
-  "quantity": zod.number().int()
+  "name": zod.string(),
+  "quantity": zod.number().int(),
+  "unit": zod.string(),
+  "lowStockThreshold": zod.number().int(),
+  "expiryDate": zod.string().nullable(),
+  "expiringSoon": zod.boolean(),
+  "status": zod.enum(['ok', 'low', 'critical', 'expired']),
+  "createdAt": zod.string()
 })
+
+
+/**
+ * @summary Delete a medication from inventory
+ */
+export const DeleteMedicationParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const DeleteMedicationResponse = zod.void()
 
 
 /**

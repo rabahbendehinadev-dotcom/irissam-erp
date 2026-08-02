@@ -282,14 +282,24 @@ export interface MedicationPage {
   pageSize: number;
 }
 
-export interface UpdateMedicationStockBody {
+export interface CreateMedicationBody {
+  name: string;
+  unit?: string;
   /** @minimum 0 */
-  quantity: number;
+  quantity?: number;
+  /** @minimum 0 */
+  lowStockThreshold?: number;
+  expiryDate?: string | null;
 }
 
-export interface MedicationStockUpdate {
-  id: number;
-  quantity: number;
+export interface UpdateMedicationBody {
+  name?: string;
+  unit?: string;
+  /** @minimum 0 */
+  quantity?: number;
+  /** @minimum 0 */
+  lowStockThreshold?: number;
+  expiryDate?: string | null;
 }
 
 export interface VehiclesStatus {

@@ -8,9 +8,10 @@
  *   - Notification au médecin + audit à chaque transition
  *   - Alertes mock allergie / stock insuffisant
  *
- * Onglet Stock : gestion du stock médicamenteux (données locales mock).
+ * Onglet Stock : gestion du stock médicamenteux via l'API (CRUD complet).
  */
 import { useState, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageWrapper } from '@/components/shared/PageWrapper';
@@ -22,8 +23,19 @@ import { cn } from '@/lib/utils';
 import {
   Pill, Search, ChevronRight, X, Package,
   AlertTriangle, CheckCircle2, Clock, Truck,
+  Plus, Pencil, Trash2, Loader2, ChevronLeft, ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
 import type { RepoPrescription, AuditCtx } from '@/types/repository';
+import {
+  useGetMedications,
+  useCreateMedication,
+  useUpdateMedication,
+  useDeleteMedication,
+  getGetMedicationsQueryKey,
+  type MedicationItem,
+  type CreateMedicationBody,
+  type UpdateMedicationBody,
+} from '@workspace/api-client-react';
 
 // ─── Prescription status config ───────────────────────────────────────────────
 
@@ -40,7 +52,6 @@ const RX_STATUS: Record<RepoPrescription['status'], {
 
 // ─── Mock stock & allergy alerts ──────────────────────────────────────────────
 
-// Simulate known allergies and low-stock drugs (mock — would come from patient record / stock DB)
 const MOCK_ALLERGIES: Record<string, string[]> = {
   'ep-01': ['Aspirine', 'HBPM'],
   'ep-02': ['Morphine'],
@@ -143,72 +154,501 @@ function DispenseModal({
   );
 }
 
-// ─── Mock stock tab ───────────────────────────────────────────────────────────
+// ─── Medication form modal (create / edit) ────────────────────────────────────
 
-type StockItem = { drug: string; quantity: number; unit: string; status: 'ok' | 'low' | 'critical' };
-
-const MOCK_STOCK: StockItem[] = [
-  { drug: 'Adrénaline 1mg/mL',    quantity: 4,   unit: 'amp',  status: 'critical' },
-  { drug: 'Morphine 10mg',        quantity: 12,  unit: 'amp',  status: 'low' },
-  { drug: 'Kétamine 500mg',       quantity: 3,   unit: 'fl',   status: 'critical' },
-  { drug: 'Paracétamol 1g',       quantity: 480, unit: 'cp',   status: 'ok' },
-  { drug: 'Amoxicilline 1g',      quantity: 150, unit: 'fl',   status: 'ok' },
-  { drug: 'Rocuronium 50mg',      quantity: 6,   unit: 'amp',  status: 'low' },
-  { drug: 'Héparine 5000 UI',     quantity: 80,  unit: 'ser',  status: 'ok' },
-  { drug: 'Sérum physiologique',  quantity: 200, unit: 'fl',   status: 'ok' },
-];
-
-const STOCK_STATUS_BADGE: Record<StockItem['status'], string> = {
-  ok:       'bg-green-100 text-green-700',
-  low:      'bg-yellow-100 text-yellow-700',
-  critical: 'bg-red-100 text-red-700',
+type MedFormValues = {
+  name: string;
+  unit: string;
+  quantity: string;
+  lowStockThreshold: string;
+  expiryDate: string;
 };
 
+function MedicationFormModal({
+  initial,
+  onClose,
+  onSave,
+  isSaving,
+}: {
+  initial?: MedicationItem;
+  onClose: () => void;
+  onSave: (values: MedFormValues) => void;
+  isSaving: boolean;
+}) {
+  const [form, setForm] = useState<MedFormValues>({
+    name: initial?.name ?? '',
+    unit: initial?.unit ?? 'unités',
+    quantity: initial?.quantity?.toString() ?? '0',
+    lowStockThreshold: initial?.lowStockThreshold?.toString() ?? '10',
+    expiryDate: initial?.expiryDate ?? '',
+  });
+
+  const isEdit = !!initial;
+
+  function set(field: keyof MedFormValues, value: string) {
+    setForm(prev => ({ ...prev, [field]: value }));
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    onSave(form);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Pill className="w-5 h-5 text-blue-600" />
+            {isEdit ? 'Modifier le médicament' : 'Nouveau médicament'}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nom <span className="text-red-500">*</span>
+            </label>
+            <input
+              required
+              type="text"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ex : Paracétamol 1g"
+              value={form.name}
+              onChange={e => set('name', e.target.value)}
+            />
+          </div>
+
+          {/* Unit + Quantity */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Unité</label>
+              <input
+                type="text"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="cp, amp, fl…"
+                value={form.unit}
+                onChange={e => set('unit', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quantité</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={form.quantity}
+                onChange={e => set('quantity', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Threshold + Expiry */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Seuil d'alerte</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={form.lowStockThreshold}
+                onChange={e => set('lowStockThreshold', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date d'expiration</label>
+              <input
+                type="date"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={form.expiryDate}
+                onChange={e => set('expiryDate', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving || !form.name.trim()}
+              className="flex-1 px-4 py-2 text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            >
+              {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isEdit ? 'Enregistrer' : 'Créer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Delete confirmation dialog ───────────────────────────────────────────────
+
+function DeleteConfirmModal({
+  medication,
+  onConfirm,
+  onClose,
+  isDeleting,
+}: {
+  medication: MedicationItem;
+  onConfirm: () => void;
+  onClose: () => void;
+  isDeleting: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+            <Trash2 className="w-5 h-5 text-red-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">Supprimer ce médicament ?</h3>
+            <p className="text-sm text-gray-500 mt-0.5">{medication.name}</p>
+          </div>
+        </div>
+        <p className="text-sm text-gray-600 mb-5">
+          Cette action est irréversible. Le médicament sera retiré de l'inventaire.
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className="flex-1 px-4 py-2 text-sm font-semibold rounded-xl text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          >
+            {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Stock status helpers ─────────────────────────────────────────────────────
+
+const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  ok:       { label: 'OK',       cls: 'bg-green-100 text-green-700' },
+  low:      { label: 'Faible',   cls: 'bg-yellow-100 text-yellow-700' },
+  critical: { label: 'Critique', cls: 'bg-red-100 text-red-700' },
+  expired:  { label: 'Expiré',   cls: 'bg-gray-100 text-gray-500' },
+};
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'all',      label: 'Tous' },
+  { value: 'critical', label: 'Critiques' },
+  { value: 'low',      label: 'Faibles' },
+  { value: 'expired',  label: 'Expirés' },
+  { value: 'ok',       label: 'OK' },
+] as const;
+
+// ─── Real stock tab ───────────────────────────────────────────────────────────
+
 function StockTab() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  const [formTarget, setFormTarget] = useState<MedicationItem | 'new' | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MedicationItem | null>(null);
+
+  const { data, isLoading, isError } = useGetMedications(
+    { status: statusFilter as 'all' | 'ok' | 'low' | 'critical' | 'expired', search: search || undefined, page, pageSize: PAGE_SIZE },
+  );
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: [getGetMedicationsQueryKey()[0]] });
+
+  const createMut = useCreateMedication({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: 'Médicament créé' });
+        setFormTarget(null);
+        invalidate();
+      },
+      onError: () => toast({ title: 'Erreur lors de la création', variant: 'destructive' }),
+    },
+  });
+
+  const updateMut = useUpdateMedication({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: 'Médicament mis à jour' });
+        setFormTarget(null);
+        invalidate();
+      },
+      onError: () => toast({ title: 'Erreur lors de la mise à jour', variant: 'destructive' }),
+    },
+  });
+
+  const deleteMut = useDeleteMedication({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: 'Médicament supprimé' });
+        setDeleteTarget(null);
+        invalidate();
+      },
+      onError: () => toast({ title: 'Erreur lors de la suppression', variant: 'destructive' }),
+    },
+  });
+
+  function handleSave(values: MedFormValues) {
+    const qty = parseInt(values.quantity, 10);
+    const threshold = parseInt(values.lowStockThreshold, 10);
+
+    if (formTarget === 'new') {
+      const body: CreateMedicationBody = {
+        name: values.name.trim(),
+        unit: values.unit || undefined,
+        quantity: isNaN(qty) ? 0 : qty,
+        lowStockThreshold: isNaN(threshold) ? 10 : threshold,
+        expiryDate: values.expiryDate || null,
+      };
+      createMut.mutate({ data: body });
+    } else if (formTarget) {
+      const body: UpdateMedicationBody = {
+        name: values.name.trim(),
+        unit: values.unit || undefined,
+        quantity: isNaN(qty) ? 0 : qty,
+        lowStockThreshold: isNaN(threshold) ? 10 : threshold,
+        expiryDate: values.expiryDate || null,
+      };
+      updateMut.mutate({ id: formTarget.id, data: body });
+    }
+  }
+
+  const medications = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // Summary counts (from current page — for full counts we'd need separate requests;
+  // use the visible page data for the status bar)
+  const criticalCount = medications.filter(m => m.status === 'critical').length;
+  const lowCount      = medications.filter(m => m.status === 'low').length;
+  const okCount       = medications.filter(m => m.status === 'ok').length;
+
+  const isMutating = createMut.isPending || updateMut.isPending;
+
   return (
     <div>
+      {/* Action bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
+        {/* Search */}
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            placeholder="Rechercher un médicament…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+
+        {/* Status filter */}
+        <div className="flex gap-1 flex-wrap">
+          {STATUS_FILTER_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => { setStatusFilter(opt.value); setPage(1); }}
+              className={cn(
+                'px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap',
+                statusFilter === opt.value
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50',
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* New medication button */}
+        <button
+          onClick={() => setFormTarget('new')}
+          className="ml-auto flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          Nouveau médicament
+        </button>
+      </div>
+
+      {/* Summary bar */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="bg-red-50 text-red-700 rounded-xl p-3 flex items-center gap-3 shadow-sm">
-          <p className="text-2xl font-bold">{MOCK_STOCK.filter(s => s.status === 'critical').length}</p>
+          <p className="text-2xl font-bold tabular-nums">{criticalCount}</p>
           <p className="text-xs opacity-80">Critiques</p>
         </div>
         <div className="bg-yellow-50 text-yellow-700 rounded-xl p-3 flex items-center gap-3 shadow-sm">
-          <p className="text-2xl font-bold">{MOCK_STOCK.filter(s => s.status === 'low').length}</p>
+          <p className="text-2xl font-bold tabular-nums">{lowCount}</p>
           <p className="text-xs opacity-80">Faibles</p>
         </div>
         <div className="bg-green-50 text-green-700 rounded-xl p-3 flex items-center gap-3 shadow-sm">
-          <p className="text-2xl font-bold">{MOCK_STOCK.filter(s => s.status === 'ok').length}</p>
+          <p className="text-2xl font-bold tabular-nums">{okCount}</p>
           <p className="text-xs opacity-80">OK</p>
         </div>
       </div>
+
+      {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              {['Médicament', 'Quantité', 'Unité', 'État'].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {MOCK_STOCK.sort((a, b) => {
-              const ord: Record<string, number> = { critical: 0, low: 1, ok: 2 };
-              return ord[a.status] - ord[b.status];
-            }).map(item => (
-              <tr key={item.drug} className={cn('hover:bg-gray-50/50', item.status !== 'ok' && 'bg-red-50/20')}>
-                <td className="px-4 py-3 font-medium text-gray-800">{item.drug}</td>
-                <td className="px-4 py-3 font-mono font-bold text-gray-900">{item.quantity}</td>
-                <td className="px-4 py-3 text-gray-500">{item.unit}</td>
-                <td className="px-4 py-3">
-                  <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', STOCK_STATUS_BADGE[item.status])}>
-                    {item.status === 'ok' ? 'OK' : item.status === 'low' ? 'Faible' : 'Critique'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20 text-gray-400">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" />
+            <span className="text-sm">Chargement…</span>
+          </div>
+        ) : isError ? (
+          <div className="text-center py-20 text-red-500">
+            <AlertTriangle className="w-10 h-10 mx-auto mb-2 opacity-50" />
+            <p className="text-sm font-medium">Erreur lors du chargement du stock</p>
+          </div>
+        ) : medications.length === 0 ? (
+          <div className="text-center py-20 text-gray-400">
+            <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="font-medium">Aucun médicament trouvé</p>
+            <p className="text-sm mt-1 opacity-70">
+              {search || statusFilter !== 'all'
+                ? 'Essayez de modifier vos filtres.'
+                : 'Cliquez sur « Nouveau médicament » pour commencer.'}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  {['Médicament', 'Quantité', 'Unité', 'Seuil', 'Expiration', 'État', 'Actions'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {medications.map(med => {
+                  const badge = STATUS_BADGE[med.status] ?? STATUS_BADGE.ok;
+                  return (
+                    <tr
+                      key={med.id}
+                      className={cn(
+                        'hover:bg-gray-50/50 transition-colors',
+                        med.status === 'critical' && 'bg-red-50/30',
+                        med.status === 'expired'  && 'bg-gray-50/50 opacity-70',
+                      )}
+                    >
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-800">{med.name}</p>
+                        {med.expiringSoon && (
+                          <p className="text-[10px] text-orange-600 font-medium flex items-center gap-0.5 mt-0.5">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />Expire bientôt
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-mono font-bold text-gray-900">{med.quantity}</td>
+                      <td className="px-4 py-3 text-gray-500">{med.unit}</td>
+                      <td className="px-4 py-3 text-gray-500 tabular-nums">{med.lowStockThreshold}</td>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                        {med.expiryDate
+                          ? new Date(med.expiryDate).toLocaleDateString('fr-FR')
+                          : <span className="text-gray-300">—</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', badge.cls)}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setFormTarget(med)}
+                            title="Modifier"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(med)}
+                            title="Supprimer"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
+          <span>{total} médicament{total > 1 ? 's' : ''}</span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 py-1 font-medium text-gray-700">
+              {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRightIcon className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Create / Edit modal */}
+      {formTarget !== null && (
+        <MedicationFormModal
+          initial={formTarget === 'new' ? undefined : formTarget}
+          onClose={() => setFormTarget(null)}
+          onSave={handleSave}
+          isSaving={isMutating}
+        />
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteTarget !== null && (
+        <DeleteConfirmModal
+          medication={deleteTarget}
+          onConfirm={() => deleteMut.mutate({ id: deleteTarget.id })}
+          onClose={() => setDeleteTarget(null)}
+          isDeleting={deleteMut.isPending}
+        />
+      )}
     </div>
   );
 }

@@ -467,6 +467,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MedicationPage"
+    post:
+      operationId: createMedication
+      tags: [medications]
+      summary: Create a new medication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMedicationBody"
+      responses:
+        "201":
+          description: Created medication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicationItem"
+        "400":
+          description: Invalid input
 
   /medications/low-stock:
     get:
@@ -489,9 +508,9 @@ paths:
 
   /medications/{id}:
     patch:
-      operationId: updateMedicationStock
+      operationId: updateMedication
       tags: [medications]
-      summary: Update medication stock quantity
+      summary: Update a medication (all fields supported)
       parameters:
         - name: id
           in: path
@@ -503,16 +522,31 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateMedicationStockBody"
+              $ref: "#/components/schemas/UpdateMedicationBody"
       responses:
         "200":
-          description: Updated medication id and quantity
+          description: Updated medication
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MedicationStockUpdate"
+                $ref: "#/components/schemas/MedicationItem"
         "400":
           description: Invalid input
+        "404":
+          description: Medication not found
+    delete:
+      operationId: deleteMedication
+      tags: [medications]
+      summary: Delete a medication from inventory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted successfully
         "404":
           description: Medication not found
 
@@ -1192,25 +1226,41 @@ components:
         - page
         - pageSize
 
-    UpdateMedicationStockBody:
+    CreateMedicationBody:
       type: object
       properties:
+        name:
+          type: string
+        unit:
+          type: string
         quantity:
           type: integer
           minimum: 0
+        lowStockThreshold:
+          type: integer
+          minimum: 0
+        expiryDate:
+          type: string
+          nullable: true
       required:
-        - quantity
+        - name
 
-    MedicationStockUpdate:
+    UpdateMedicationBody:
       type: object
       properties:
-        id:
-          type: integer
+        name:
+          type: string
+        unit:
+          type: string
         quantity:
           type: integer
-      required:
-        - id
-        - quantity
+          minimum: 0
+        lowStockThreshold:
+          type: integer
+          minimum: 0
+        expiryDate:
+          type: string
+          nullable: true
 
     VehiclesStatus:
       type: object

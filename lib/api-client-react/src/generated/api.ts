@@ -30,6 +30,7 @@ import type {
   ConsultationListItem,
   CreateAppointmentBody,
   CreateConsultationBody,
+  CreateMedicationBody,
   DashboardStats,
   GetAppointmentsListParams,
   GetConsultationsListParams,
@@ -40,8 +41,8 @@ import type {
   LowStockResponse,
   MarkAllReadResult,
   MarkReadResult,
+  MedicationItem,
   MedicationPage,
-  MedicationStockUpdate,
   OrStatus,
   PatientListItem,
   RecentPatient,
@@ -49,7 +50,7 @@ import type {
   UpcomingAppointment,
   UpdateAppointmentStatusBody,
   UpdateConsultationStatusBody,
-  UpdateMedicationStockBody,
+  UpdateMedicationBody,
   VehiclesStatus
 } from './api.schemas';
 
@@ -63,10 +64,6 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
-/** UseQueryOptions with queryKey made optional — orval provides it internally. */
-type UseQueryOptionsCompat<TData, TError, TSelectData = TData> =
-  Omit<UseQueryOptions<TData, TError, TSelectData>, 'queryKey'> &
-  { queryKey?: ReadonlyArray<unknown> };
 
 
 const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
@@ -83,6 +80,11 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+
+// Compatibility type: makes queryKey optional so callers can omit it (e.g. pass only { refetchInterval })
+type UseQueryOptionsCompat<TQueryFnData, TError = unknown, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey> =
+  Omit<UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>, 'queryKey'> & { queryKey?: TQueryKey };
 
 export const getHealthCheckUrl = () => {
 
@@ -1774,6 +1776,77 @@ export function useGetMedications<TData = Awaited<ReturnType<typeof getMedicatio
 
 
 
+export const getCreateMedicationUrl = () => {
+
+
+
+
+  return `/api/medications`
+}
+
+/**
+ * @summary Create a new medication
+ */
+export const createMedication = async (createMedicationBody: CreateMedicationBody, options?: Parameters<typeof customFetch>[1]): Promise<MedicationItem> => {
+
+  return customFetch<MedicationItem>(getCreateMedicationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createMedicationBody)
+  }
+);}
+
+
+
+
+
+export const getCreateMedicationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMedication>>, TError,{data: BodyType<CreateMedicationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMedication>>, TError,{data: BodyType<CreateMedicationBody>}, TContext> => {
+
+const mutationKey = ['createMedication'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMedication>>, {data: BodyType<CreateMedicationBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createMedication(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMedicationMutationResult = NonNullable<Awaited<ReturnType<typeof createMedication>>>
+    export type CreateMedicationMutationBody = BodyType<CreateMedicationBody>
+    export type CreateMedicationMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a new medication
+ */
+export const useCreateMedication = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMedication>>, TError,{data: BodyType<CreateMedicationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMedication>>,
+        TError,
+        {data: BodyType<CreateMedicationBody>},
+        TContext
+      > => {
+      return useMutation(getCreateMedicationMutationOptions(options));
+    }
+
 export const getGetMedicationsLowStockUrl = (params?: GetMedicationsLowStockParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -1858,7 +1931,7 @@ export function useGetMedicationsLowStock<TData = Awaited<ReturnType<typeof getM
 
 
 
-export const getUpdateMedicationStockUrl = (id: number,) => {
+export const getUpdateMedicationUrl = (id: number,) => {
 
 
 
@@ -1867,17 +1940,17 @@ export const getUpdateMedicationStockUrl = (id: number,) => {
 }
 
 /**
- * @summary Update medication stock quantity
+ * @summary Update a medication (all fields supported)
  */
-export const updateMedicationStock = async (id: number,
-    updateMedicationStockBody: UpdateMedicationStockBody, options?: Parameters<typeof customFetch>[1]): Promise<MedicationStockUpdate> => {
+export const updateMedication = async (id: number,
+    updateMedicationBody: UpdateMedicationBody, options?: Parameters<typeof customFetch>[1]): Promise<MedicationItem> => {
 
-  return customFetch<MedicationStockUpdate>(getUpdateMedicationStockUrl(id),
+  return customFetch<MedicationItem>(getUpdateMedicationUrl(id),
   {
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(updateMedicationStockBody)
+    body: JSON.stringify(updateMedicationBody)
   }
 );}
 
@@ -1885,11 +1958,11 @@ export const updateMedicationStock = async (id: number,
 
 
 
-export const getUpdateMedicationStockMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMedicationStock>>, TError,{id: number;data: BodyType<UpdateMedicationStockBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateMedicationStock>>, TError,{id: number;data: BodyType<UpdateMedicationStockBody>}, TContext> => {
+export const getUpdateMedicationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMedication>>, TError,{id: number;data: BodyType<UpdateMedicationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMedication>>, TError,{id: number;data: BodyType<UpdateMedicationBody>}, TContext> => {
 
-const mutationKey = ['updateMedicationStock'];
+const mutationKey = ['updateMedication'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1899,10 +1972,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMedicationStock>>, {id: number;data: BodyType<UpdateMedicationStockBody>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMedication>>, {id: number;data: BodyType<UpdateMedicationBody>}> = (props) => {
           const {id,data} = props ?? {};
 
-          return  updateMedicationStock(id,data,requestOptions)
+          return  updateMedication(id,data,requestOptions)
         }
 
 
@@ -1912,22 +1985,93 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type UpdateMedicationStockMutationResult = NonNullable<Awaited<ReturnType<typeof updateMedicationStock>>>
-    export type UpdateMedicationStockMutationBody = BodyType<UpdateMedicationStockBody>
-    export type UpdateMedicationStockMutationError = ErrorType<void>
+    export type UpdateMedicationMutationResult = NonNullable<Awaited<ReturnType<typeof updateMedication>>>
+    export type UpdateMedicationMutationBody = BodyType<UpdateMedicationBody>
+    export type UpdateMedicationMutationError = ErrorType<void>
 
     /**
- * @summary Update medication stock quantity
+ * @summary Update a medication (all fields supported)
  */
-export const useUpdateMedicationStock = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMedicationStock>>, TError,{id: number;data: BodyType<UpdateMedicationStockBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useUpdateMedication = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMedication>>, TError,{id: number;data: BodyType<UpdateMedicationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof updateMedicationStock>>,
+        Awaited<ReturnType<typeof updateMedication>>,
         TError,
-        {id: number;data: BodyType<UpdateMedicationStockBody>},
+        {id: number;data: BodyType<UpdateMedicationBody>},
         TContext
       > => {
-      return useMutation(getUpdateMedicationStockMutationOptions(options));
+      return useMutation(getUpdateMedicationMutationOptions(options));
+    }
+
+export const getDeleteMedicationUrl = (id: number,) => {
+
+
+
+
+  return `/api/medications/${id}`
+}
+
+/**
+ * @summary Delete a medication from inventory
+ */
+export const deleteMedication = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteMedicationUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteMedicationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMedication>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMedication>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteMedication'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMedication>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteMedication(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMedicationMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMedication>>>
+
+    export type DeleteMedicationMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a medication from inventory
+ */
+export const useDeleteMedication = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMedication>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMedication>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteMedicationMutationOptions(options));
     }
 
 export const getGetVehiclesStatusUrl = () => {

@@ -13,7 +13,6 @@ export type {
   MedicationItem,
   MedicationItemStatus,
   MedicationPage,
-  MedicationStockUpdate,
   OrStatus,
   RecentPatient,
   ServiceChartPoint,
