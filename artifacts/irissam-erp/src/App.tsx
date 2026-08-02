@@ -27,6 +27,7 @@ const ResuscitationPage = lazy(() => import('@/pages/Resuscitation'));
 const OperatingRoomPage = lazy(() => import('@/pages/OperatingRoom'));
 const PersonnelPage = lazy(() => import('@/pages/Personnel'));
 const AmbulancesPage = lazy(() => import('@/pages/Ambulances'));
+const DevTestRunnerPage = lazy(() => import('@/pages/DevTestRunner'));
 
 // ---------------------------------------------------------------------------
 // Loading skeleton shown while a lazy chunk is fetching
@@ -138,6 +139,7 @@ function Router() {
       <Route path="/hr" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/finance" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/ambulances" component={() => <ProtectedRoute component={AmbulancesPage} />} />
+      <Route path="/dev/tests" component={() => <ProtectedRoute component={DevTestRunnerPage} />} />
       <Route path="/archives" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/reports" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={PlaceholderPage} />} />
