@@ -57,6 +57,20 @@ import type {
 import { customFetch } from '../custom-fetch';
 import type { ErrorType , BodyType } from '../custom-fetch';
 
+
+// Compatibility shim: makes queryKey optional so callers can omit it (e.g. pass
+// only { refetchInterval: 30_000 }) without TypeScript demanding queryKey.
+// Orval v8 generates UseQueryOptions<...> which marks queryKey as required; this
+// wrapper loosens that to match the expected caller API (React Query infers queryKey).
+type UseQueryOptionsCompat<
+  TQueryFnData,
+  TError = unknown,
+  TData = TQueryFnData,
+  TQueryKey extends QueryKey = QueryKey,
+> = Omit<UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>, "queryKey"> & {
+  queryKey?: TQueryKey;
+};
+
 type AwaitedInput<T> = PromiseLike<T> | T;
 
       type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
@@ -80,11 +94,6 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
-
-
-// Compatibility type: makes queryKey optional so callers can omit it (e.g. pass only { refetchInterval })
-type UseQueryOptionsCompat<TQueryFnData, TError = unknown, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey> =
-  Omit<UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>, 'queryKey'> & { queryKey?: TQueryKey };
 
 export const getHealthCheckUrl = () => {
 
