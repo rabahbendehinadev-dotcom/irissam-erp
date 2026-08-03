@@ -33,6 +33,8 @@ const AmbulancesPage = lazy(() => import('@/pages/Ambulances'));
 const DevTestRunnerPage = lazy(() => import('@/pages/DevTestRunner'));
 const ChangePasswordPage = lazy(() => import('@/pages/ChangePassword'));
 const FacturationPage = lazy(() => import('@/pages/Facturation'));
+
+const SettingsPage = lazy(() => import('@/pages/Settings'));
 const InsurancePage    = lazy(() => import('@/pages/InsurancePage'));
 const HRPage           = lazy(() => import('@/pages/HR'));
 const MedicalStockPage = lazy(() => import('@/pages/MedicalStock'));
@@ -202,7 +204,7 @@ function Router() {
       <Route path="/dev/tests" component={() => <ProtectedRoute component={DevTestRunnerPage} />} />
       <Route path="/archives" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/reports" component={() => <ProtectedRoute component={PlaceholderPage} />} />
-      <Route path="/settings" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
       <Route component={() => (
         <Suspense fallback={<FullPageSpinner />}>
           <NotFound />
