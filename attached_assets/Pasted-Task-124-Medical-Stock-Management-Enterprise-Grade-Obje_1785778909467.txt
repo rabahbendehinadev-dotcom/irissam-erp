@@ -1,0 +1,342 @@
+Task #124 — Medical Stock Management (Enterprise Grade)
+
+Objectif :
+Construire un module complet de Gestion du Stock Médical (Medical Inventory) pour un ERP Hospitalier de niveau Enterprise.
+
+IMPORTANT :
+- Ne jamais utiliser de Mock Data.
+- Toutes les données doivent provenir de PostgreSQL.
+- TypeScript : 0 erreur.
+- Responsive Desktop / Tablet / Mobile.
+- Compatible PWA.
+- Respecter l'architecture actuelle du projet.
+- Utiliser React + Node.js + PostgreSQL.
+- Toutes les opérations critiques doivent être transactionnelles.
+- Audit log sur chaque action sensible.
+- RBAC complet avec permissions.
+
+──────────────────────────────
+
+PHASE 1 — DATABASE
+
+Créer les migrations nécessaires.
+
+Tables principales :
+
+medical_items
+medical_categories
+medical_units
+medical_suppliers
+medical_manufacturers
+medical_batches
+medical_stock_movements
+medical_purchase_orders
+medical_purchase_order_items
+medical_stock_adjustments
+medical_stock_transfers
+medical_transfer_items
+medical_consumptions
+medical_consumption_items
+medical_expirations
+medical_inventory_sessions
+medical_inventory_items
+
+Ajouter les index nécessaires.
+
+Créer les contraintes.
+
+Créer les foreign keys.
+
+Créer les séquences.
+
+Créer les vues SQL utiles.
+
+Créer les triggers nécessaires.
+
+Toutes les migrations doivent être idempotentes.
+
+──────────────────────────────
+
+PHASE 2 — INVENTORY ENGINE
+
+Créer un moteur complet de gestion du stock.
+
+Entrée
+
+Sortie
+
+Consommation
+
+Retour
+
+Transfert
+
+Ajustement
+
+Inventaire
+
+Lot
+
+Numéro de lot
+
+Date fabrication
+
+Date expiration
+
+FIFO
+
+FEFO
+
+Stock réservé
+
+Stock disponible
+
+Stock physique
+
+Stock théorique
+
+Calcul automatique des mouvements.
+
+Jamais de quantité négative.
+
+Toutes les opérations dans une transaction PostgreSQL.
+
+──────────────────────────────
+
+PHASE 3 — ALERT ENGINE
+
+Créer les alertes automatiques.
+
+Stock faible
+
+Rupture
+
+Produit expiré
+
+Produit expire bientôt
+
+Lot rappelé
+
+Consommation anormale
+
+Surstock
+
+Alertes temps réel.
+
+──────────────────────────────
+
+PHASE 4 — BACKEND API
+
+Créer toutes les routes REST.
+
+Items
+
+Categories
+
+Suppliers
+
+Manufacturers
+
+Purchase Orders
+
+Transfers
+
+Adjustments
+
+Inventory Sessions
+
+Stock Movements
+
+Consumption
+
+Dashboard
+
+Reports
+
+Search
+
+Statistics
+
+Toutes les routes protégées avec requireAuth.
+
+Permissions granulaires.
+
+Audit log.
+
+Validation Zod.
+
+──────────────────────────────
+
+PHASE 5 — FRONTEND
+
+Créer un module complet.
+
+Pages :
+
+Dashboard Stock
+
+Produits
+
+Catégories
+
+Fournisseurs
+
+Fabricants
+
+Commandes d'achat
+
+Réceptions
+
+Transferts
+
+Ajustements
+
+Inventaires
+
+Mouvements
+
+Lots
+
+Produits expirés
+
+Rapports
+
+Analytics
+
+Chaque page doit avoir :
+
+Recherche
+
+Filtres
+
+Pagination
+
+Export PDF
+
+Export Excel
+
+Responsive
+
+Drawer
+
+Bottom Sheet Mobile
+
+Skeleton
+
+Empty State
+
+Error State
+
+Loading State
+
+──────────────────────────────
+
+PHASE 6 — DASHBOARD
+
+Créer un Dashboard professionnel.
+
+KPI :
+
+Valeur totale du stock
+
+Nombre produits
+
+Nombre lots
+
+Produits faibles
+
+Produits expirés
+
+Produits critiques
+
+Consommation aujourd'hui
+
+Consommation mois
+
+Top produits
+
+Top services consommateurs
+
+Top fournisseurs
+
+Valeur immobilisée
+
+Graphiques Recharts.
+
+──────────────────────────────
+
+PHASE 7 — INTÉGRATION
+
+Relier automatiquement le stock avec :
+
+Pharmacie
+
+Laboratoire
+
+Bloc opératoire
+
+Réanimation
+
+Urgences
+
+Hospitalisation
+
+Imagerie
+
+Banque de sang
+
+Chaque prescription ou consommation doit décrémenter automatiquement le stock.
+
+──────────────────────────────
+
+PHASE 8 — MOBILE
+
+Le module doit fonctionner parfaitement sur :
+
+Desktop
+
+Tablet
+
+Android
+
+iPhone
+
+PWA
+
+Toutes les tables deviennent des cartes sur mobile.
+
+Tous les Dialog deviennent Bottom Sheets.
+
+──────────────────────────────
+
+PHASE 9 — TESTS
+
+Créer des tests d'acceptation complets.
+
+CRUD
+
+Transactions
+
+Permissions
+
+FIFO
+
+FEFO
+
+Lots
+
+Expiration
+
+Alertes
+
+Performance
+
+Responsive
+
+TypeScript
+
+Runtime
+
+Objectif final :
+
+Livrer un module Medical Stock Enterprise prêt pour la production, parfaitement intégré avec tous les autres modules déjà développés (Patients, Admissions, Consultations, Bloc, ICU, Laboratoire, Imagerie, Pharmacie, Facturation, Assurance et RH).

@@ -28,6 +28,7 @@ import paymentsRouter         from "./payments";
 import insuranceRouter        from "./insurance";
 import serviceCatalogRouter   from "./service-catalog";
 import hrRouter                from "./hr/index";
+import medicalStockRouter      from "./medical-stock/index";
 import { requireAuth } from "../middleware/requireAuth";
 import { requirePermission } from "../middleware/requirePermission";
 
@@ -69,6 +70,8 @@ router.use("/insurance",           requireAuth, insuranceRouter);
 router.use("/service-catalog",     requireAuth, serviceCatalogRouter);
 // HR module
 router.use("/hr",                  requireAuth, hrRouter);
+// Medical stock module
+router.use("/medical-stock",       requireAuth, medicalStockRouter);
 // Notifications — stream does NOT require auth (SSE reconnects can't set headers)
 router.use("/notifications",       notificationsRouter);
 
