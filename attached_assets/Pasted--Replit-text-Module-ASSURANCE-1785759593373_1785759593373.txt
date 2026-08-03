@@ -1,0 +1,778 @@
+انسخ هذا البرومبت كامل وابعثه لـReplit:
+
+```text
+ابدأ الآن تطوير Module كامل خاص بـ:
+
+ASSURANCE / TIERS PAYANT / CNAS / CASNOS / CONVENTIONS
+
+داخل نظام IRISSAM HOSPITAL ERP.
+
+مهم جدًا:
+
+- لا تغيّر التصميم الحالي.
+- لا تغيّر الـSidebar أو الـTopbar.
+- لا تضف Module آخر.
+- استعمل PostgreSQL الحقيقي والـAPI الحقيقي.
+- ممنوع استعمال MockRepository.
+- استعمل نفس Design System الحالي.
+- دعم كامل للغات:
+  - Français
+  - العربية RTL
+  - English
+- طبّق Authentication وRBAC وAudit على كل العمليات.
+- لا تضع أي Placeholder أو Coming Soon.
+- كل البيانات يجب أن تكون مرتبطة فعليًا بـPatient وInvoice وEncounter.
+
+==================================================
+1. الهدف من Module
+==================================================
+
+إنشاء نظام متكامل لإدارة:
+
+- Organismes payeurs
+- CNAS
+- CASNOS
+- Mutuelles
+- Assurances privées
+- Conventions entreprises
+- Tiers payant
+- Prises en charge
+- Claims / Dossiers de remboursement
+- Bordereaux
+- Paiements des organismes
+- Plafonds de couverture
+- Expiration des droits
+- Documents justificatifs
+- Rejets
+- Approbations partielles
+- Soldes restants
+
+==================================================
+2. الجداول المطلوبة
+==================================================
+
+راجع الجداول الموجودة أولًا، ولا تنشئ جداول مكررة.
+
+أكمل أو أنشئ:
+
+insurance_organizations
+insurance_plans
+patient_insurance_policies
+coverage_requests
+insurance_claims
+insurance_claim_items
+insurance_payments
+insurance_documents
+insurance_bordereaux
+insurance_bordereau_items
+insurance_rejections
+insurance_approvals
+
+كل الجداول تستعمل:
+
+- id UUID
+- createdAt
+- updatedAt
+- deletedAt
+- createdBy
+- updatedBy
+- version
+- siteId عند الحاجة
+
+==================================================
+3. Organismes payeurs
+==================================================
+
+أنشئ صفحة:
+
+Organismes payeurs
+
+تحتوي على:
+
+- CNAS
+- CASNOS
+- Mutuelles
+- Assurances privées
+- Entreprises conventionnées
+- Autres organismes
+
+الحقول:
+
+- code
+- nom
+- type
+- adresse
+- téléphone
+- email
+- contact principal
+- numéro convention
+- date début convention
+- date fin convention
+- délai moyen de paiement
+- taux de couverture par défaut
+- plafond annuel
+- statut
+- siteId
+- notes
+
+الحالات:
+
+- actif
+- inactif
+- suspendu
+- convention expirée
+
+Actions:
+
+- Voir
+- Modifier
+- Suspendre
+- Réactiver
+- Voir conventions
+- Voir paiements
+- Voir bordereaux
+- Voir dossiers en attente
+
+==================================================
+4. Polices d’assurance patient
+==================================================
+
+داخل Patient Detail أضف Tab أو أكمل Tab Assurance.
+
+كل Police تحتوي على:
+
+- patientId
+- organismeId
+- numéro adhérent
+- numéro assuré
+- bénéficiaire principal
+- ayant droit
+- type couverture
+- date début
+- date expiration
+- taux couverture
+- plafond
+- plafond consommé
+- plafond restant
+- ticket modérateur
+- statut
+- priorité
+- documents
+
+الحالات:
+
+- active
+- expirée
+- suspendue
+- en attente de validation
+- refusée
+
+المطلوب:
+
+- دعم أكثر من Assurance لنفس المريض.
+- تحديد Assurance principale.
+- تنبيه قبل انتهاء الصلاحية.
+- منع استعمال Police منتهية.
+- التحقق من plafond المتبقي.
+- عرض Badge واضحة حسب الحالة.
+- تجديد Police.
+- أرشفة Police القديمة.
+- رفع:
+  - Carte CNAS
+  - Carte CASNOS
+  - Attestation
+  - Convention
+  - Justificatifs
+
+==================================================
+5. Prise en charge
+==================================================
+
+أنشئ نظام Prise en charge مرتبط بـ:
+
+- Patient
+- Encounter
+- Admission
+- Consultation
+- Invoice
+- Organisme
+- Police
+
+الحقول:
+
+- requestNumber
+- patientId
+- encounterId
+- policyId
+- organizationId
+- requestedAmount
+- requestedServices
+- requestDate
+- expectedResponseDate
+- status
+- approvedAmount
+- patientShare
+- organizationShare
+- rejectionReason
+- decisionDate
+- decisionBy
+- documents
+
+الحالات:
+
+- brouillon
+- soumise
+- en cours d’étude
+- informations complémentaires requises
+- approuvée
+- partiellement approuvée
+- refusée
+- expirée
+- annulée
+
+==================================================
+6. Insurance Claims
+==================================================
+
+أنشئ صفحة:
+
+Dossiers Assurance
+
+تحتوي على:
+
+- N° Dossier
+- Patient
+- MRN
+- Organisme
+- Facture
+- Encounter
+- Montant facture
+- Montant demandé
+- Montant accepté
+- Montant payé
+- Reste
+- Statut
+- Date soumission
+- Délai écoulé
+- Actions
+
+الفلاتر:
+
+- Organisme
+- Statut
+- Date
+- Site
+- Montant
+- Patient
+- Facture
+- En retard
+
+Actions:
+
+- Ouvrir
+- Soumettre
+- Ajouter document
+- Demander complément
+- Approuver
+- Approuver partiellement
+- Refuser
+- Marquer comme payé
+- Imprimer dossier
+- Ajouter au bordereau
+
+==================================================
+7. Claim Detail
+==================================================
+
+أنشئ صفحة أو Slide-over كاملة تعرض:
+
+- Patient
+- Assurance
+- Facture
+- Encounter
+- Services facturés
+- Montants
+- Part patient
+- Part organisme
+- Documents
+- Historique
+- Timeline
+- Audit
+- Messages internes
+- Décisions
+
+كل Claim Item يحتوي على:
+
+- invoiceItemId
+- serviceCode
+- description
+- amountBilled
+- amountRequested
+- amountApproved
+- amountRejected
+- rejectionReason
+- status
+
+اسمح بالموافقة الجزئية على مستوى كل Service.
+
+==================================================
+8. حساب التغطية
+==================================================
+
+كل الحسابات تكون في Backend باستخدام NUMERIC/DECIMAL.
+
+احسب:
+
+- total facture
+- taux couverture
+- plafond disponible
+- ticket modérateur
+- part patient
+- part organisme
+- montant non couvert
+- montant rejeté
+- montant approuvé
+- montant payé
+- reste organisme
+
+ممنوع الحسابات المالية الأساسية في Frontend فقط.
+
+==================================================
+9. قواعد التغطية
+==================================================
+
+أنشئ Rules Engine مرن يدعم:
+
+- couverture par pourcentage
+- plafond annuel
+- plafond par acte
+- plafond par journée
+- exclusions
+- franchise
+- ticket modérateur
+- nombre maximal d’actes
+- autorisation préalable
+- services non couverts
+- tarifs conventionnés
+- délais de carence
+
+إذا الخدمة غير مغطاة:
+
+- اعرض السبب.
+- حوّل قيمتها إلى Part patient.
+- لا تحذفها من الفاتورة.
+
+==================================================
+10. Bordereaux
+==================================================
+
+أنشئ صفحة:
+
+Bordereaux d’envoi
+
+كل Bordereau يحتوي على:
+
+- bordereauNumber
+- organizationId
+- periodFrom
+- periodTo
+- claimCount
+- totalRequested
+- totalApproved
+- totalPaid
+- status
+- submittedAt
+- submittedBy
+- referenceExternal
+- notes
+
+الحالات:
+
+- brouillon
+- prêt
+- soumis
+- reçu
+- en cours
+- partiellement payé
+- payé
+- rejeté
+
+المطلوب:
+
+- إضافة عدة Claims إلى Bordereau.
+- منع إضافة Claim موجودة في Bordereau آخر نشط.
+- توليد PDF.
+- تصدير Excel/CSV.
+- تسجيل تاريخ الإرسال.
+- تسجيل رقم الإيداع الخارجي.
+- رفع accusé de réception.
+
+==================================================
+11. Paiements organismes
+==================================================
+
+أنشئ نظام تسجيل دفعات CNAS / CASNOS / Assurance.
+
+الحقول:
+
+- paymentNumber
+- organizationId
+- bordereauId اختياري
+- claimId اختياري
+- amount
+- paymentDate
+- method
+- bankReference
+- receivedBy
+- notes
+- document
+
+عند تسجيل الدفع:
+
+- وزع المبلغ على Claims.
+- حدّث amountPaid.
+- حدّث Claim Status.
+- حدّث Invoice insurerSharePaid.
+- لا تعتبر Part patient مدفوعة.
+- سجل Audit وTimeline.
+
+دعم:
+
+- Paiement total
+- Paiement partiel
+- Paiement groupé
+- Régularisation
+- Retenue
+- Différence de paiement
+
+==================================================
+12. الربط مع Facturation
+==================================================
+
+داخل Invoice Detail:
+
+أضف Section Assurance تحتوي على:
+
+- Organisme
+- Police
+- Taux couverture
+- Plafond
+- Part organisme
+- Part patient
+- Claim status
+- Montant demandé
+- Montant approuvé
+- Montant payé
+- Reste organisme
+
+Actions:
+
+- Créer demande de prise en charge
+- Créer Claim
+- Ouvrir Claim
+- Ajouter au Bordereau
+- Enregistrer paiement organisme
+
+إذا Claim مرفوضة جزئيًا:
+
+- الجزء المرفوض يتحول إلى Part patient فقط بعد موافقة مستخدم عنده Permission مناسبة.
+- تسجل العملية في Audit.
+
+==================================================
+13. الربط مع Patient Detail
+==================================================
+
+داخل Patient Detail:
+
+Tab Assurance:
+
+- Polices actives
+- Historique des polices
+- Plafonds
+- Expiration
+- Documents
+- Prises en charge
+- Claims
+- Organismes
+- Part patient
+- Part assurance
+- Montants en attente
+
+Tab Facturation:
+
+- عرض حالة Claims لكل Facture.
+- إظهار:
+  - En attente organisme
+  - Partiellement approuvée
+  - Payée
+  - Refusée
+
+==================================================
+14. Dashboard Assurance
+==================================================
+
+أنشئ Dashboard داخل Module Assurance تحتوي على:
+
+Cards:
+
+- Dossiers en attente
+- Montant demandé
+- Montant approuvé
+- Montant rejeté
+- Montant payé
+- Reste à encaisser
+- Bordereaux en attente
+- Dossiers en retard
+
+Charts:
+
+- Montants par organisme
+- Claims par statut
+- Délais moyens de traitement
+- Paiements mensuels
+- Rejets par motif
+- Top services rejetés
+
+Widgets:
+
+- Dossiers urgents
+- Polices expirant bientôt
+- Bordereaux non payés
+- Organismes en retard
+- Claims nécessitant documents
+
+==================================================
+15. Alerts وNotifications
+==================================================
+
+أنشئ Notifications عند:
+
+- Police ستنتهي خلال 30 يومًا.
+- Police انتهت.
+- Plafond تجاوز 80%.
+- Plafond انتهى.
+- Claim تم إرسالها.
+- Claim تحتاج Documents.
+- Claim تمت الموافقة عليها.
+- Claim تمت الموافقة عليها جزئيًا.
+- Claim تم رفضها.
+- Bordereau تجاوز délai.
+- Paiement organisme وصل.
+- فرق بين amountApproved وamountPaid.
+
+==================================================
+16. Documents
+==================================================
+
+دعم رفع ومعاينة:
+
+- Carte assurance
+- Attestation
+- Convention
+- Prise en charge
+- Bordereau
+- Accusé réception
+- Décision refus
+- Justificatif paiement
+- Courrier organisme
+
+استعمل جدول Attachments الحالي.
+
+==================================================
+17. الصلاحيات
+==================================================
+
+أضف Permissions:
+
+- insurance.view
+- insurance.organizations.view
+- insurance.organizations.create
+- insurance.organizations.update
+- insurance.policies.view
+- insurance.policies.create
+- insurance.policies.update
+- insurance.policies.renew
+- insurance.claims.view
+- insurance.claims.create
+- insurance.claims.submit
+- insurance.claims.approve
+- insurance.claims.partial_approve
+- insurance.claims.reject
+- insurance.claims.mark_paid
+- insurance.bordereaux.view
+- insurance.bordereaux.create
+- insurance.bordereaux.submit
+- insurance.payments.view
+- insurance.payments.create
+- insurance.reports.view
+- insurance.export
+
+كل Endpoint حساس محمي في Backend.
+
+==================================================
+18. Audit
+==================================================
+
+سجل:
+
+- إنشاء Organisme
+- تعديل Convention
+- إنشاء Police
+- تجديد Police
+- إنشاء Claim
+- إرسال Claim
+- موافقة
+- موافقة جزئية
+- رفض
+- إضافة Document
+- إنشاء Bordereau
+- إرسال Bordereau
+- تسجيل Paiement organisme
+- تعديل Part patient
+- Export
+- Print
+- View sensitive financial data
+
+==================================================
+19. APIs
+==================================================
+
+أنشئ APIs منظمة:
+
+/api/insurance/organizations
+/api/insurance/plans
+/api/patients/:id/insurance-policies
+/api/coverage-requests
+/api/insurance/claims
+/api/insurance/claims/:id
+/api/insurance/claims/:id/submit
+/api/insurance/claims/:id/approve
+/api/insurance/claims/:id/partial-approve
+/api/insurance/claims/:id/reject
+/api/insurance/claims/:id/mark-paid
+/api/insurance/bordereaux
+/api/insurance/bordereaux/:id/submit
+/api/insurance/payments
+/api/insurance/dashboard
+/api/insurance/reports
+
+==================================================
+20. Transactions
+==================================================
+
+استعمل PostgreSQL Transaction في:
+
+- إنشاء Claim من Facture
+- Approbation partielle
+- Rejet
+- إضافة Claims إلى Bordereau
+- تسجيل Paiement organisme
+- توزيع Paiement على Claims
+- تعديل Part patient / Part assurance
+
+أي فشل = Rollback كامل.
+
+==================================================
+21. Responsive وPWA
+==================================================
+
+كل صفحات Assurance تعمل على:
+
+- iPhone
+- Android
+- Tablet
+- Desktop
+- PWA standalone
+
+Mobile:
+
+- الجداول تتحول إلى Cards.
+- Modals تتحول إلى Bottom Sheets.
+- لا horizontal overflow.
+- أزرار touch-friendly.
+- Tabs scrollable.
+
+==================================================
+22. اختبارات القبول
+==================================================
+
+TEST A:
+إضافة CNAS كOrganisme
+→ تظهر في القائمة.
+
+TEST B:
+إضافة Police لمريض
+→ تظهر داخل Patient Detail.
+
+TEST C:
+Police منتهية
+→ لا يمكن استعمالها.
+
+TEST D:
+Facture 10000 DZD وتغطية 80%
+→ Part organisme = 8000
+→ Part patient = 2000.
+
+TEST E:
+Plafond المتبقي 5000 فقط
+→ Organisme share لا تتجاوز 5000.
+
+TEST F:
+Claim جزئية
+→ كل Item له amountApproved مختلف.
+
+TEST G:
+إضافة Claim إلى Bordereau
+→ لا يمكن إضافتها مرة ثانية.
+
+TEST H:
+تسجيل Paiement organisme جزئي
+→ Claim = partially_paid.
+
+TEST I:
+تسجيل كامل المبلغ
+→ Claim = paid.
+
+TEST J:
+رفض Claim
+→ السبب إجباري.
+
+TEST K:
+User بدون insurance.claims.approve
+→ HTTP 403.
+
+TEST L:
+Dashboard KPIs صحيحة.
+
+TEST M:
+PDF Bordereau يعمل.
+
+TEST N:
+Patient Detail يعرض Police وClaims.
+
+TEST O:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+
+==================================================
+23. التقرير النهائي
+==================================================
+
+بعد الانتهاء أعطني:
+
+- Migrations الجديدة.
+- الجداول الجديدة.
+- Routes وEndpoints.
+- Services وRepositories.
+- Permissions.
+- الصفحات والمكونات الجديدة.
+- قواعد التغطية المطبقة.
+- نتائج TEST A–O.
+- عدد Placeholders المتبقية.
+- صفر TypeScript Errors.
+- صفر Runtime SQL Errors.
+- صفر White Screens.
+
+لا تبدأ RH أو BI أو أي Module آخر حتى تتم الموافقة على Assurance بالكامل.
+```
