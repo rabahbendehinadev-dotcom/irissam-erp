@@ -172,8 +172,11 @@ router.post("/claims/:id/submit", requirePermission("insurance.claims.submit"), 
 router.post("/claims/:id/approve", requirePermission("insurance.claims.approve"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const a = actor(req);
-    const { amountApproved, notes } = req.body as { amountApproved: number; notes?: string };
-    if (amountApproved == null) { res.status(400).json({ error: "amountApproved requis" }); return; }
+    const raw = req.body as { amountApproved: number | string; notes?: string };
+    if (raw.amountApproved == null) { res.status(400).json({ error: "amountApproved requis" }); return; }
+    const amountApproved = Number(raw.amountApproved);
+    if (isNaN(amountApproved) || amountApproved < 0) { res.status(400).json({ error: "amountApproved doit être un nombre positif" }); return; }
+    const { notes } = raw;
     const { rows: [claim] } = await pool.query(`SELECT * FROM insurance_claims WHERE id=$1 AND deleted_at IS NULL`, [String(req.params.id)]);
     if (!claim) { res.status(404).json({ error: "Dossier introuvable" }); return; }
 
@@ -224,22 +227,130 @@ router.post("/claims/:id/reject", requirePermission("insurance.claims.reject"), 
 
 // ── POST /claims/:id/mark-paid ────────────────────────────────────────────────
 router.post("/claims/:id/mark-paid", requirePermission("insurance.claims.mark_paid"), async (req: AuthenticatedRequest, res, next) => {
+  const client = await pool.connect();
   try {
+    await client.query("BEGIN");
     const a = actor(req);
+    const claimId = String(req.params.id);
     const { amountPaid } = req.body as { amountPaid: number };
-    if (amountPaid == null) { res.status(400).json({ error: "amountPaid requis" }); return; }
-    const { rows: [updated] } = await pool.query(
-      `UPDATE insurance_claims SET status='paid', amount_paid=$1, amount_paid_num=$2, paid_at=NOW(), updated_by=$3, updated_at=NOW(), version=version+1 WHERE id=$4 AND deleted_at IS NULL RETURNING *`,
-      [amountPaid, amountPaid.toFixed(2), a.userId, String(req.params.id)],
+
+    if (amountPaid == null || Number(amountPaid) <= 0) {
+      await client.query("ROLLBACK");
+      res.status(400).json({ error: "amountPaid doit être un montant positif" });
+      return;
+    }
+
+    // Validate UUID format before hitting the DB (prevents "invalid input syntax for type uuid" 500)
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(claimId)) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Dossier introuvable" });
+      return;
+    }
+
+    // Lock claim row to prevent concurrent payments
+    const { rows: [claim] } = await client.query(
+      `SELECT id, status, invoice_id,
+              COALESCE(amount_approved_num::NUMERIC, amount_approved::NUMERIC, 0) AS approved,
+              COALESCE(amount_requested_num::NUMERIC, amount_requested::NUMERIC, 0) AS requested,
+              COALESCE(amount_paid_num::NUMERIC, 0) AS already_paid
+         FROM insurance_claims
+        WHERE id = $1 AND deleted_at IS NULL
+          FOR UPDATE`,
+      [claimId],
     );
-    if (!updated) { res.status(404).json({ error: "Dossier introuvable" }); return; }
-    await pool.query(
-      `UPDATE invoices SET paid_amount=paid_amount+$1, remaining_amount=GREATEST(0,remaining_amount-$1), status=(CASE WHEN (remaining_amount-$1)<=0.01 THEN 'paid' ELSE 'partially_paid' END)::invoice_status, updated_at=NOW() WHERE id=$2`,
-      [amountPaid, updated.invoice_id],
+    if (!claim) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Dossier introuvable" });
+      return;
+    }
+    if (claim.status === "paid") {
+      await client.query("ROLLBACK");
+      res.status(409).json({
+        code: "OVERPAYMENT",
+        error: "Ce sinistre est déjà entièrement payé",
+        amountRequested: amountPaid,
+        remainingAmount: 0,
+        entityType: "insurance_claim",
+        entityId: claimId,
+      });
+      return;
+    }
+
+    // Only approvable/payable states allow mark-paid
+    const PAYABLE_STATUSES = ["approved", "partially_approved", "partially_paid", "submitted"];
+    if (!PAYABLE_STATUSES.includes(claim.status as string)) {
+      await client.query("ROLLBACK");
+      res.status(422).json({
+        error: `Ce sinistre ne peut pas être payé (statut: ${claim.status}). Il doit être approuvé d'abord.`,
+      });
+      return;
+    }
+
+    // Use amount_requested as ceiling when the claim hasn't been formally approved yet
+    // (amount_approved is null for 'submitted' claims)
+    const approved    = Math.round(Number(claim.approved)     * 100) / 100 ||
+                        Math.round(Number(claim.requested)    * 100) / 100;
+    const alreadyPaid = Math.round(Number(claim.already_paid) * 100) / 100;
+    const remaining   = Math.round((approved - alreadyPaid)   * 100) / 100;
+
+    if (Number(amountPaid) > remaining + 0.01) {
+      await client.query("ROLLBACK");
+      await auditService.log({
+        module: "system", action: "update", resourceType: "InsuranceClaim", resourceId: claimId,
+        newValue: { rejectedReason: "OVERPAYMENT", entityType: "insurance_claim" },
+      }, a);
+      res.status(409).json({
+        code: "OVERPAYMENT",
+        error: `Le montant (${Number(amountPaid).toFixed(2)}) dépasse le reste approuvé (${remaining.toFixed(2)} DZD)`,
+        amountRequested: amountPaid,
+        remainingAmount: remaining,
+        entityType: "insurance_claim",
+        entityId: claimId,
+      });
+      return;
+    }
+
+    const toApply = Math.min(Number(amountPaid), remaining);
+    const newPaid  = Math.round((alreadyPaid + toApply) * 100) / 100;
+    const newStatus = newPaid >= approved - 0.01 ? "paid" : "partially_paid";
+
+    const { rows: [updated] } = await client.query(
+      `UPDATE insurance_claims
+          SET status       = $1,
+              amount_paid  = $2, amount_paid_num = $3,
+              paid_at      = CASE WHEN $1 = 'paid' THEN NOW() ELSE paid_at END,
+              updated_by   = $4, updated_at = NOW(), version = version + 1
+        WHERE id = $5 AND deleted_at IS NULL
+        RETURNING *`,
+      [newStatus, newPaid, newPaid.toFixed(2), a.userId, claimId],
     );
-    await auditService.log({ module: "system", action: "update", resourceType: "InsuranceClaim", resourceId: String(req.params.id), newValue: { status: "paid", amountPaid } }, a);
+
+    // Lock invoice row then update insurer share
+    if (updated.invoice_id) {
+      await client.query(`SELECT id FROM invoices WHERE id = $1 FOR UPDATE`, [updated.invoice_id]);
+      await client.query(
+        `UPDATE invoices
+            SET paid_amount      = paid_amount + $1,
+                remaining_amount = GREATEST(0, remaining_amount - $1),
+                status           = (CASE WHEN (remaining_amount - $1) <= 0.01 THEN 'paid'
+                                         ELSE 'partially_paid' END)::invoice_status,
+                updated_at       = NOW()
+          WHERE id = $2`,
+        [toApply, updated.invoice_id],
+      );
+    }
+
+    await client.query("COMMIT");
+    await auditService.log({
+      module: "system", action: "update", resourceType: "InsuranceClaim",
+      resourceId: claimId, newValue: { status: newStatus },
+    }, a);
     res.json(updated);
-  } catch (err) { next(err); }
+  } catch (err) {
+    await client.query("ROLLBACK");
+    next(err);
+  } finally { client.release(); }
 });
 
 // ── POST /claims/:id/transfer-rejected ───────────────────────────────────────

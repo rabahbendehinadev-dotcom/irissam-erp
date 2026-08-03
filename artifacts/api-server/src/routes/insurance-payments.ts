@@ -68,7 +68,22 @@ router.post("/payments", requirePermission("insurance.payments.create"), async (
     );
     res.status(201).json(payment);
   } catch (err: unknown) {
-    const e = err as { status?: number; message: string };
+    const e = err as {
+      status?: number; message: string; code?: string;
+      amountRequested?: number; remainingAmount?: number;
+      entityType?: string; entityId?: string;
+    };
+    if (e.status === 409 && e.code === "OVERPAYMENT") {
+      res.status(409).json({
+        code: "OVERPAYMENT",
+        error: e.message,
+        amountRequested: e.amountRequested,
+        remainingAmount: e.remainingAmount,
+        entityType: e.entityType,
+        entityId: e.entityId,
+      });
+      return;
+    }
     if (e.status) { res.status(e.status).json({ error: e.message }); return; }
     next(err);
   }

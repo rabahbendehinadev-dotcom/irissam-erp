@@ -145,10 +145,39 @@ router.post("/", requirePermission("payments.create"), async (req: Authenticated
     if (inv.status === "cancelled") { await client.query("ROLLBACK"); res.status(409).json({ error: "Impossible de payer une facture annulée" }); return; }
 
     // Calculate remaining from DB (not from client input)
-    const remaining = Number(inv.remaining_amount ?? 0);
+    const remaining = Math.round(Number(inv.remaining_amount ?? 0) * 100) / 100;
+    if (remaining <= 0.01) {
+      await client.query("ROLLBACK");
+      await auditService.log(
+        { action: "update", module: "system", resourceId: body.invoiceId, resourceType: "Invoice",
+          newValue: { rejectedReason: "OVERPAYMENT_ALREADY_PAID" } },
+        a,
+      );
+      res.status(409).json({
+        code: "OVERPAYMENT",
+        error: "Cette facture est déjà entièrement payée",
+        amountRequested: body.amount,
+        remainingAmount: 0,
+        entityType: "invoice",
+        entityId: body.invoiceId,
+      });
+      return;
+    }
     if (body.amount > remaining + 0.01) {
       await client.query("ROLLBACK");
-      res.status(409).json({ error: `Le montant (${body.amount}) dépasse le reste à payer (${remaining.toFixed(2)})` });
+      await auditService.log(
+        { action: "update", module: "system", resourceId: body.invoiceId, resourceType: "Invoice",
+          newValue: { rejectedReason: "OVERPAYMENT", entityType: "invoice" } },
+        a,
+      );
+      res.status(409).json({
+        code: "OVERPAYMENT",
+        error: `Le montant (${body.amount.toFixed(2)}) dépasse le reste à payer (${remaining.toFixed(2)} DZD)`,
+        amountRequested: body.amount,
+        remainingAmount: remaining,
+        entityType: "invoice",
+        entityId: body.invoiceId,
+      });
       return;
     }
 

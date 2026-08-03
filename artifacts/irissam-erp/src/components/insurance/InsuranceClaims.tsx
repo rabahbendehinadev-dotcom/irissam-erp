@@ -123,20 +123,55 @@ function RejectModal({ claim, onClose }: ActionModalProps & { claim: InsuranceCl
 
 function MarkPaidModal({ claim, onClose }: ActionModalProps & { claim: InsuranceClaim }) {
   const markPaid = useMarkClaimPaid();
-  const [amount, setAmount] = useState(String(claim.amount_approved ?? claim.amount_requested));
+  const approved    = Number(claim.amount_approved ?? claim.amount_requested);
+  const alreadyPaid = Number(claim.amount_paid ?? 0);
+  const remaining   = Math.max(0, Math.round((approved - alreadyPaid) * 100) / 100);
+  const [amount, setAmount] = useState(remaining.toFixed(2));
+  const [err, setErr] = useState<string | null>(null);
+
+  function fmt(n: number) { return n.toLocaleString("fr-DZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
   async function go() {
-    await markPaid.mutateAsync({ id: claim.id, amountPaid: Number(amount) });
-    onClose();
+    const amt = Number(amount);
+    if (!amt || amt <= 0) { setErr("Montant invalide"); return; }
+    if (amt > remaining + 0.01) {
+      setErr(`Le montant dépasse le reste approuvé (${fmt(remaining)} DZD)`);
+      return;
+    }
+    setErr(null);
+    try {
+      await markPaid.mutateAsync({ id: claim.id, amountPaid: amt });
+      onClose();
+    } catch (e: unknown) {
+      const body = e as { response?: { data?: { error?: string; code?: string; remainingAmount?: number } }; message?: string };
+      if (body?.response?.data?.code === "OVERPAYMENT") {
+        const serverRemaining = body.response.data.remainingAmount ?? remaining;
+        setErr(`Trop-perçu détecté. Reste approuvé : ${fmt(serverRemaining)} DZD`);
+      } else {
+        setErr(body?.response?.data?.error ?? body?.message ?? "Erreur lors de l'enregistrement");
+      }
+    }
   }
+
   return (
     <ModalShell title="Marquer comme payé" onClose={onClose}>
+      {/* Amounts summary */}
+      <div className="bg-gray-50 rounded-lg p-3 grid grid-cols-3 gap-2 text-center text-xs mb-4">
+        <div><div className="text-gray-400 mb-0.5">Approuvé</div><div className="font-semibold text-gray-800">{fmt(approved)} DZD</div></div>
+        <div><div className="text-gray-400 mb-0.5">Déjà payé</div><div className="font-semibold text-green-600">{fmt(alreadyPaid)} DZD</div></div>
+        <div><div className="text-gray-400 mb-0.5">Reste</div><div className="font-bold text-red-600">{fmt(remaining)} DZD</div></div>
+      </div>
+      {err && <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">{err}</div>}
       <div className="mb-4">
-        <label className="text-xs text-gray-500 font-medium block mb-1">Montant payé (DZD)</label>
-        <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
+        <label className="text-xs text-gray-500 font-medium block mb-1">Montant à payer (DZD)</label>
+        <input type="number" min={0.01} step={0.01} max={remaining}
+          value={amount} onChange={e => { setAmount(e.target.value); setErr(null); }}
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+        <button type="button" onClick={() => setAmount(remaining.toFixed(2))}
+          className="mt-1 text-xs text-blue-600 hover:underline">Solder (tout payer)</button>
       </div>
       <div className="flex gap-2">
-        <button onClick={go} disabled={markPaid.isPending || !amount}
+        <button onClick={go} disabled={markPaid.isPending || !amount || remaining <= 0}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 disabled:opacity-60">
           {markPaid.isPending && <Loader2 size={14} className="animate-spin"/>} <Banknote size={14}/> Enregistrer
         </button>

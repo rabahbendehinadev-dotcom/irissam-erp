@@ -474,8 +474,13 @@ export class InsuranceService {
       // Distribute payment across claims
       let remaining = Math.round(input.amount * 100) / 100;
 
+      // Validate amount > 0
+      if (input.amount <= 0) {
+        throw Object.assign(new Error("Le montant doit être positif"), { status: 400 });
+      }
+
       if (input.bordereauId) {
-        // Get all unpaid/partially-paid claims in this bordereau, ordered by claim
+        // Lock all unpaid/partially-paid claims in this bordereau to prevent concurrent payments
         const { rows: claims } = await client.query(
           `SELECT c.id,
                   COALESCE(c.amount_approved_num, c.amount_approved::NUMERIC, 0) AS approved,
@@ -484,7 +489,8 @@ export class InsuranceService {
              JOIN insurance_claims c ON c.id = bi.claim_id
             WHERE bi.bordereau_id = $1
               AND c.status NOT IN ('paid')
-            ORDER BY c.created_at`,
+            ORDER BY c.created_at
+            FOR UPDATE OF c`,
           [input.bordereauId],
         );
 
@@ -546,16 +552,40 @@ export class InsuranceService {
           [input.bordereauId, actor.userId],
         );
       } else if (input.claimId) {
-        // Direct claim payment
+        // Direct claim payment — lock claim row to prevent concurrent payments
         const { rows: [clm] } = await client.query(
-          `SELECT COALESCE(amount_approved_num, amount_approved::NUMERIC, 0) AS approved,
-                  amount_paid_num
-             FROM insurance_claims WHERE id = $1`,
+          `SELECT id, status,
+                  COALESCE(amount_approved_num, amount_approved::NUMERIC, 0) AS approved,
+                  COALESCE(amount_paid_num, 0) AS already_paid,
+                  invoice_id
+             FROM insurance_claims WHERE id = $1
+             FOR UPDATE`,
           [input.claimId],
         );
-        const approved = Math.round(Number(clm.approved) * 100) / 100;
-        const alreadyPaid = Math.round(Number(clm.amount_paid_num ?? 0) * 100) / 100;
-        const newPaid = Math.min(approved, Math.round((alreadyPaid + remaining) * 100) / 100);
+        if (!clm) throw Object.assign(new Error("Sinistre introuvable"), { status: 404 });
+        if (clm.status === "paid") {
+          throw Object.assign(new Error("Ce sinistre est déjà entièrement payé"), {
+            status: 409, code: "OVERPAYMENT",
+            amountRequested: input.amount, remainingAmount: 0,
+            entityType: "insurance_claim", entityId: input.claimId,
+          });
+        }
+
+        const approved    = Math.round(Number(clm.approved)     * 100) / 100;
+        const alreadyPaid = Math.round(Number(clm.already_paid) * 100) / 100;
+        const owed        = Math.round((approved - alreadyPaid) * 100) / 100;
+
+        if (remaining > owed + 0.01) {
+          throw Object.assign(
+            new Error(`Le montant (${remaining.toFixed(2)}) dépasse le reste approuvé (${owed.toFixed(2)} DZD)`),
+            { status: 409, code: "OVERPAYMENT",
+              amountRequested: remaining, remainingAmount: owed,
+              entityType: "insurance_claim", entityId: input.claimId },
+          );
+        }
+
+        const toApply  = Math.min(remaining, owed);
+        const newPaid  = Math.round((alreadyPaid + toApply) * 100) / 100;
         const newStatus = newPaid >= approved ? "paid" : "partially_paid";
 
         await client.query(
@@ -568,10 +598,13 @@ export class InsuranceService {
           [newPaid, newPaid.toFixed(2), newStatus, actor.userId, input.claimId],
         );
 
-        // Update invoice
+        // Lock invoice row then update insurer share paid
+        if (clm.invoice_id) {
+          await client.query(`SELECT id FROM invoices WHERE id = $1 FOR UPDATE`, [clm.invoice_id]);
+        }
         await client.query(
           `UPDATE invoices
-             SET paid_amount     = paid_amount + $1,
+             SET paid_amount      = paid_amount + $1,
                  remaining_amount = GREATEST(0, remaining_amount - $1),
                  status = (CASE
                    WHEN (remaining_amount - $1) <= 0.01 THEN 'paid'
@@ -579,7 +612,7 @@ export class InsuranceService {
                  END)::invoice_status,
                  updated_at = NOW()
            WHERE id = (SELECT invoice_id FROM insurance_claims WHERE id = $2)`,
-          [remaining, input.claimId],
+          [toApply, input.claimId],
         );
       }
 

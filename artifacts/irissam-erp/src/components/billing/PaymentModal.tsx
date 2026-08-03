@@ -43,8 +43,18 @@ export function PaymentModal({ invoice, onClose, onSubmit }: Props) {
     try {
       await onSubmit(amt, method, reference || undefined, notes || undefined);
       onClose();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Erreur lors de l'enregistrement");
+    } catch (e: unknown) {
+      const body = e as { response?: { data?: { error?: string; code?: string; remainingAmount?: number } }; message?: string };
+      if (body?.response?.data?.code === "OVERPAYMENT") {
+        const serverRemaining = body.response.data.remainingAmount;
+        setErr(
+          serverRemaining != null
+            ? `Trop-perçu : le reste à payer est ${fmt(serverRemaining)} DZD`
+            : (body.response.data.error ?? "Paiement refusé : montant trop élevé"),
+        );
+      } else {
+        setErr(body?.response?.data?.error ?? (e instanceof Error ? e.message : "Erreur lors de l'enregistrement"));
+      }
     } finally { setSubmitting(false); }
   };
 

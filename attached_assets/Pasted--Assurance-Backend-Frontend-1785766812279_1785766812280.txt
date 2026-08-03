@@ -1,0 +1,130 @@
+ممتاز، اختبار Assurance نجح كامل تقريبًا، والتقرير كشف وصلّح مشاكل حقيقية في الـBackend والـFrontend.
+
+لكن قبل ما نبدأ **Module RH**، لازم ندير 3 مهام صغيرة بالترتيب، لأنهم مرتبطين بالاستقرار المالي:
+
+1. **#123 منع Overpayment** — الأولوية الأولى.
+2. **#121 إصلاح NaN في Dashboard**.
+3. **#122 مراجعة PWA/Service Worker**.
+
+الأهم الآن #123، لأن دفع مبلغ أكبر من الباقي يقدر يفسد الفاتورة والـClaim.
+
+انسخ هذا البرومبت وابعثه:
+
+```text
+ابدأ الآن Task #123 — حماية كاملة ضد السداد الزائد Overpayment.
+
+ممنوع بدء Module RH قبل إنهاء هذه المهمة.
+
+الهدف:
+منع أي دفع يتجاوز المبلغ المتبقي في:
+
+- Factures
+- Claims Assurance
+- Bordereaux
+- Paiements organismes
+- Paiements patients
+- Refunds
+- Credit Notes
+
+المطلوب:
+
+1. Backend هو المصدر الوحيد للحساب.
+2. لا تعتمد على تعطيل الزر في Frontend فقط.
+3. استخدم PostgreSQL Transaction.
+4. استخدم Row Lock:
+   SELECT ... FOR UPDATE
+   على الفاتورة أو الـClaim قبل حساب المبلغ المتبقي.
+5. احسب remainingAmount من قاعدة البيانات داخل نفس Transaction.
+6. إذا amount <= 0:
+   → HTTP 400
+7. إذا amount > remainingAmount:
+   → HTTP 409
+   code = OVERPAYMENT
+   مع:
+   - amountRequested
+   - remainingAmount
+   - entityType
+   - entityId
+8. إذا remainingAmount = 0:
+   → منع أي Payment جديد.
+9. دعم tolerance مالية صغيرة فقط عند الضرورة:
+   0.01 DZD كحد أقصى.
+10. منع الدفع المتزامن:
+    محاولتا Payment في نفس اللحظة لا يجب أن تتجاوزا المبلغ المتبقي.
+11. بعد نجاح الدفع:
+    - تحديث paidAmount
+    - تحديث remainingAmount
+    - تحديث status
+    داخل نفس Transaction.
+12. منع paidAmount من تجاوز totalAmount بأي حال.
+13. أضف Database Check Constraints إن أمكن:
+    - paid_amount >= 0
+    - remaining_amount >= 0
+    - paid_amount <= total_amount
+14. Frontend:
+    - عرض Reste à payer
+    - تعيين max للمبلغ
+    - رسالة واضحة عند OVERPAYMENT
+    - لا crash
+15. Audit:
+    سجل كل محاولة Overpayment مرفوضة بدون تسجيل بيانات حساسة.
+
+اختبارات القبول:
+
+TEST A:
+Facture reste 1000 DZD
+Payment 1200
+→ HTTP 409 OVERPAYMENT
+
+TEST B:
+Facture reste 1000
+Payment 1000
+→ paid
+
+TEST C:
+Facture déjà payée
+Payment جديد
+→ HTTP 409
+
+TEST D:
+محاولتان متزامنتان 700 + 700 على reste 1000
+→ واحدة تنجح
+→ الثانية تُرفض
+→ paidAmount لا يتجاوز 1000
+
+TEST E:
+Claim reste organisme 5000
+Paiement 6000
+→ HTTP 409
+
+TEST F:
+Amount = 0 أو سالب
+→ HTTP 400
+
+TEST G:
+بعد Refund
+→ remainingAmount يعاد حسابه بشكل صحيح حسب قواعد النظام
+
+TEST H:
+Database constraints تمنع أي قيمة سالبة أو تجاوز
+
+TEST I:
+Frontend يعرض رسالة مفهومة ولا يحدث Runtime Error
+
+TEST J:
+0 TypeScript Errors
+0 Runtime SQL Errors
+
+التقرير النهائي:
+
+- الملفات المعدلة
+- Endpoints المحمية
+- طريقة Row Lock
+- Constraints المضافة
+- نتائج TEST A–J
+- تأكيد عدم وجود Overpayment
+- TypeScript = 0
+- Runtime SQL = 0
+```
+
+بعد #123، ندير #121 و#122 بسرعة، وبعدها نبدأ RH.

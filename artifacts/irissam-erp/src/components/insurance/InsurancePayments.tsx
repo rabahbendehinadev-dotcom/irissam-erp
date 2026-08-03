@@ -47,7 +47,13 @@ function RegisterPaymentForm({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100"><X size={18}/></button>
         </div>
         <form onSubmit={submit} className="p-5 space-y-4">
-          {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error.startsWith("OVERPAYMENT:")
+                ? <><strong>Trop-perçu :</strong> {error.replace("OVERPAYMENT:", "").trim()}</>
+                : error}
+            </div>
+          )}
           <div>
             <label className="text-xs text-gray-500 font-medium block mb-1">Organisme *</label>
             <select required value={form.organizationId ?? ''} onChange={e => setForm(f => ({ ...f, organizationId: e.target.value }))}

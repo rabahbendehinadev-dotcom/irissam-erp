@@ -35,6 +35,16 @@ description: Full insurance/tiers-payant module — backend (Task #119) + fronte
 
 **Why:** PatientInsuranceDetail has both named and default export for backward compat with existing import sites.
 
+### Overpayment protection (Task #123)
+- Billing `payments.ts` already had FOR UPDATE + overpayment check — enhanced 409 to include `code:"OVERPAYMENT"`, `amountRequested`, `remainingAmount`, `entityType`, `entityId`.
+- Insurance mark-paid: fully rewritten with `pool.connect()` + BEGIN/COMMIT + `SELECT ... FOR UPDATE` on claim + invoice.
+- `insuranceService.registerOrgPayment`: bordereau path uses `FOR UPDATE OF c`; direct claim path uses FOR UPDATE + throws structured OVERPAYMENT error.
+- `amountApproved` in `/claims/:id/approve` arrives as JSON string → must coerce with `Number()` before calling `.toFixed()`.
+- Mark-paid checks `PAYABLE_STATUSES = ["approved","partially_approved","partially_paid","submitted"]` — draft claims return 422 not OVERPAYMENT.
+- For submitted (not formally approved) claims, `amount_requested_num` is used as ceiling fallback.
+- DB constraints migration 012: `chk_inv_paid_nonneg`, `chk_inv_rem_nonneg`, `chk_inv_no_overpay` on invoices; `chk_claim_paid_nonneg`; `chk_bord_paid_nonneg`.
+- `remaining_amount` semantics: after claim creation = `total_amount - patient_share` (insurer's outstanding share). Billing payments reduce it regardless of payer type.
+
 ### Bug fixes applied (from E2E testing)
 1. **invoice_status cast** — All SQL updating `invoices.status` via CASE expression needed `::invoice_status` cast (4 occurrences: insurance-claims.ts ×2, insuranceService.ts ×2). Symptom: HTTP 500 on mark-paid and payment registration.
 2. **Plafond/ceiling priority** — `insuranceService.ts createClaimFromInvoice` was overriding the policy's specific ceiling with the plan's `annual_ceiling`. Fix: policy ceiling takes precedence; plan ceiling is only a fallback when policy has no ceiling.
