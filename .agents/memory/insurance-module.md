@@ -35,6 +35,14 @@ description: Full insurance/tiers-payant module — backend (Task #119) + fronte
 
 **Why:** PatientInsuranceDetail has both named and default export for backward compat with existing import sites.
 
+### Dashboard NaN fixes (Task #121)
+- Root cause: field name mismatches between backend and frontend + missing fields.
+- Backend returned `charts.byStatus`/`byOrganization`/`monthlyPayments`/`widgets.*` but frontend expected `charts.claims_by_status`/`by_organization`/`monthly_payments`/`alerts.*`.
+- `kpis.active_policies`, `kpis.bordereau_count`, `kpis.expiring_policies` were absent from backend → `Number(undefined)` = NaN.
+- Widget aliases missing: `amount_requested AS amount`, `days_until_expiry AS days_left`, `total_requested AS total`.
+- Fix: fully rewritten backend response (aligned keys); backend `n()` helper coerces all DB values before sending; frontend `safeNumber()`/`safeCurrency()`/`safeCount()`/`safePercentage()`/`safeDivision()` helpers exported from InsuranceDashboard.tsx; `InsuranceDashboardData` kpi fields changed from `string` to `number`.
+- Charts now have empty state (`<ChartEmptyState />`) when array is empty.
+
 ### Overpayment protection (Task #123)
 - Billing `payments.ts` already had FOR UPDATE + overpayment check — enhanced 409 to include `code:"OVERPAYMENT"`, `amountRequested`, `remainingAmount`, `entityType`, `entityId`.
 - Insurance mark-paid: fully rewritten with `pool.connect()` + BEGIN/COMMIT + `SELECT ... FOR UPDATE` on claim + invoice.

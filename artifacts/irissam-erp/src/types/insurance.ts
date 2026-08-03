@@ -211,27 +211,30 @@ export interface InsuranceOrgPayment {
 
 export interface InsuranceDashboardData {
   kpis: {
-    pending_claims: string;
-    total_requested: string;
-    total_approved: string;
-    total_rejected: string;
-    total_paid: string;
-    remaining_to_collect: string;
-    overdue_claims: string;
-    active_policies: string;
-    expiring_policies: string;
-    bordereau_count: string;
+    /** Count of claims not yet paid/rejected/cancelled */
+    pending_claims: number;
+    total_requested: number;
+    total_approved: number;
+    total_rejected: number;
+    total_paid: number;
+    remaining_to_collect: number;
+    overdue_claims: number;
+    active_policies: number;
+    expiring_policies: number;
+    bordereau_count: number;
   };
   charts?: {
     claims_by_status?: Array<{ status: string; count: number; amount: number }>;
     monthly_payments?: Array<{ month: string; amount: number }>;
     by_organization?: Array<{ name: string; count: number; amount: number }>;
     requested_vs_approved?: Array<{ month: string; requested: number; approved: number }>;
+    rejection_reasons?: Array<{ reason: string; count: number; total_amount: number }>;
+    top_rejected_services?: Array<{ service_code: string; description: string; rejection_count: number; total_rejected: number }>;
   };
   alerts?: {
-    expiring_policies?: Array<{ patient_name: string; policy_number: string; days_left: number }>;
-    overdue_claims?: Array<{ claim_number: string; days_overdue: number; amount: number }>;
-    pending_bordereaux?: Array<{ bordereau_number: string; claim_count: number; total: number }>;
+    expiring_policies?: Array<{ id: string; patient_name: string; policy_number: string; days_left: number; organization_name: string }>;
+    overdue_claims?: Array<{ id: string; claim_number: string; status: string; days_overdue: number; amount: number; patient_name: string; organization_name: string }>;
+    pending_bordereaux?: Array<{ id: string; bordereau_number: string; status: string; claim_count: number; total: number; total_requested: number; total_approved: number; total_paid: number; organization_name: string }>;
   };
 }
 
