@@ -9,7 +9,7 @@ function actor(req: AuthenticatedRequest) {
   return { userId: req.auth?.userId ?? "system", userName: req.auth?.userId ?? "system" };
 }
 
-router.get("/", requirePermission("hr.absences.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/", requirePermission("hr.absences.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { employee_id, status, type, limit = "50", offset = "0" } = req.query as Record<string, string>;
     const conds: string[] = ["a.deleted_at IS NULL"];
@@ -30,11 +30,11 @@ router.get("/", requirePermission("hr.absences.view"), async (req: Authenticated
   } catch (err) { next(err); }
 });
 
-router.post("/", requirePermission("hr.absences.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/", requirePermission("hr.absences.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     const { employeeId, dateFrom, dateTo, type, reason, documentUrl } = req.body;
-    if (!employeeId || !dateFrom || !dateTo || !type) return res.status(400).json({ error: "employeeId, dateFrom, dateTo, type requis" });
+    if (!employeeId || !dateFrom || !dateTo || !type) return void res.status(400).json({ error: "employeeId, dateFrom, dateTo, type requis" });
     const row = await pool.query(`
       INSERT INTO absence_records (employee_id, date_from, date_to, type, reason, document_url, status, created_by, updated_by)
       VALUES ($1::uuid,$2::date,$3::date,$4::absence_type,$5,$6,'soumise'::absence_status,$7::uuid,$7::uuid) RETURNING *`,
@@ -43,7 +43,7 @@ router.post("/", requirePermission("hr.absences.manage"), async (req: Authentica
   } catch (err) { next(err); }
 });
 
-router.post("/:id/approve", requirePermission("hr.absences.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/approve", requirePermission("hr.absences.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     const row = await pool.query(`
@@ -58,7 +58,7 @@ router.post("/:id/approve", requirePermission("hr.absences.manage"), async (req:
   } catch (err) { next(err); }
 });
 
-router.post("/:id/reject", requirePermission("hr.absences.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/reject", requirePermission("hr.absences.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     await pool.query(`UPDATE absence_records SET status='rejetee'::absence_status, updated_at=NOW(), updated_by=$1::uuid WHERE id=$2::uuid`,

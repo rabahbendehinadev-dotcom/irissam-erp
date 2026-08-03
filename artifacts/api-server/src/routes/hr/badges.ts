@@ -27,7 +27,7 @@ router.get("/devices", requirePermission("hr.badges.view"), async (_req, res, ne
   } catch (err) { next(err); }
 });
 
-router.post("/devices", requirePermission("hr.badges.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/devices", requirePermission("hr.badges.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     const { code, name, siteId, location, ipAddress, serialNumber, firmware, notes } = req.body;
@@ -39,7 +39,7 @@ router.post("/devices", requirePermission("hr.badges.manage"), async (req: Authe
   } catch (err) { next(err); }
 });
 
-router.patch("/devices/:id", requirePermission("hr.badges.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.patch("/devices/:id", requirePermission("hr.badges.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     const { status, location, firmware, notes } = req.body;
@@ -57,7 +57,7 @@ router.patch("/devices/:id", requirePermission("hr.badges.manage"), async (req: 
 
 // ─── Assignments ──────────────────────────────────────────────────────────────
 
-router.get("/assignments", requirePermission("hr.badges.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/assignments", requirePermission("hr.badges.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { employee_id } = req.query as Record<string, string>;
     const conds = ["a.deleted_at IS NULL"];
@@ -73,13 +73,13 @@ router.get("/assignments", requirePermission("hr.badges.view"), async (req: Auth
   } catch (err) { next(err); }
 });
 
-router.post("/assignments", requirePermission("hr.badges.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/assignments", requirePermission("hr.badges.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const act = actor(req);
     const { employeeId, badgeNumber } = req.body;
-    if (!employeeId || !badgeNumber) { await client.query("ROLLBACK"); return res.status(400).json({ error: "employeeId et badgeNumber requis" }); }
+    if (!employeeId || !badgeNumber) { await client.query("ROLLBACK"); return void res.status(400).json({ error: "employeeId et badgeNumber requis" }); }
 
     // Revoke any existing active badge for this employee
     await client.query(`
@@ -105,7 +105,7 @@ router.post("/assignments", requirePermission("hr.badges.manage"), async (req: A
   } finally { client.release(); }
 });
 
-router.post("/assignments/:id/revoke", requirePermission("hr.badges.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/assignments/:id/revoke", requirePermission("hr.badges.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     const row = await pool.query(`
@@ -126,7 +126,7 @@ router.post("/assignments/:id/revoke", requirePermission("hr.badges.manage"), as
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 
-router.get("/events", requirePermission("hr.badges.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/events", requirePermission("hr.badges.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { employee_id, device_id, date, processed, limit = "100", offset = "0" } = req.query as Record<string, string>;
     const conds: string[] = [];
@@ -150,10 +150,10 @@ router.get("/events", requirePermission("hr.badges.view"), async (req: Authentic
 });
 
 // Endpoint: receive badge event from device (future hardware integration)
-router.post("/events", async (req, res, next) => {
+router.post("/events", async (req, res, next): Promise<void> => {
   try {
     const { employeeId, badgeNumber, deviceId, eventType, eventTime, rawData } = req.body;
-    if (!badgeNumber || !eventType) return res.status(400).json({ error: "badgeNumber et eventType requis" });
+    if (!badgeNumber || !eventType) return void res.status(400).json({ error: "badgeNumber et eventType requis" });
 
     // Resolve employee from badge number if not provided
     let resolvedEmployeeId = employeeId;
@@ -196,14 +196,14 @@ router.post("/events", async (req, res, next) => {
 });
 
 // DEV-ONLY: simulate a badge event (admin only)
-router.post("/simulate", requirePermission("hr.badges.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/simulate", requirePermission("hr.badges.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   if (process.env.NODE_ENV === "production") {
-    return res.status(403).json({ error: "Simulation désactivée en production" });
+    return void res.status(403).json({ error: "Simulation désactivée en production" });
   }
   try {
     const act = actor(req);
     const { employeeId, eventType, deviceId } = req.body;
-    if (!employeeId || !eventType) return res.status(400).json({ error: "employeeId et eventType requis" });
+    if (!employeeId || !eventType) return void res.status(400).json({ error: "employeeId et eventType requis" });
 
     const ba = await pool.query(
       `SELECT badge_number FROM badge_assignments WHERE employee_id=$1::uuid AND status='active' AND deleted_at IS NULL LIMIT 1`,

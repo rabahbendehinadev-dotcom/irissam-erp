@@ -12,7 +12,7 @@ function actor(req: AuthenticatedRequest) {
 }
 
 // GET /hr/planning/shifts — list shifts with filters
-router.get("/shifts", requirePermission("hr.planning.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/shifts", requirePermission("hr.planning.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { employee_id, department_id, date_from, date_to, type, status, limit = "200", offset = "0" } = req.query as Record<string, string>;
     const conds: string[] = ["s.deleted_at IS NULL"];
@@ -44,7 +44,7 @@ router.get("/shifts", requirePermission("hr.planning.view"), async (req: Authent
 });
 
 // POST /hr/planning/shifts — create shift with conflict detection
-router.post("/shifts", requirePermission("hr.planning.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/shifts", requirePermission("hr.planning.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -52,7 +52,7 @@ router.post("/shifts", requirePermission("hr.planning.manage"), async (req: Auth
     const { employeeId, departmentId, siteId, service, shiftDate, type, startTime, endTime, breakMinutes, role, notes } = req.body;
     if (!employeeId || !shiftDate || !type || !startTime || !endTime) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "employeeId, shiftDate, type, startTime, endTime requis" });
+      return void res.status(400).json({ error: "employeeId, shiftDate, type, startTime, endTime requis" });
     }
 
     // Conflict detection
@@ -69,7 +69,7 @@ router.post("/shifts", requirePermission("hr.planning.manage"), async (req: Auth
     );
     if (conflict.rows.length > 0) {
       await client.query("ROLLBACK");
-      return res.status(409).json({ error: "Conflit de planning: shift déjà assigné sur ce créneau", conflictingShiftId: conflict.rows[0].id });
+      return void res.status(409).json({ error: "Conflit de planning: shift déjà assigné sur ce créneau", conflictingShiftId: conflict.rows[0].id });
     }
 
     const row = await client.query(`
@@ -93,14 +93,14 @@ router.post("/shifts", requirePermission("hr.planning.manage"), async (req: Auth
   } catch (err: any) {
     await client.query("ROLLBACK").catch(() => {});
     if (err.code === "23P01") {
-      return res.status(409).json({ error: "Conflit de planning détecté (contrainte DB)" });
+      return void res.status(409).json({ error: "Conflit de planning détecté (contrainte DB)" });
     }
     next(err);
   } finally { client.release(); }
 });
 
 // PATCH /hr/planning/shifts/:id
-router.patch("/shifts/:id", requirePermission("hr.planning.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.patch("/shifts/:id", requirePermission("hr.planning.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     const { status, startTime, endTime, notes } = req.body;
@@ -119,7 +119,7 @@ router.patch("/shifts/:id", requirePermission("hr.planning.manage"), async (req:
 });
 
 // DELETE /hr/planning/shifts/:id — soft-delete (set status=annule)
-router.delete("/shifts/:id", requirePermission("hr.planning.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.delete("/shifts/:id", requirePermission("hr.planning.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     await pool.query(`
@@ -131,7 +131,7 @@ router.delete("/shifts/:id", requirePermission("hr.planning.manage"), async (req
 });
 
 // POST /hr/planning/shifts/duplicate-week — duplicate a week of shifts
-router.post("/shifts/duplicate-week", requirePermission("hr.planning.manage"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/shifts/duplicate-week", requirePermission("hr.planning.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -139,7 +139,7 @@ router.post("/shifts/duplicate-week", requirePermission("hr.planning.manage"), a
     const { sourceWeekStart, targetWeekStart, employeeIds } = req.body;
     if (!sourceWeekStart || !targetWeekStart) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "sourceWeekStart et targetWeekStart requis" });
+      return void res.status(400).json({ error: "sourceWeekStart et targetWeekStart requis" });
     }
 
     const sourceEnd = new Date(sourceWeekStart);

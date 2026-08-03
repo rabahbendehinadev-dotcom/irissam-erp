@@ -26,7 +26,7 @@ async function nextContractNumber(client: any): Promise<string> {
 }
 
 // GET /hr/employees — list with filters
-router.get("/", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { q, status, category, department_id, site_id, limit = "50", offset = "0" } = req.query as Record<string, string>;
     const conditions: string[] = ["e.deleted_at IS NULL"];
@@ -129,7 +129,7 @@ router.get("/", requirePermission("hr.employees.view"), async (req: Authenticate
 });
 
 // GET /hr/employees/:id — single employee detail
-router.get("/:id", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/:id", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const [empRow, profileRow, contactRow, emergRow, contractRow, docsRow, leaveBal] = await Promise.all([
@@ -148,7 +148,7 @@ router.get("/:id", requirePermission("hr.employees.view"), async (req: Authentic
       pool.query(`SELECT * FROM leave_balances WHERE employee_id=$1::uuid ORDER BY year DESC`, [id]),
     ]);
 
-    if (!empRow.rows[0]) return res.status(404).json({ error: "Employé non trouvé" });
+    if (!empRow.rows[0]) return void res.status(404).json({ error: "Employé non trouvé" });
 
     res.json({
       employee: empRow.rows[0],
@@ -163,7 +163,7 @@ router.get("/:id", requirePermission("hr.employees.view"), async (req: Authentic
 });
 
 // POST /hr/employees — create (wizard, full transaction)
-router.post("/", requirePermission("hr.employees.create"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/", requirePermission("hr.employees.create"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -175,7 +175,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     const existing = await client.query("SELECT id FROM employees WHERE matricule=$1 AND deleted_at IS NULL", [matricule]);
     if (existing.rows.length) {
       await client.query("ROLLBACK");
-      return res.status(409).json({ error: "Matricule déjà utilisé", field: "matricule" });
+      return void res.status(409).json({ error: "Matricule déjà utilisé", field: "matricule" });
     }
 
     // Step 2 — Insert employee
@@ -315,7 +315,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
 });
 
 // PATCH /hr/employees/:id — update
-router.patch("/:id", requirePermission("hr.employees.update"), async (req: AuthenticatedRequest, res, next) => {
+router.patch("/:id", requirePermission("hr.employees.update"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -325,7 +325,7 @@ router.patch("/:id", requirePermission("hr.employees.update"), async (req: Authe
 
     // Get old values for audit
     const oldRow = await client.query("SELECT * FROM employees WHERE id=$1::uuid AND deleted_at IS NULL", [id]);
-    if (!oldRow.rows[0]) { await client.query("ROLLBACK"); return res.status(404).json({ error: "Employé non trouvé" }); }
+    if (!oldRow.rows[0]) { await client.query("ROLLBACK"); return void res.status(404).json({ error: "Employé non trouvé" }); }
 
     // Update employees
     const updateFields: string[] = [];
@@ -415,12 +415,12 @@ router.patch("/:id", requirePermission("hr.employees.update"), async (req: Authe
 });
 
 // PATCH /hr/employees/:id/status — change status
-router.patch("/:id/status", requirePermission("hr.employees.update"), async (req: AuthenticatedRequest, res, next) => {
+router.patch("/:id/status", requirePermission("hr.employees.update"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const { status, reason } = req.body;
     const act = actor(req);
-    if (!status) return res.status(400).json({ error: "status requis" });
+    if (!status) return void res.status(400).json({ error: "status requis" });
 
     await pool.query(`
       UPDATE employees SET status=$1::employee_status, updated_at=NOW(),
@@ -437,7 +437,7 @@ router.patch("/:id/status", requirePermission("hr.employees.update"), async (req
 });
 
 // DELETE (archive) /hr/employees/:id
-router.delete("/:id", requirePermission("hr.employees.archive"), async (req: AuthenticatedRequest, res, next) => {
+router.delete("/:id", requirePermission("hr.employees.archive"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const act = actor(req);
@@ -454,7 +454,7 @@ router.delete("/:id", requirePermission("hr.employees.archive"), async (req: Aut
 });
 
 // GET /hr/employees/:id/attendance — attendance list for employee
-router.get("/:id/attendance", requirePermission("hr.attendance.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/:id/attendance", requirePermission("hr.attendance.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const { month, year, limit = "30", offset = "0" } = req.query as Record<string, string>;
@@ -475,7 +475,7 @@ router.get("/:id/attendance", requirePermission("hr.attendance.view"), async (re
 });
 
 // GET /hr/employees/:id/leaves
-router.get("/:id/leaves", requirePermission("hr.leaves.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/:id/leaves", requirePermission("hr.leaves.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const rows = await pool.query(
@@ -491,7 +491,7 @@ router.get("/:id/leaves", requirePermission("hr.leaves.view"), async (req: Authe
 });
 
 // GET /hr/employees/:id/documents
-router.get("/:id/documents", requirePermission("hr.documents.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/:id/documents", requirePermission("hr.documents.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const rows = await pool.query(
@@ -501,7 +501,7 @@ router.get("/:id/documents", requirePermission("hr.documents.view"), async (req:
 });
 
 // POST /hr/employees/:id/documents
-router.post("/:id/documents", requirePermission("hr.documents.upload"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/documents", requirePermission("hr.documents.upload"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const act = actor(req);
@@ -518,7 +518,7 @@ router.post("/:id/documents", requirePermission("hr.documents.upload"), async (r
 });
 
 // GET /hr/employees/:id/contracts
-router.get("/:id/contracts", requirePermission("hr.contracts.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/:id/contracts", requirePermission("hr.contracts.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const rows = await pool.query(
@@ -528,7 +528,7 @@ router.get("/:id/contracts", requirePermission("hr.contracts.view"), async (req:
 });
 
 // GET /hr/employees/:id/notes
-router.get("/:id/notes", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/:id/notes", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const rows = await pool.query(
@@ -542,7 +542,7 @@ router.get("/:id/notes", requirePermission("hr.employees.view"), async (req: Aut
 });
 
 // POST /hr/employees/:id/notes
-router.post("/:id/notes", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/notes", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const act = actor(req);
@@ -556,7 +556,7 @@ router.post("/:id/notes", requirePermission("hr.employees.view"), async (req: Au
 });
 
 // GET /hr/employees/:id/audit
-router.get("/:id/audit", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/:id/audit", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const rows = await pool.query(

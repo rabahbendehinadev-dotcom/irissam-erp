@@ -12,7 +12,7 @@ function actor(req: AuthenticatedRequest) {
 }
 
 // GET /hr/attendance — list
-router.get("/", requirePermission("hr.attendance.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/", requirePermission("hr.attendance.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { date, employee_id, status, department_id, limit = "100", offset = "0" } = req.query as Record<string, string>;
     const conds: string[] = ["a.deleted_at IS NULL"];
@@ -67,13 +67,13 @@ router.get("/", requirePermission("hr.attendance.view"), async (req: Authenticat
 });
 
 // POST /hr/attendance/check-in — badge check-in
-router.post("/check-in", requirePermission("hr.attendance.create"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/check-in", requirePermission("hr.attendance.create"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const act = actor(req);
     const { employeeId, checkIn, source, deviceId, shiftId } = req.body;
-    if (!employeeId) { await client.query("ROLLBACK"); return res.status(400).json({ error: "employeeId requis" }); }
+    if (!employeeId) { await client.query("ROLLBACK"); return void res.status(400).json({ error: "employeeId requis" }); }
 
     const now = checkIn ? new Date(checkIn) : new Date();
     const today = now.toISOString().split("T")[0];
@@ -146,13 +146,13 @@ router.post("/check-in", requirePermission("hr.attendance.create"), async (req: 
 });
 
 // POST /hr/attendance/check-out
-router.post("/check-out", requirePermission("hr.attendance.create"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/check-out", requirePermission("hr.attendance.create"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const act = actor(req);
     const { employeeId, checkOut, source, deviceId } = req.body;
-    if (!employeeId) { await client.query("ROLLBACK"); return res.status(400).json({ error: "employeeId requis" }); }
+    if (!employeeId) { await client.query("ROLLBACK"); return void res.status(400).json({ error: "employeeId requis" }); }
 
     const now = checkOut ? new Date(checkOut) : new Date();
     const today = now.toISOString().split("T")[0];
@@ -163,7 +163,7 @@ router.post("/check-out", requirePermission("hr.attendance.create"), async (req:
     );
     if (!existing.rows[0]?.check_in) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Aucun check-in trouvé pour aujourd'hui" });
+      return void res.status(400).json({ error: "Aucun check-in trouvé pour aujourd'hui" });
     }
 
     const rec = existing.rows[0];
@@ -201,7 +201,7 @@ router.post("/check-out", requirePermission("hr.attendance.create"), async (req:
 });
 
 // PATCH /hr/attendance/:id/correct — manual correction
-router.patch("/:id/correct", requirePermission("hr.attendance.correct"), async (req: AuthenticatedRequest, res, next) => {
+router.patch("/:id/correct", requirePermission("hr.attendance.correct"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     const { checkIn, checkOut, status, anomaly, notes } = req.body;

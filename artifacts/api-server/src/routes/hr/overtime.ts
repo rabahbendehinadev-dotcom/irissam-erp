@@ -9,7 +9,7 @@ function actor(req: AuthenticatedRequest) {
   return { userId: req.auth?.userId ?? "system", userName: req.auth?.userId ?? "system" };
 }
 
-router.get("/", requirePermission("hr.overtime.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/", requirePermission("hr.overtime.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { employee_id, status, limit = "50", offset = "0" } = req.query as Record<string, string>;
     const conds: string[] = ["o.deleted_at IS NULL"];
@@ -29,11 +29,11 @@ router.get("/", requirePermission("hr.overtime.view"), async (req: Authenticated
   } catch (err) { next(err); }
 });
 
-router.post("/", requirePermission("hr.attendance.create"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/", requirePermission("hr.attendance.create"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     const { employeeId, recordDate, plannedHours, workedHours, reason, compensationType } = req.body;
-    if (!employeeId || !recordDate || !plannedHours || !workedHours) return res.status(400).json({ error: "employeeId, recordDate, plannedHours, workedHours requis" });
+    if (!employeeId || !recordDate || !plannedHours || !workedHours) return void res.status(400).json({ error: "employeeId, recordDate, plannedHours, workedHours requis" });
     const overtimeHours = Math.max(0, parseFloat(workedHours) - parseFloat(plannedHours));
     const row = await pool.query(`
       INSERT INTO overtime_records (employee_id, record_date, planned_hours, worked_hours, overtime_hours, reason,
@@ -46,7 +46,7 @@ router.post("/", requirePermission("hr.attendance.create"), async (req: Authenti
   } catch (err) { next(err); }
 });
 
-router.post("/:id/approve", requirePermission("hr.overtime.approve"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/approve", requirePermission("hr.overtime.approve"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     const row = await pool.query(`
@@ -61,7 +61,7 @@ router.post("/:id/approve", requirePermission("hr.overtime.approve"), async (req
   } catch (err) { next(err); }
 });
 
-router.post("/:id/reject", requirePermission("hr.overtime.approve"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/reject", requirePermission("hr.overtime.approve"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     await pool.query(`UPDATE overtime_records SET status='rejetee'::absence_status, updated_at=NOW(), updated_by=$1::uuid WHERE id=$2::uuid`,

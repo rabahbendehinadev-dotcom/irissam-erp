@@ -16,7 +16,7 @@ async function nextContractNumber(client: any): Promise<string> {
 }
 
 // GET /hr/contracts — list
-router.get("/", requirePermission("hr.contracts.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/", requirePermission("hr.contracts.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { status, employee_id, expiring_days, limit = "50", offset = "0" } = req.query as Record<string, string>;
     const conds: string[] = ["c.deleted_at IS NULL"];
@@ -49,7 +49,7 @@ router.get("/", requirePermission("hr.contracts.view"), async (req: Authenticate
 });
 
 // POST /hr/contracts — create
-router.post("/", requirePermission("hr.contracts.create"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/", requirePermission("hr.contracts.create"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -57,7 +57,7 @@ router.post("/", requirePermission("hr.contracts.create"), async (req: Authentic
     const { employeeId, type, status, startDate, endDate, trialEndDate, isFullTime, weeklyHours, salaryBase, notes, documentUrl } = req.body;
     if (!employeeId || !type || !startDate) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "employeeId, type, startDate requis" });
+      return void res.status(400).json({ error: "employeeId, type, startDate requis" });
     }
     const contractNumber = await nextContractNumber(client);
     const row = await client.query(`
@@ -86,7 +86,7 @@ router.post("/", requirePermission("hr.contracts.create"), async (req: Authentic
 });
 
 // PATCH /hr/contracts/:id — update
-router.patch("/:id", requirePermission("hr.contracts.update"), async (req: AuthenticatedRequest, res, next) => {
+router.patch("/:id", requirePermission("hr.contracts.update"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const act = actor(req);
@@ -106,7 +106,7 @@ router.patch("/:id", requirePermission("hr.contracts.update"), async (req: Authe
 });
 
 // POST /hr/contracts/:id/renew — renew contract
-router.post("/:id/renew", requirePermission("hr.contracts.renew"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/renew", requirePermission("hr.contracts.renew"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -115,7 +115,7 @@ router.post("/:id/renew", requirePermission("hr.contracts.renew"), async (req: A
     const { startDate, endDate, salaryBase, notes } = req.body;
 
     const old = await client.query("SELECT * FROM employee_contracts WHERE id=$1::uuid AND deleted_at IS NULL", [id]);
-    if (!old.rows[0]) { await client.query("ROLLBACK"); return res.status(404).json({ error: "Contrat non trouvé" }); }
+    if (!old.rows[0]) { await client.query("ROLLBACK"); return void res.status(404).json({ error: "Contrat non trouvé" }); }
 
     // Mark old contract as renewed
     await client.query(`UPDATE employee_contracts SET status='renouvele'::contract_status, updated_at=NOW(), updated_by=$1::uuid WHERE id=$2::uuid`,
@@ -147,7 +147,7 @@ router.post("/:id/renew", requirePermission("hr.contracts.renew"), async (req: A
 });
 
 // POST /hr/contracts/:id/terminate
-router.post("/:id/terminate", requirePermission("hr.contracts.update"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/terminate", requirePermission("hr.contracts.update"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const act = actor(req);

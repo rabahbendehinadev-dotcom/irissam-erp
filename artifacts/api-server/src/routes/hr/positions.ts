@@ -27,7 +27,7 @@ router.get("/", requirePermission("hr.employees.view"), async (_req, res, next) 
 });
 
 // POST /hr/positions
-router.post("/", requirePermission("hr.employees.create"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/", requirePermission("hr.employees.create"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = { userId: req.auth?.userId ?? "system" };
     const { code, name, category, departmentId, description, requiredQualification, maxHeadcount } = req.body;
@@ -40,7 +40,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
 });
 
 // PATCH /hr/positions/:id
-router.patch("/:id", requirePermission("hr.employees.update"), async (req: AuthenticatedRequest, res, next) => {
+router.patch("/:id", requirePermission("hr.employees.update"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = { userId: req.auth?.userId ?? "system" };
     const { name, description, maxHeadcount, active } = req.body;
@@ -74,7 +74,7 @@ router.get("/departments", requirePermission("hr.employees.view"), async (_req, 
 });
 
 // POST /hr/positions/departments
-router.post("/departments", requirePermission("hr.employees.create"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/departments", requirePermission("hr.employees.create"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = { userId: req.auth?.userId ?? "system" };
     const { code, name, parentId, siteId, managerId, description } = req.body;
@@ -87,7 +87,7 @@ router.post("/departments", requirePermission("hr.employees.create"), async (req
 });
 
 // PATCH /hr/positions/departments/:id
-router.patch("/departments/:id", requirePermission("hr.employees.update"), async (req: AuthenticatedRequest, res, next) => {
+router.patch("/departments/:id", requirePermission("hr.employees.update"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = { userId: req.auth?.userId ?? "system" };
     const { name, managerId, description, active } = req.body;

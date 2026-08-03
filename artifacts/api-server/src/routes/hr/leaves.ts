@@ -12,7 +12,7 @@ function actor(req: AuthenticatedRequest) {
 }
 
 // GET /hr/leaves
-router.get("/", requirePermission("hr.leaves.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/", requirePermission("hr.leaves.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { employee_id, status, leave_type, limit = "50", offset = "0" } = req.query as Record<string, string>;
     const conds: string[] = ["lr.deleted_at IS NULL"];
@@ -40,7 +40,7 @@ router.get("/", requirePermission("hr.leaves.view"), async (req: AuthenticatedRe
 });
 
 // POST /hr/leaves
-router.post("/", requirePermission("hr.leaves.create"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/", requirePermission("hr.leaves.create"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -48,7 +48,7 @@ router.post("/", requirePermission("hr.leaves.create"), async (req: Authenticate
     const { employeeId, leaveType, dateFrom, dateTo, numberOfDays, replacementEmployeeId, reason, documentUrl } = req.body;
     if (!employeeId || !leaveType || !dateFrom || !dateTo || !numberOfDays) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "employeeId, leaveType, dateFrom, dateTo, numberOfDays requis" });
+      return void res.status(400).json({ error: "employeeId, leaveType, dateFrom, dateTo, numberOfDays requis" });
     }
 
     const currentYear = new Date(dateFrom).getFullYear();
@@ -63,7 +63,7 @@ router.post("/", requirePermission("hr.leaves.create"), async (req: Authenticate
       const remaining = parseFloat(bal.rows[0].remaining_days ?? "0");
       if (parseFloat(numberOfDays) > remaining) {
         await client.query("ROLLBACK");
-        return res.status(422).json({
+        return void res.status(422).json({
           error: "Solde insuffisant",
           code: "INSUFFICIENT_BALANCE",
           requested: parseFloat(numberOfDays),
@@ -109,7 +109,7 @@ router.post("/", requirePermission("hr.leaves.create"), async (req: Authenticate
 });
 
 // POST /hr/leaves/:id/manager-approve
-router.post("/:id/manager-approve", requirePermission("hr.leaves.manager_approve"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/manager-approve", requirePermission("hr.leaves.manager_approve"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const act = actor(req);
     const { comment } = req.body;
@@ -122,13 +122,13 @@ router.post("/:id/manager-approve", requirePermission("hr.leaves.manager_approve
       RETURNING *`,
       [act.userId, comment ?? null, req.params.id]
     );
-    if (!row.rows[0]) return res.status(404).json({ error: "Demande non trouvée ou statut invalide" });
+    if (!row.rows[0]) return void res.status(404).json({ error: "Demande non trouvée ou statut invalide" });
     res.json(row.rows[0]);
   } catch (err) { next(err); }
 });
 
 // POST /hr/leaves/:id/hr-approve
-router.post("/:id/hr-approve", requirePermission("hr.leaves.hr_approve"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/hr-approve", requirePermission("hr.leaves.hr_approve"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -138,10 +138,10 @@ router.post("/:id/hr-approve", requirePermission("hr.leaves.hr_approve"), async 
     const lr = await client.query(
       `SELECT * FROM leave_requests WHERE id=$1::uuid AND deleted_at IS NULL FOR UPDATE`, [req.params.id]
     );
-    if (!lr.rows[0]) { await client.query("ROLLBACK"); return res.status(404).json({ error: "Demande non trouvée" }); }
+    if (!lr.rows[0]) { await client.query("ROLLBACK"); return void res.status(404).json({ error: "Demande non trouvée" }); }
     if (!["soumise","validation_manager","validation_rh"].includes(lr.rows[0].status)) {
       await client.query("ROLLBACK");
-      return res.status(422).json({ error: "Statut invalide pour approbation RH" });
+      return void res.status(422).json({ error: "Statut invalide pour approbation RH" });
     }
 
     const currentYear = new Date(lr.rows[0].date_from).getFullYear();
@@ -156,7 +156,7 @@ router.post("/:id/hr-approve", requirePermission("hr.leaves.hr_approve"), async 
       const actualRemaining = parseFloat(bal.rows[0].remaining_days ?? "0");
       if (nd > actualRemaining + parseFloat(bal.rows[0].pending_days ?? "0")) {
         await client.query("ROLLBACK");
-        return res.status(422).json({ error: "Solde insuffisant au moment de l'approbation" });
+        return void res.status(422).json({ error: "Solde insuffisant au moment de l'approbation" });
       }
       // Move from pending to used
       await client.query(`
@@ -199,7 +199,7 @@ router.post("/:id/hr-approve", requirePermission("hr.leaves.hr_approve"), async 
 });
 
 // POST /hr/leaves/:id/reject
-router.post("/:id/reject", requirePermission("hr.leaves.hr_approve"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/reject", requirePermission("hr.leaves.hr_approve"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -207,7 +207,7 @@ router.post("/:id/reject", requirePermission("hr.leaves.hr_approve"), async (req
     const { comment } = req.body;
 
     const lr = await client.query(`SELECT * FROM leave_requests WHERE id=$1::uuid FOR UPDATE`, [req.params.id]);
-    if (!lr.rows[0]) { await client.query("ROLLBACK"); return res.status(404).json({ error: "Demande non trouvée" }); }
+    if (!lr.rows[0]) { await client.query("ROLLBACK"); return void res.status(404).json({ error: "Demande non trouvée" }); }
 
     // Release pending days
     const currentYear = new Date(lr.rows[0].date_from).getFullYear();
@@ -236,13 +236,13 @@ router.post("/:id/reject", requirePermission("hr.leaves.hr_approve"), async (req
 });
 
 // POST /hr/leaves/:id/cancel
-router.post("/:id/cancel", requirePermission("hr.leaves.create"), async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/cancel", requirePermission("hr.leaves.create"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const act = actor(req);
     const lr = await client.query(`SELECT * FROM leave_requests WHERE id=$1::uuid FOR UPDATE`, [req.params.id]);
-    if (!lr.rows[0]) { await client.query("ROLLBACK"); return res.status(404).json({ error: "Demande non trouvée" }); }
+    if (!lr.rows[0]) { await client.query("ROLLBACK"); return void res.status(404).json({ error: "Demande non trouvée" }); }
 
     if (lr.rows[0].status === "approuvee") {
       // Return used days to balance
@@ -273,7 +273,7 @@ router.post("/:id/cancel", requirePermission("hr.leaves.create"), async (req: Au
 });
 
 // GET /hr/leaves/balances — all balances
-router.get("/balances", requirePermission("hr.leaves.view"), async (req: AuthenticatedRequest, res, next) => {
+router.get("/balances", requirePermission("hr.leaves.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { employee_id, year } = req.query as Record<string, string>;
     const conds: string[] = [];
