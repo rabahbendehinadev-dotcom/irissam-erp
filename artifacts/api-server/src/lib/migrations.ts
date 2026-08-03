@@ -42,6 +42,8 @@ const MIGRATIONS = [
   "016_medical_stock_permissions.sql",
   "017_biomedical.sql",
   "018_biomedical_permissions.sql",
+  "019_quality_module.sql",
+  "020_quality_permissions.sql",
 ];
 
 async function ensureTrackingTable(client: PoolClient): Promise<void> {

@@ -7,7 +7,8 @@ import {
   LayoutDashboard, Users, Calendar, ClipboardList, AlertTriangle,
   Stethoscope, Bed, Scissors, HeartPulse, Baby, FlaskConical, Scan,
   Pill, Droplets, Package, Microscope, UserCheck, Users2, DollarSign,
-  Truck, FolderOpen, BarChart3, Settings, ChevronLeft, Bell, Shield
+  Truck, FolderOpen, BarChart3, Settings, ChevronLeft, Bell, Shield,
+  ShieldCheck
 } from "lucide-react";
 
 /** sessionStorage key — kept separate from page scroll keys */
@@ -110,6 +111,12 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
         { path: "/blood-bank",    icon: Droplets,     label: "nav.blood_bank" },
         { path: "/medical-stock", icon: Package,      label: "nav.medical_stock" },
         { path: "/biomedical",    icon: Microscope,   label: "nav.biomedical" },
+      ]
+    },
+    {
+      label: "nav.group.quality",
+      items: [
+        { path: "/quality", icon: ShieldCheck, label: "nav.quality" },
       ]
     },
     {

@@ -16,6 +16,8 @@ export default {
   "nav.blood_bank": "Blood Bank",
   "nav.medical_stock": "Medical Stock",
   "nav.biomedical": "Biomedical",
+  "nav.quality": "Quality & Risk",
+  "nav.group.quality": "QUALITY & RISK",
   "nav.doctors": "Doctors",
   "nav.hr": "HR & Staff",
   "nav.finance": "Finance & Billing",

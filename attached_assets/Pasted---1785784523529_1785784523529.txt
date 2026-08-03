@@ -1,0 +1,363 @@
+بما أنك كملت كل الموديولات الطبية الأساسية، ما نروحوش لموديول جديد صغير. دير حاجة ترفع قيمة المشروع كامل.
+
+أنا أنصحك تكون الخطوة القادمة **Module Qualité & Gestion des Risques** لأنه موجود في أغلب أنظمة ERP الخاصة بالمستشفيات الكبيرة، ويعطي انطباع احترافي جدًا.
+
+انسخ هذا البرومبت كامل:
+
+```text
+Task #126 — Quality Management & Risk Management (Enterprise Grade)
+
+Objectif :
+
+Construire un module complet de Gestion de la Qualité, Gestion des Risques et Accréditation pour un ERP Hospitalier Enterprise.
+
+IMPORTANT
+
+- PostgreSQL uniquement
+- React + Node.js
+- TypeScript = 0 erreur
+- Aucune Mock Data
+- Responsive Desktop / Tablet / Mobile
+- Compatible PWA
+- Audit complet
+- RBAC quality.*
+- Toutes les opérations critiques transactionnelles
+
+──────────────────────────────
+
+PHASE 1 — DATABASE
+
+Créer les migrations.
+
+Tables :
+
+quality_incidents
+
+quality_non_conformities
+
+quality_corrective_actions
+
+quality_preventive_actions
+
+quality_risk_register
+
+quality_risk_assessments
+
+quality_audits
+
+quality_audit_findings
+
+quality_documents
+
+quality_document_versions
+
+quality_document_approvals
+
+quality_committees
+
+quality_meetings
+
+quality_meeting_minutes
+
+quality_indicators
+
+quality_indicator_values
+
+quality_training
+
+quality_training_attendance
+
+quality_checklists
+
+quality_checklist_items
+
+quality_improvements
+
+quality_notifications
+
+Ajouter :
+
+Foreign Keys
+
+Indexes
+
+Constraints
+
+Triggers
+
+Sequences
+
+Views
+
+Migrations idempotentes.
+
+──────────────────────────────
+
+PHASE 2 — INCIDENT MANAGEMENT
+
+Créer le workflow :
+
+Déclaration
+
+Qualification
+
+Investigation
+
+Analyse
+
+Cause racine
+
+Correction
+
+Validation
+
+Clôture
+
+Historique complet.
+
+──────────────────────────────
+
+PHASE 3 — NON CONFORMITIES
+
+Workflow complet.
+
+Détection
+
+Analyse
+
+Correction
+
+Validation
+
+Suivi
+
+Archivage
+
+──────────────────────────────
+
+PHASE 4 — CAPA
+
+Corrective Actions
+
+Preventive Actions
+
+Responsable
+
+Échéance
+
+Pièces jointes
+
+Validation
+
+Historique
+
+──────────────────────────────
+
+PHASE 5 — RISK MANAGEMENT
+
+Créer un registre complet des risques.
+
+Impact
+
+Probabilité
+
+Criticité
+
+Mesures
+
+Plan d'action
+
+Réévaluation
+
+Heat Map
+
+──────────────────────────────
+
+PHASE 6 — AUDITS
+
+Audits internes
+
+Audits externes
+
+Planning
+
+Checklist
+
+Résultats
+
+Constats
+
+Recommandations
+
+Suivi
+
+──────────────────────────────
+
+PHASE 7 — DOCUMENT MANAGEMENT
+
+Versionning
+
+Workflow d'approbation
+
+Signature
+
+Historique
+
+Archivage
+
+Expiration
+
+──────────────────────────────
+
+PHASE 8 — DASHBOARD
+
+Créer :
+
+Nombre incidents
+
+Non conformités ouvertes
+
+CAPA en retard
+
+Risques critiques
+
+Audits planifiés
+
+Audits terminés
+
+Documents expirés
+
+Indicateurs qualité
+
+Graphiques Recharts
+
+HeatMap des risques
+
+Tendance mensuelle
+
+──────────────────────────────
+
+PHASE 9 — FRONTEND
+
+Créer :
+
+Dashboard Qualité
+
+Incidents
+
+Non-conformités
+
+CAPA
+
+Risques
+
+Audits
+
+Documents
+
+Indicateurs
+
+Réunions Qualité
+
+Checklist
+
+Rapports
+
+Analytics
+
+Responsive
+
+Bottom Sheets
+
+Drawer
+
+Skeleton
+
+Loading
+
+Empty State
+
+Error State
+
+Export PDF
+
+Export Excel
+
+Recherche
+
+Filtres
+
+Pagination
+
+──────────────────────────────
+
+PHASE 10 — INTÉGRATION
+
+Connecter automatiquement avec :
+
+Patients
+
+Admissions
+
+Urgences
+
+Bloc opératoire
+
+Réanimation
+
+Laboratoire
+
+Imagerie
+
+Pharmacie
+
+Stock Médical
+
+Biomédical
+
+RH
+
+Facturation
+
+Assurance
+
+Lorsqu'un incident est déclaré dans un module :
+
+Créer automatiquement un Incident Qualité.
+
+Toutes les actions importantes doivent être historisées.
+
+──────────────────────────────
+
+PHASE 11 — TESTS
+
+Créer des tests E2E complets.
+
+CRUD
+
+Workflow
+
+CAPA
+
+Audit
+
+Documents
+
+Permissions
+
+Transactions
+
+Responsive
+
+Performance
+
+TypeScript
+
+Runtime
+
+Objectif final :
+
+Livrer un module Quality Management Enterprise prêt pour la production, entièrement intégré avec tous les modules existants.
+```
+
+هذا من أكثر الموديولات اللي يخلي المدير يحس أن النظام موجه فعلًا للمستشفيات الكبيرة، وليس مجرد نظام مرضى وفواتير. بعده نقدر ننتقل إلى **Analytics/BI التنفيذي** أو **Portail Patient & Médecin** حسب الأولوية.

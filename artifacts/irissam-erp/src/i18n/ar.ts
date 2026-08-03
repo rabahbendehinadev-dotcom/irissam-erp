@@ -16,6 +16,8 @@ export default {
   "nav.blood_bank": "بنك الدم",
   "nav.medical_stock": "المخزون الطبي",
   "nav.biomedical": "الهندسة الطبية",
+  "nav.quality": "الجودة والمخاطر",
+  "nav.group.quality": "الجودة وإدارة المخاطر",
   "nav.doctors": "الأطباء",
   "nav.hr": "الموارد البشرية",
   "nav.finance": "المالية والفوترة",
