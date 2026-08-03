@@ -1,0 +1,292 @@
+ابدأ الآن Task #122 — مراجعة نهائية وشاملة لـ PWA وService Worker.
+
+مهم جدًا:
+- لا تغيّر التصميم.
+- لا تضف Module جديد.
+- لا تغيّر منطق الـBackend.
+- لا تخزن بيانات طبية حساسة داخل Cache.
+- الهدف هو منع النسخ القديمة، الشاشة البيضاء، والـAssets العالقة بعد النشر.
+
+==================================================
+1. مراجعة Service Worker الحالي
+==================================================
+
+راجع:
+
+- تسجيل Service Worker.
+- install event.
+- activate event.
+- fetch event.
+- cache version.
+- cleanup للكاشات القديمة.
+- skipWaiting.
+- clientsClaim.
+- navigation fallback.
+
+حدد هل المشروع يستعمل:
+
+- Workbox
+- Vite PWA plugin
+- Service Worker يدوي
+
+ولا تخلط أكثر من طريقة في نفس الوقت.
+
+==================================================
+2. استراتيجية الـCaching
+==================================================
+
+استعمل السياسة التالية:
+
+Static assets:
+- JavaScript
+- CSS
+- Fonts
+- Icons
+- Logo
+→ Cache First مع versioning.
+
+HTML وNavigation:
+→ Network First.
+→ fallback للـApp Shell فقط عند انقطاع الشبكة.
+
+API الطبية:
+- patients
+- encounters
+- consultations
+- emergencies
+- admissions
+- lab
+- imaging
+- pharmacy
+- invoices
+- insurance
+→ Network Only أو Network First بدون تخزين دائم للبيانات الحساسة.
+
+Auth:
+- /api/auth/login
+- /api/auth/me
+- /api/auth/refresh
+- /api/auth/logout
+→ Network Only دائمًا.
+
+PDF:
+- invoices PDF
+- receipts PDF
+- medical documents
+→ Network Only.
+
+Uploads وAttachments:
+→ Network Only.
+
+ممنوع تخزين:
+- Tokens
+- Cookies
+- Passwords
+- Patient data
+- Medical records
+- Financial data
+داخل Cache Storage.
+
+==================================================
+3. تحديث النسخة
+==================================================
+
+عند نشر نسخة جديدة:
+
+- اكتشاف Service Worker جديد في وضع waiting.
+- إظهار Toast أو Banner:
+  "Une nouvelle version est disponible."
+- زر:
+  "Mettre à jour"
+
+عند الضغط:
+
+1. إرسال رسالة SKIP_WAITING.
+2. انتظار controllerchange.
+3. Reload مرة واحدة فقط.
+4. منع Reload Loop.
+
+إذا المستخدم لم يضغط:
+- لا تجبره على Reload أثناء إدخال بيانات.
+- أعد عرض التنبيه لاحقًا.
+
+==================================================
+4. تنظيف الكاش
+==================================================
+
+داخل activate:
+
+- حذف كل Cache قديمة.
+- الاحتفاظ فقط بالنسخة الحالية.
+- لا تترك assets قديمة من Build سابق.
+- تحقق أن اسم الكاش يتغير مع كل Build.
+
+مثال:
+irissam-static-v<buildVersion>
+irissam-shell-v<buildVersion>
+
+==================================================
+5. App Shell
+==================================================
+
+عند Offline:
+
+- افتح Shell التطبيق.
+- اعرض Banner:
+  "Vous êtes hors ligne."
+- لا تعرض بيانات قديمة على أنها حديثة.
+- إذا الصفحة تحتاج API:
+  - اعرض Error State واضح.
+  - زر Réessayer.
+- لا تسمح بعمليات طبية حساسة بدون اتصال إلا إذا كانت Queue موثوقة، وهي غير مطلوبة الآن.
+
+==================================================
+6. Direct Routes
+==================================================
+
+اختبر:
+
+- /dashboard
+- /patients
+- /patients/:id
+- /insurance
+- /finance
+- /alerts
+- /admissions
+- /emergencies
+
+في الحالات:
+
+- Online.
+- Offline بعد فتح التطبيق.
+- Refresh مباشر.
+- فتح التطبيق من الأيقونة.
+
+لا يجب ظهور:
+- 404.
+- White Screen.
+- Redirect Loop.
+- Loading Loop.
+
+==================================================
+7. Install App
+==================================================
+
+Android:
+- beforeinstallprompt يعمل.
+- زر Installer يظهر عند الحاجة.
+- يختفي بعد التثبيت.
+
+Desktop:
+- زر Installer يظهر في Topbar/User menu.
+- التثبيت ينجح.
+
+iPhone/iPad:
+- Add to Home Screen instructions.
+- لا يظهر الشرح إذا التطبيق Standalone.
+- dismissedAt لمدة 7 أيام.
+- apple-touch-icon صحيح.
+- اسم التطبيق IRISSAM ERP.
+- يفتح Standalone.
+
+==================================================
+8. Manifest
+==================================================
+
+تحقق من:
+
+- name
+- short_name
+- start_url
+- scope
+- display=standalone
+- orientation
+- background_color
+- theme_color
+- icons 192x192
+- icons 512x512
+- maskable icon
+- apple-touch-icon
+
+شغل Manifest validation وتأكد أنه صالح.
+
+==================================================
+9. أمان الـPWA
+==================================================
+
+- HTTPS فقط.
+- لا تسجل Cookies أو Tokens في Console.
+- لا تخزن API Responses الحساسة في Cache.
+- لا تسمح بـCross-Origin غير موثوق.
+- تحقق من Content Security Policy.
+- Service Worker يعمل فقط داخل Scope الصحيح.
+
+==================================================
+10. اختبارات القبول
+==================================================
+
+TEST A:
+Install على iPhone
+→ يفتح Standalone.
+
+TEST B:
+Install على Android
+→ prompt يعمل.
+
+TEST C:
+Install على Desktop
+→ زر Installer يعمل.
+
+TEST D:
+نشر نسخة جديدة
+→ Update Banner يظهر.
+
+TEST E:
+الضغط على Mettre à jour
+→ النسخة الجديدة تفتح.
+→ Reload مرة واحدة فقط.
+
+TEST F:
+الكاش القديم يُحذف.
+
+TEST G:
+API الطبية غير موجودة داخل Cache Storage.
+
+TEST H:
+Auth endpoints غير مخزنة.
+
+TEST I:
+Offline
+→ Shell يفتح.
+→ Offline Banner يظهر.
+→ لا Crash.
+
+TEST J:
+Direct refresh على routes الرئيسية
+→ يعمل.
+
+TEST K:
+Manifest valid.
+
+TEST L:
+0 Runtime Errors.
+
+TEST M:
+0 TypeScript Errors.
+
+==================================================
+التقرير النهائي
+==================================================
+
+أعطني:
+
+- نوع Service Worker المستعمل.
+- الملفات المعدلة.
+- استراتيجية Cache النهائية.
+- أسماء الكاشات.
+- طريقة Version Update.
+- نتيجة Install iPhone/Android/Desktop.
+- نتائج TEST A–M.
+- هل توجد API Responses حساسة داخل Cache أم لا.
+- عدد Runtime Errors.
+- عدد TypeScript Errors.

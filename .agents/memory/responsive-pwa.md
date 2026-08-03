@@ -31,7 +31,7 @@ Closes on route change via `useEffect` on `location`.
 - `public/manifest.webmanifest`: name="IRISSAM HOSPITAL ERP", short_name="IRISSAM ERP", display=standalone, theme_color=#1B2A4A
 - `public/sw.js`: API = network-first (never cached), static = cache-first, navigation = network → fallback index.html
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `maskable-512.png`, `apple-touch-icon.png`
-- SW registered via inline `<script>` in `index.html` (not main.tsx) for reliability
+- SW registered — registration in index.html inline script (not main.tsx); uses sw.js?v=__SW_BUILD_ID__ for versioning via inline `<script>` in `index.html` (not main.tsx) for reliability
 - `index.html` has all Apple meta tags (apple-mobile-web-app-capable, status-bar-style, title)
 
 ## iOS Install Banner

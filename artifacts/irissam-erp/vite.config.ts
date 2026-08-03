@@ -1,9 +1,33 @@
 import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
+
+// ── SW build-ID plugin ────────────────────────────────────────────────────────
+// Injects `window.__SW_BUILD_ID__ = "TIMESTAMP"` into the HTML <head> so that
+// the inline SW registration script can version the SW URL: sw.js?v=TIMESTAMP.
+// This causes the cache name to change every build, evicting stale assets.
+const BUILD_TIME = Date.now().toString();
+
+function swBuildIdPlugin(): Plugin {
+  return {
+    name: 'sw-build-id',
+    transformIndexHtml: {
+      order: 'pre' as const,
+      handler(): import('vite').HtmlTagDescriptor[] {
+        return [
+          {
+            tag: 'script',
+            injectTo: 'head-prepend' as const,
+            children: `var __SW_BUILD_ID__="${BUILD_TIME}";`,
+          },
+        ];
+      },
+    },
+  };
+}
 
 const rawPort = process.env.PORT;
 
@@ -30,6 +54,7 @@ if (!basePath) {
 export default defineConfig({
   base: basePath,
   plugins: [
+    swBuildIdPlugin(),
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
