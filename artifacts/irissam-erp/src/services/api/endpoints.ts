@@ -72,4 +72,23 @@ export const API_ENDPOINTS = {
     INVOICES: '/finance/invoices',
     STATS: '/finance/stats',
   },
+
+  // Insurance / Tiers payant
+  INSURANCE: {
+    ORGS: '/insurance/organizations',
+    ORG: (id: string) => `/insurance/organizations/${id}`,
+    PLANS: '/insurance/plans',
+    PLAN: (id: string) => `/insurance/plans/${id}`,
+    POLICIES: '/insurance/policies',
+    POLICY: (id: string) => `/insurance/policies/${id}`,
+    COVERAGE_REQUESTS: '/insurance/coverage-requests',
+    COVERAGE_REQUEST: (id: string) => `/insurance/coverage-requests/${id}`,
+    CLAIMS: '/insurance/claims',
+    CLAIM: (id: string) => `/insurance/claims/${id}`,
+    BORDEREAUX: '/insurance/bordereaux',
+    BORDEREAU: (id: string) => `/insurance/bordereaux/${id}`,
+    PAYMENTS: '/insurance/payments',
+    PAYMENT: (id: string) => `/insurance/payments/${id}`,
+    DASHBOARD: '/insurance/dashboard',
+  },
 } as const;

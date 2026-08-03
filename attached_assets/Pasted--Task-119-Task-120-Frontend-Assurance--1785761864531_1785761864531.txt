@@ -1,0 +1,301 @@
+تمت الموافقة على Task #119.
+
+ابدأ الآن Task #120 (Frontend Assurance).
+
+مهم جدًا:
+
+- لا تغيّر Design System.
+- لا تضف Module جديد.
+- استعمل الـAPI الموجودة في #119 فقط.
+- لا تستعمل Mock Data.
+- React Query فقط.
+- Responsive كامل.
+- PWA جاهزة.
+- i18n كامل.
+
+==================================================
+1. Dashboard Assurance
+==================================================
+
+أنشئ Dashboard احترافي.
+
+Cards:
+
+- Organismes
+- Polices actives
+- Claims en attente
+- Claims approuvées
+- Claims rejetées
+- Bordereaux
+- Paiements reçus
+- Reste à encaisser
+
+Charts:
+
+- Claims par statut
+- Paiements mensuels
+- Répartition organismes
+- Montants demandés vs approuvés
+- Délais moyens
+
+Widgets:
+
+- Polices expirant bientôt
+- Plafonds presque atteints
+- Claims en retard
+- Bordereaux non envoyés
+- Derniers paiements
+
+==================================================
+2. Organismes
+==================================================
+
+صفحة كاملة.
+
+CRUD.
+
+Recherche.
+
+Filtres.
+
+Cards mobile.
+
+Drawer détail.
+
+Voir:
+
+- conventions
+- plans
+- paiements
+- claims
+
+==================================================
+3. Claims
+==================================================
+
+Table responsive.
+
+Filtres:
+
+- organisme
+- statut
+- patient
+- facture
+- date
+
+Actions:
+
+- ouvrir
+- soumettre
+- approuver
+- approbation partielle
+- rejeter
+- paiement
+- bordereau
+
+==================================================
+4. Claim Detail
+==================================================
+
+Slide-over كبير.
+
+Sections:
+
+Patient
+
+Police
+
+Invoice
+
+Coverage
+
+Claim Items
+
+Documents
+
+Timeline
+
+Audit
+
+Messages
+
+Actions
+
+لكل Claim Item:
+
+- montant demandé
+- montant accepté
+- montant rejeté
+- motif
+
+Approbation partielle par ligne.
+
+==================================================
+5. Bordereaux
+==================================================
+
+واجهة كاملة.
+
+Créer.
+
+Ajouter Claims.
+
+Retirer Claims.
+
+Envoyer.
+
+Exporter PDF.
+
+Exporter Excel.
+
+Voir paiements.
+
+==================================================
+6. Paiements Organismes
+==================================================
+
+Liste.
+
+Recherche.
+
+Filtres.
+
+Détail.
+
+Receipt.
+
+Distribution.
+
+Historique.
+
+==================================================
+7. Patient Detail
+==================================================
+
+Tab Assurance.
+
+عرض:
+
+- Polices
+- Claims
+- Documents
+- Expiration
+- Plafond
+- Couverture
+- Alertes
+
+Progress bars.
+
+Badges.
+
+Actions.
+
+==================================================
+8. Invoice Detail
+==================================================
+
+Section Assurance.
+
+Actions:
+
+Créer Claim.
+
+Voir Claim.
+
+Ajouter Bordereau.
+
+Paiement organisme.
+
+إذا Claim مرفوضة:
+
+اعرض:
+
+Montant refusé
+
+سبب الرفض
+
+زر:
+
+Transférer vers Part Patient
+
+مع Confirmation.
+
+==================================================
+9. Responsive
+==================================================
+
+كل Tables:
+
+Desktop → Table
+
+Mobile → Cards
+
+كل Modals:
+
+Bottom Sheet
+
+Tabs:
+
+Scrollable
+
+==================================================
+10. Acceptance Tests
+==================================================
+
+TEST A
+Dashboard يعمل.
+
+TEST B
+Organismes CRUD.
+
+TEST C
+Claims تظهر.
+
+TEST D
+Claim Detail.
+
+TEST E
+Partial Approval.
+
+TEST F
+Bordereaux.
+
+TEST G
+Paiements.
+
+TEST H
+Patient Detail.
+
+TEST I
+Invoice Detail.
+
+TEST J
+Responsive.
+
+TEST K
+PWA.
+
+TEST L
+0 Runtime Errors.
+
+TEST M
+0 White Screens.
+
+TEST N
+0 TypeScript Errors.
+
+==================================================
+التقرير النهائي
+==================================================
+
+أعطني:
+
+- الملفات الجديدة.
+- الصفحات.
+- المكونات.
+- Hooks.
+- APIs المستعملة.
+- نتائج TEST A–N.
+- عدد Placeholders المتبقية.
+- TypeScript = 0.
+- Runtime = 0.
