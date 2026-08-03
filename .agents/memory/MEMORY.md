@@ -19,3 +19,4 @@
 - [Responsive PWA Architecture](responsive-pwa.md) — DashboardLayout drawer pattern, Sidebar translate-x classes, Topbar hamburger/search/filters, SW registered, iOS banner 7d dismiss, modals bottom-sheet on mobile
 - [HR Module](hr-module.md) — migrations 013+014; btree_gist required; ScrollableTabBar at @/components/ui/; useQuery at @/hooks/useQuery; apiClient re-export at @/lib/api-client
 - [Medical Stock Module](medical-stock-module.md) — migrations 015+016, 12 sub-routers, FEFO consumptions, pg_trgm graceful fallback, 11 frontend tabs
+- [Biomedical Module](biomedical-module.md) — migrations 017+018, 12 sub-routers, 22 tables, import path fix (@workspace/db not ../../lib/db.js), MIGRATIONS array in migrations.ts is hardcoded

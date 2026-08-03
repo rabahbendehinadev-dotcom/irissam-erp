@@ -1,0 +1,351 @@
+Task #125 — Biomédical Management (Enterprise Grade)
+
+Objectif :
+Construire un module complet de Gestion Biomédicale pour un ERP Hospitalier Enterprise.
+
+IMPORTANT :
+
+- PostgreSQL uniquement.
+- Aucune Mock Data.
+- React + Node.js.
+- TypeScript : 0 erreur.
+- Responsive Desktop / Tablet / Mobile.
+- Compatible PWA.
+- Audit Log complet.
+- RBAC biomed.*
+- Toutes les opérations critiques transactionnelles.
+
+──────────────────────────────
+
+PHASE 1 — DATABASE
+
+Créer les migrations nécessaires.
+
+Tables :
+
+biomedical_equipment
+biomedical_categories
+biomedical_manufacturers
+biomedical_models
+biomedical_locations
+biomedical_installations
+biomedical_maintenance_plans
+biomedical_work_orders
+biomedical_work_order_tasks
+biomedical_preventive_maintenance
+biomedical_corrective_maintenance
+biomedical_calibrations
+biomedical_calibration_certificates
+biomedical_spare_parts
+biomedical_spare_part_movements
+biomedical_equipment_failures
+biomedical_equipment_documents
+biomedical_contracts
+biomedical_suppliers
+biomedical_incidents
+biomedical_inspections
+biomedical_disposals
+
+Ajouter :
+
+Foreign Keys
+
+Indexes
+
+Contraintes
+
+Triggers
+
+Séquences
+
+Vues SQL
+
+Migrations idempotentes.
+
+──────────────────────────────
+
+PHASE 2 — EQUIPMENT ENGINE
+
+Chaque équipement possède :
+
+Code interne
+
+Code barre
+
+QR Code
+
+Numéro de série
+
+Marque
+
+Modèle
+
+Fabricant
+
+Date achat
+
+Date installation
+
+Date mise en service
+
+Durée de vie
+
+Garantie
+
+Localisation
+
+Service
+
+Responsable
+
+État
+
+Criticité
+
+Valeur
+
+Historique complet.
+
+──────────────────────────────
+
+PHASE 3 — MAINTENANCE
+
+Préventive
+
+Corrective
+
+Urgente
+
+Planifiée
+
+Calendrier automatique.
+
+Ordres de travail.
+
+Technicien.
+
+Temps passé.
+
+Pièces utilisées.
+
+Coût.
+
+Validation.
+
+Historique.
+
+──────────────────────────────
+
+PHASE 4 — CALIBRATION
+
+Gestion complète :
+
+Planning
+
+Rappel
+
+Certificats PDF
+
+Dates
+
+Historique
+
+Équipement bloqué si calibration expirée.
+
+──────────────────────────────
+
+PHASE 5 — INCIDENTS
+
+Créer les workflows.
+
+Déclaration.
+
+Analyse.
+
+Cause.
+
+Correction.
+
+Validation.
+
+Clôture.
+
+Historique.
+
+──────────────────────────────
+
+PHASE 6 — API
+
+Créer toutes les routes :
+
+Equipment
+
+Maintenance
+
+Calibration
+
+Contracts
+
+Suppliers
+
+Failures
+
+Incidents
+
+Inspections
+
+Dashboard
+
+Reports
+
+Search
+
+Statistics
+
+Audit
+
+Toutes protégées.
+
+──────────────────────────────
+
+PHASE 7 — FRONTEND
+
+Créer :
+
+Dashboard Biomédical
+
+Équipements
+
+Maintenance
+
+Calendrier
+
+Interventions
+
+Calibrations
+
+Incidents
+
+Pièces détachées
+
+Contrats
+
+Documents
+
+Rapports
+
+Analytics
+
+Responsive.
+
+Drawer.
+
+Bottom Sheet.
+
+Loading.
+
+Error.
+
+Empty.
+
+Pagination.
+
+Recherche.
+
+Filtres.
+
+Export PDF.
+
+Export Excel.
+
+──────────────────────────────
+
+PHASE 8 — DASHBOARD
+
+Créer :
+
+Nombre équipements
+
+Équipements actifs
+
+En panne
+
+Maintenance aujourd'hui
+
+Maintenance retard
+
+Calibration expirée
+
+Coût maintenance
+
+Disponibilité
+
+MTBF
+
+MTTR
+
+Top pannes
+
+Top coûts
+
+Graphiques Recharts.
+
+──────────────────────────────
+
+PHASE 9 — INTÉGRATION
+
+Relier automatiquement avec :
+
+Bloc opératoire
+
+Réanimation
+
+Laboratoire
+
+Imagerie
+
+Urgences
+
+Hospitalisation
+
+Chaque équipement doit être lié au service dans lequel il est installé.
+
+Lorsqu'un équipement est déclaré hors service :
+
+- Générer une alerte.
+- Empêcher son affectation.
+- Historiser l'incident.
+
+──────────────────────────────
+
+PHASE 10 — TESTS
+
+Créer des tests complets :
+
+CRUD
+
+Maintenance
+
+Calibration
+
+Planning
+
+QR Code
+
+Audit
+
+Permissions
+
+Transactions
+
+Responsive
+
+Performance
+
+TypeScript
+
+Runtime
+
+Objectif final :
+
+Livrer un module Biomédical Enterprise prêt pour la production, entièrement intégré avec tous les modules existants (Patients, Admissions, Consultations, Bloc opératoire, Réanimation, Laboratoire, Imagerie, Pharmacie, Banque de sang, Facturation, Assurance, RH et Stock Médical).
