@@ -53,12 +53,15 @@ export function DashboardLayout({ children, noPadding = false }: { children: Rea
         {/* Main content — full width on mobile, offset on desktop */}
         <main
           className={cn(
-            "flex-1 transition-all duration-300 pt-14",
+            "flex-1 transition-all duration-300",
             // Desktop only: offset by sidebar width
             isRTL
               ? (collapsed ? "lg:mr-16" : "lg:mr-[220px]")
               : (collapsed ? "lg:ml-16" : "lg:ml-[220px]")
           )}
+          // paddingTop = 56px (h-14) + iOS safe-area-inset-top
+          // On desktop/Android, env() resolves to 0 → stays exactly 56px
+          style={{ paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
         >
           <OfflineBanner />
           <div className={noPadding ? "h-full" : "p-3 sm:p-4 lg:p-6 h-full"}>

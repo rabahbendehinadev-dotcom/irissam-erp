@@ -101,16 +101,30 @@ export function Topbar({ collapsed, setCollapsed, onMobileMenuToggle }: TopbarPr
   return (
     <>
       {/* ── Main topbar ────────────────────────────────────────────────── */}
+      {/*
+        Safe-area strategy:
+        - paddingTop = env(safe-area-inset-top)   → pushes content below status bar / Dynamic Island
+        - paddingLeft/Right = max(px, safe-area)  → respects notch on landscape
+        - The inner content row is always h-14 (56px) — desktop layout is NOT affected
+          because env(safe-area-inset-top) resolves to 0 on non-iOS / non-standalone
+      */}
       <header
         className={cn(
-          "h-14 bg-white border-b border-gray-200 flex items-center justify-between px-3 sm:px-4 fixed top-0 z-20 transition-all duration-300",
-          // Left edge on desktop: offset by sidebar
+          "bg-white border-b border-gray-200 fixed top-0 z-20 transition-all duration-300",
           isRTL
             ? (collapsed ? "lg:right-16" : "lg:right-[220px]")
             : (collapsed ? "lg:left-16" : "lg:left-[220px]"),
           isRTL ? "left-0 right-0 lg:right-auto" : "left-0 right-0 lg:left-auto"
         )}
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          paddingLeft: "max(0px, env(safe-area-inset-left))",
+          paddingRight: "max(0px, env(safe-area-inset-right))",
+        }}
       >
+        {/* Inner content row — fixed 56px height, unaffected by safe-area */}
+        <div className="h-14 flex items-center justify-between px-3 sm:px-4">
+
         {/* Left: hamburger (mobile) + search (desktop) */}
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {/* Hamburger — mobile/tablet only */}
@@ -315,7 +329,8 @@ export function Topbar({ collapsed, setCollapsed, onMobileMenuToggle }: TopbarPr
               </div>
             )}
           </div>
-        </div>
+        </div>{/* end right actions */}
+        </div>{/* end h-14 inner row */}
       </header>
 
       {/* ── Search overlay ─────────────────────────────────────────────── */}
