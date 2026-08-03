@@ -1,0 +1,1065 @@
+أكيد. ابعثلو هذا البرومبت كامل وابدأ به **Module الموارد البشرية RH** فقط:
+
+```text
+ابدأ الآن تطوير Module كامل خاص بـ:
+
+RESSOURCES HUMAINES — RH
+
+داخل نظام IRISSAM HOSPITAL ERP.
+
+مهم جدًا:
+
+- لا تغيّر التصميم الحالي.
+- لا تغيّر الـSidebar أو الـTopbar.
+- لا تبدأ Module آخر.
+- استعمل PostgreSQL الحقيقي والـAPI الحقيقي.
+- ممنوع استعمال MockRepository.
+- استعمل نفس Design System الحالي.
+- دعم كامل للغات:
+  - Français
+  - العربية RTL
+  - English
+- طبّق Authentication وRBAC وAudit على جميع العمليات.
+- كل الصفحات تكون Responsive وتعمل على:
+  - iPhone
+  - Android
+  - Tablet
+  - Desktop
+  - PWA standalone
+- لا تضع Placeholder أو Coming Soon.
+- الرواتب الكاملة ليست ضمن هذه المرحلة؛ حضّر بنيتها فقط للمستقبل.
+
+==================================================
+1. الهدف من Module
+==================================================
+
+إنشاء نظام متكامل لإدارة:
+
+- ملفات الموظفين
+- الأطباء
+- الممرضين
+- الإداريين
+- التقنيين
+- عمال النظافة
+- سائقي الإسعاف
+- الصيادلة
+- موظفي المختبر
+- موظفي الأشعة
+- العقود
+- المناصب
+- الأقسام
+- الحضور والانصراف
+- التأخرات
+- الغيابات
+- العطل
+- المناوبات
+- Pointage / Badge
+- التخطيط الأسبوعي والشهري
+- الوثائق المهنية
+- التنبيهات
+- Dashboard RH
+- Audit كامل
+
+==================================================
+2. مراجعة قاعدة البيانات
+==================================================
+
+راجع الجداول الموجودة أولًا، ولا تنشئ أي جدول مكرر.
+
+أنشئ أو أكمل الجداول التالية:
+
+employees
+employee_profiles
+employee_contacts
+employee_emergency_contacts
+employee_documents
+employee_contracts
+employee_assignments
+employee_positions
+employee_departments
+employee_sites
+employee_schedules
+employee_shifts
+employee_shift_assignments
+attendance_records
+attendance_events
+absence_records
+leave_requests
+leave_balances
+overtime_records
+late_records
+badge_devices
+badge_assignments
+badge_events
+hr_alerts
+hr_notes
+hr_audit_events
+
+كل الجداول تستعمل:
+
+- id UUID
+- createdAt
+- updatedAt
+- deletedAt
+- createdBy
+- updatedBy
+- deletedBy
+- version
+- siteId عند الحاجة
+
+==================================================
+3. ملف الموظف
+==================================================
+
+أنشئ صفحة:
+
+Employés
+
+تحتوي على:
+
+- زر Ajouter un employé
+- Recherche
+- Filtres
+- Export
+- Import Placeholder disabled فقط
+- عدد الموظفين
+- الحاضرين
+- الغائبين
+- المتأخرين
+- في عطلة
+- في مناوبة
+- العقود القريبة من الانتهاء
+
+جدول الموظفين يحتوي على:
+
+- Photo
+- Matricule
+- Nom
+- Prénom
+- Fonction
+- Département
+- Site
+- Type de contrat
+- Date d’embauche
+- Téléphone
+- Email
+- Statut
+- Présence aujourd’hui
+- Prochaine garde
+- Actions
+
+Actions:
+
+- Voir
+- Modifier
+- Planning
+- Pointage
+- Documents
+- Contrat
+- Congés
+- Historique
+- Suspendre
+- Archiver
+
+ممنوع الحذف النهائي.
+
+==================================================
+4. إنشاء موظف جديد
+==================================================
+
+أنشئ Wizard احترافي:
+
+Step 1 — Identité
+- Nom
+- Prénom
+- Sexe
+- Date de naissance
+- Lieu de naissance
+- Nationalité
+- Situation familiale
+- Photo
+
+Step 2 — Identifiants
+- Matricule يولد تلقائيًا
+- Numéro pièce d’identité
+- Numéro sécurité sociale
+- Numéro ordre professionnel للأطباء والصيادلة عند الحاجة
+- User account مرتبط اختياريًا
+
+Step 3 — Coordonnées
+- Téléphone principal
+- Téléphone secondaire
+- Email professionnel
+- Email personnel
+- Adresse
+- Commune
+- Wilaya
+- Pays
+
+Step 4 — Affectation
+- Site
+- Building
+- Floor
+- Department
+- Service
+- Position
+- Manager
+- Équipe
+- Type de personnel:
+  - Médical
+  - Paramédical
+  - Administratif
+  - Technique
+  - Support
+
+Step 5 — Contrat
+- Type contrat:
+  - CDI
+  - CDD
+  - Vacataire
+  - Garde
+  - Stage
+  - Prestataire
+  - Convention
+- Date début
+- Date fin
+- Période d’essai
+- Temps plein / partiel
+- Nombre heures semaine
+- Salaire de base Placeholder
+- Statut contrat
+- Notes
+
+Step 6 — Planning
+- Jours de travail
+- Heure début
+- Heure fin
+- Pause
+- Rotation
+- Travail de nuit
+- Garde
+- Astreinte
+
+Step 7 — Contact d’urgence
+- Nom
+- Relation
+- Téléphone
+- Adresse
+
+Step 8 — Documents
+- CNI
+- Diplôme
+- Autorisation d’exercice
+- Contrat signé
+- Certificat médical
+- Casier judiciaire
+- Photo
+- Attestation
+- Autres documents
+
+Step 9 — Résumé
+- Vérification
+- Enregistrer
+- Créer compte utilisateur
+- Envoyer invitation Placeholder
+
+==================================================
+5. صفحة تفاصيل الموظف
+==================================================
+
+أنشئ Employee Profile Header يحتوي على:
+
+- Photo
+- Nom complet
+- Matricule
+- Fonction
+- Département
+- Site
+- Statut
+- Présence actuelle
+- Type contrat
+- Date embauche
+- Manager
+- Prochaine garde
+- Solde congés
+
+Tabs:
+
+- Vue générale
+- Identité
+- Affectation
+- Contrat
+- Planning
+- Présence
+- Retards
+- Absences
+- Congés
+- Heures supplémentaires
+- Documents
+- Badge
+- Notes
+- Historique
+- Audit
+
+==================================================
+6. الحالات المهنية
+==================================================
+
+الحالات:
+
+- actif
+- en congé
+- absent
+- suspendu
+- détaché
+- en formation
+- en arrêt
+- fin de contrat
+- archivé
+
+كل تغيير حالة يجب أن:
+
+- يسجل التاريخ والوقت
+- يسجل المستخدم
+- يسجل السبب
+- يظهر في Timeline
+- يسجل في Audit
+
+==================================================
+7. العقود
+==================================================
+
+أنشئ صفحة:
+
+Contrats
+
+تحتوي على:
+
+- N° contrat
+- Employé
+- Type
+- Date début
+- Date fin
+- Durée
+- Temps de travail
+- Statut
+- Jours restants
+- Actions
+
+الحالات:
+
+- brouillon
+- actif
+- en période d’essai
+- suspendu
+- expiré
+- résilié
+- renouvelé
+
+المطلوب:
+
+- إنشاء عقد
+- تجديد عقد
+- تمديد
+- تعليق
+- إنهاء
+- تاريخ العقود السابقة
+- رفع نسخة PDF
+- تنبيه قبل الانتهاء:
+  - 90 يومًا
+  - 30 يومًا
+  - 7 أيام
+
+==================================================
+8. المناصب والأقسام
+==================================================
+
+أنشئ إدارة:
+
+- Positions
+- Grades
+- Departments
+- Services
+- Teams
+- Managers
+
+Position fields:
+
+- code
+- name
+- category
+- description
+- requiredQualification
+- maxHeadcount
+- active
+
+أضف:
+
+- عدد الموظفين في كل منصب
+- الشواغر
+- العجز
+- الفائض
+
+==================================================
+9. الجداول والمناوبات
+==================================================
+
+أنشئ صفحة:
+
+Planning & Gardes
+
+طرق العرض:
+
+- Jour
+- Semaine
+- Mois
+- Par employé
+- Par service
+- Par équipe
+
+أنواع Shift:
+
+- Matin
+- Après-midi
+- Nuit
+- Garde 12h
+- Garde 24h
+- Astreinte
+- Repos
+- Formation
+
+كل Shift تحتوي على:
+
+- employé
+- site
+- department
+- service
+- date
+- heure début
+- heure fin
+- pause
+- rôle
+- statut
+- notes
+
+المطلوب:
+
+- Drag & Drop
+- Dupliquer semaine
+- Affectation multiple
+- Rotation
+- Templates
+- Détection conflits
+- منع موظف من Shiftين متداخلين
+- منع تجاوز عدد الساعات المسموح
+- تنبيه نقص الطاقم في خدمة معينة
+- مقارنة Planning prévu مع présence réelle
+
+==================================================
+10. الحضور والانصراف
+==================================================
+
+أنشئ صفحة:
+
+Pointage
+
+تحتوي على:
+
+- Présents
+- Absents
+- En retard
+- Sortis
+- En pause
+- En mission
+- En garde
+- Non pointés
+
+كل Attendance Record:
+
+- employeeId
+- date
+- plannedStart
+- plannedEnd
+- checkIn
+- checkOut
+- breakStart
+- breakEnd
+- totalWorkedMinutes
+- overtimeMinutes
+- lateMinutes
+- earlyLeaveMinutes
+- source
+- deviceId
+- status
+- anomaly
+- approvedBy
+
+مصادر Pointage:
+
+- Badge
+- QR Code
+- Manuel
+- Mobile
+- Import appareil
+- API badgeuse
+
+==================================================
+11. Badge / Pointage
+==================================================
+
+أنشئ Foundation كاملة لأجهزة Badge.
+
+badge_devices:
+
+- code
+- name
+- siteId
+- location
+- ipAddress
+- serialNumber
+- status
+- lastSeenAt
+- firmware
+- notes
+
+badge_assignments:
+
+- employeeId
+- badgeNumber
+- assignedAt
+- revokedAt
+- status
+
+badge_events:
+
+- employeeId
+- badgeNumber
+- deviceId
+- eventType
+- eventTime
+- rawData
+- processed
+- anomaly
+
+Event types:
+
+- check_in
+- check_out
+- break_start
+- break_end
+- access_granted
+- access_denied
+
+في هذه المرحلة:
+
+- استعمل API وبيانات حقيقية داخل قاعدة البيانات
+- لا تربط جهاز Badge خارجي فعليًا بعد
+- حضّر Endpoint استقبال أحداث الجهاز للمستقبل
+- أضف Simulate Badge Event للأدمن في Development فقط
+
+==================================================
+12. التأخرات
+==================================================
+
+أنشئ صفحة:
+
+Retards
+
+تحتوي على:
+
+- Employé
+- Date
+- Heure prévue
+- Heure arrivée
+- Minutes de retard
+- Motif
+- Justifié
+- Approuvé par
+- Statut
+
+الحالات:
+
+- en attente
+- justifié
+- non justifié
+- approuvé
+- rejeté
+
+قواعد:
+
+- حساب التأخر تلقائيًا
+- Grace Period قابلة للإعداد
+- تجميع التأخرات شهريًا
+- تنبيه إذا تجاوز الموظف حدًا معينًا
+
+==================================================
+13. الغيابات
+==================================================
+
+أنشئ صفحة:
+
+Absences
+
+الأنواع:
+
+- Absence injustifiée
+- Maladie
+- Mission
+- Formation
+- Accident de travail
+- Congé exceptionnel
+- Suspension
+- Autre
+
+الحقول:
+
+- employeeId
+- dateFrom
+- dateTo
+- type
+- reason
+- document
+- status
+- approvedBy
+
+الحالات:
+
+- brouillon
+- soumise
+- approuvée
+- rejetée
+- annulée
+
+==================================================
+14. العطل
+==================================================
+
+أنشئ صفحة:
+
+Congés
+
+أنواع العطل:
+
+- Annuel
+- Maladie
+- Maternité
+- Paternité
+- Mariage
+- Décès familial
+- Sans solde
+- Récupération
+- Formation
+- Exceptionnel
+
+كل Leave Request:
+
+- employeeId
+- leaveType
+- dateFrom
+- dateTo
+- numberOfDays
+- balanceBefore
+- balanceAfter
+- replacementEmployeeId
+- reason
+- status
+- approvedBy
+- documents
+
+Workflow:
+
+- brouillon
+- soumise
+- validation manager
+- validation RH
+- approuvée
+- rejetée
+- annulée
+
+المطلوب:
+
+- حساب الرصيد
+- منع طلب أكبر من الرصيد إلا بصلاحية خاصة
+- منع تعارض مع Shift
+- اقتراح Remplaçant
+- تحديث Planning بعد الموافقة
+
+==================================================
+15. الساعات الإضافية
+==================================================
+
+أنشئ:
+
+Heures supplémentaires
+
+الحقول:
+
+- employeeId
+- date
+- plannedHours
+- workedHours
+- overtimeHours
+- reason
+- approvedBy
+- status
+- compensationType:
+  - paiement
+  - récupération
+
+لا تطور حساب الرواتب الآن.
+
+فقط حضّر البيانات والاعتماد.
+
+==================================================
+16. الوثائق
+==================================================
+
+استعمل Attachments الحالي.
+
+أنواع الوثائق:
+
+- CNI
+- Diplôme
+- Autorisation exercice
+- Contrat
+- Attestation travail
+- Certificat médical
+- Casier judiciaire
+- Photo
+- Évaluation
+- Sanction
+- Formation
+- Autre
+
+أضف:
+
+- Expiry Date
+- Reminder
+- Versioning
+- Preview
+- Download
+- Print
+- Permissions
+
+==================================================
+17. Dashboard RH
+==================================================
+
+Cards:
+
+- Total employés
+- Présents aujourd’hui
+- Absents
+- En retard
+- En congé
+- En garde
+- Contrats expirant
+- Documents expirant
+- Heures supplémentaires
+- Postes vacants
+
+Charts:
+
+- Présence par jour
+- Absences par mois
+- Répartition par département
+- Répartition par catégorie
+- Retards mensuels
+- Congés par type
+- Heures supplémentaires
+- Effectif prévu vs réel
+
+Widgets:
+
+- Employés absents aujourd’hui
+- Retards critiques
+- Contrats expirant bientôt
+- Documents expirant
+- Services en sous-effectif
+- Gardes non couvertes
+- Demandes de congé en attente
+
+==================================================
+18. Notifications
+==================================================
+
+أنشئ Notifications عند:
+
+- عقد قرب الانتهاء
+- وثيقة قرب الانتهاء
+- موظف لم يسجل الحضور
+- تأخر تجاوز الحد
+- غياب غير مبرر
+- طلب عطلة جديد
+- عطلة تمت الموافقة عليها أو رفضها
+- Shift غير مغطى
+- موظف لديه Shifts متداخلة
+- تجاوز ساعات العمل
+- Badge غير معروف
+- Badge Device Offline
+
+==================================================
+19. RBAC
+==================================================
+
+أضف Permissions:
+
+- hr.view
+- hr.dashboard.view
+- hr.employees.view
+- hr.employees.create
+- hr.employees.update
+- hr.employees.archive
+- hr.contracts.view
+- hr.contracts.create
+- hr.contracts.update
+- hr.contracts.renew
+- hr.planning.view
+- hr.planning.manage
+- hr.attendance.view
+- hr.attendance.create
+- hr.attendance.correct
+- hr.absences.view
+- hr.absences.manage
+- hr.leaves.view
+- hr.leaves.create
+- hr.leaves.manager_approve
+- hr.leaves.hr_approve
+- hr.overtime.view
+- hr.overtime.approve
+- hr.badges.view
+- hr.badges.manage
+- hr.documents.view
+- hr.documents.upload
+- hr.documents.delete
+- hr.reports.view
+- hr.export
+- hr.settings.manage
+
+الأدوار:
+
+- hr_manager
+- hr_officer
+- manager
+- employee
+
+كل Endpoint حساس محمي في Backend.
+
+==================================================
+20. Data Scope
+==================================================
+
+طبّق Scope حسب:
+
+- Site
+- Department
+- Service
+- Manager
+- Role
+
+مثال:
+
+- Manager يشوف فريقه فقط
+- HR Manager يشوف كامل المؤسسة حسب Scope
+- الموظف يشوف ملفه وطلباته فقط
+- Super Admin يشوف كل شيء
+
+==================================================
+21. Audit
+==================================================
+
+سجل:
+
+- إنشاء موظف
+- تعديل بيانات
+- تغيير منصب
+- تغيير قسم
+- إنشاء عقد
+- تجديد عقد
+- إنهاء عقد
+- إضافة Shift
+- تعديل Planning
+- تسجيل حضور يدوي
+- تعديل حضور
+- اعتماد غياب
+- اعتماد عطلة
+- رفض عطلة
+- إضافة وثيقة
+- حذف وثيقة
+- إسناد Badge
+- تعطيل Badge
+- Export
+- Print
+- View sensitive HR data
+
+==================================================
+22. APIs
+==================================================
+
+أنشئ APIs منظمة:
+
+/api/hr/dashboard
+/api/hr/employees
+/api/hr/employees/:id
+/api/hr/employees/:id/contracts
+/api/hr/employees/:id/attendance
+/api/hr/employees/:id/leaves
+/api/hr/employees/:id/documents
+/api/hr/contracts
+/api/hr/positions
+/api/hr/schedules
+/api/hr/shifts
+/api/hr/attendance
+/api/hr/attendance/check-in
+/api/hr/attendance/check-out
+/api/hr/absences
+/api/hr/leaves
+/api/hr/leaves/:id/manager-approve
+/api/hr/leaves/:id/hr-approve
+/api/hr/overtime
+/api/hr/badge-devices
+/api/hr/badges
+/api/hr/badge-events
+/api/hr/reports
+/api/hr/settings
+
+==================================================
+23. Transactions
+==================================================
+
+استعمل Transaction في:
+
+- إنشاء موظف + عقد + Affectation + User Account
+- تغيير القسم
+- تغيير المنصب
+- تجديد العقد
+- اعتماد العطلة + خصم الرصيد + تحديث Planning
+- تسجيل Pointage
+- تصحيح حضور
+- إسناد Badge
+- تعطيل Badge
+
+أي فشل = Rollback كامل.
+
+==================================================
+24. Responsive وPWA
+==================================================
+
+كل صفحات RH تعمل على:
+
+- iPhone
+- Android
+- Tablet
+- Desktop
+- PWA standalone
+
+Mobile:
+
+- Tables تتحول إلى Cards
+- Modals تتحول إلى Bottom Sheets
+- Planning يكون scrollable
+- Tabs تستعمل ScrollableTabBar
+- لا Horizontal Overflow
+- أزرار Touch-friendly
+- احترام Safe Area
+
+==================================================
+25. الرواتب
+==================================================
+
+لا تطور Payroll كامل الآن.
+
+حضّر فقط:
+
+- salaryBase
+- allowances
+- deductions
+- overtimeApproved
+- absenceDays
+- leaveDays
+- payrollStatus Placeholder
+
+ولا تنشئ حساب رواتب أو تصاريح ضريبية في هذه المرحلة.
+
+==================================================
+26. اختبارات القبول
+==================================================
+
+TEST A:
+إنشاء موظف مع عقد وAffectation
+→ جميع السجلات تنشأ داخل Transaction.
+
+TEST B:
+Matricule مكرر
+→ HTTP 409.
+
+TEST C:
+عقد منتهي
+→ Alert تظهر.
+
+TEST D:
+إنشاء Shiftين متداخلين لنفس الموظف
+→ HTTP 409.
+
+TEST E:
+Check-in متأخر
+→ lateMinutes محسوبة.
+
+TEST F:
+Check-out
+→ totalWorkedMinutes محسوبة.
+
+TEST G:
+طلب عطلة أكبر من الرصيد
+→ مرفوض.
+
+TEST H:
+Manager يوافق ثم RH توافق
+→ الرصيد يتحدث وPlanning يتحدث.
+
+TEST I:
+غياب غير مبرر
+→ يظهر في Dashboard وتنبيه.
+
+TEST J:
+Badge Event
+→ Attendance يتحدث.
+
+TEST K:
+Manager لا يرى موظفين خارج فريقه.
+
+TEST L:
+Employee لا يعدل بيانات موظف آخر.
+
+TEST M:
+Dashboard KPIs صحيحة.
+
+TEST N:
+Mobile Responsive يعمل.
+
+TEST O:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+
+==================================================
+27. التقرير النهائي
+==================================================
+
+بعد الانتهاء أعطني:
+
+- Migrations الجديدة
+- الجداول والعلاقات
+- Routes وEndpoints
+- Services وRepositories
+- Permissions والأدوار
+- الصفحات والمكونات الجديدة
+- قواعد الحضور والعطل والمناوبات
+- نتائج TEST A–O
+- عدد Placeholders المتبقية
+- صفر TypeScript Errors
+- صفر Runtime SQL Errors
+- صفر White Screens
+
+لا تبدأ Payroll الكامل أو Biomédical أو GED قبل الموافقة على Module RH.
+```

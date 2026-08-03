@@ -17,3 +17,4 @@
 - [Billing Module](billing-module.md) — Phase 1+2+Task#109: mig 008+009, 5 routes, PDF, billing tabs in PatientDetail (PatientInvoicesTab/PaymentTab/BillingTab), 4 patient billing routes
 - [Insurance Module](insurance-module.md) — mig 010+011: 10 tables, 7 sub-routers, coverage engine; insurer_name nullable; claim_number_seq required; bodies camelCase; plans need coverageType
 - [Responsive PWA Architecture](responsive-pwa.md) — DashboardLayout drawer pattern, Sidebar translate-x classes, Topbar hamburger/search/filters, SW registered, iOS banner 7d dismiss, modals bottom-sheet on mobile
+- [HR Module](hr-module.md) — migrations 013+014; btree_gist required; ScrollableTabBar at @/components/ui/; useQuery at @/hooks/useQuery; apiClient re-export at @/lib/api-client
