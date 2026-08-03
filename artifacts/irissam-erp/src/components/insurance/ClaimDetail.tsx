@@ -10,6 +10,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number | string | undefined | null) {
@@ -157,17 +158,15 @@ export default function ClaimDetail({ claimId, onClose }: Props) {
           </div>
         </div>
 
-        {/* Tabs — scrollable */}
-        <div className="flex overflow-x-auto border-b border-gray-100 flex-shrink-0 px-2 scrollbar-hide">
-          {TABS.map(({ id, label }) => (
-            <button key={id} onClick={() => setActiveTab(id)}
-              className={cn(
-                'flex items-center gap-1 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 -mb-px flex-shrink-0 transition-colors',
-                activeTab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'
-              )}>
-              {label}
-            </button>
-          ))}
+        {/* Tabs — scrollable on all devices */}
+        <div className="border-b border-gray-100 flex-shrink-0">
+          <ScrollableTabBar
+            tabs={TABS.map(({ id, label, icon }) => ({ id, label, icon }))}
+            activeTab={activeTab}
+            onTabChange={id => setActiveTab(id as ClaimTab)}
+            iconSize={13}
+            className="px-2"
+          />
         </div>
 
         {/* Tab content */}

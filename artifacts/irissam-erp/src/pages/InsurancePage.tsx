@@ -3,6 +3,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useLanguage } from '@/i18n';
 import { Shield, LayoutDashboard, Building2, FileText, Package, Banknote } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 
 const InsuranceDashboard    = lazy(() => import('@/components/insurance/InsuranceDashboard'));
 const InsuranceOrganizations = lazy(() => import('@/components/insurance/InsuranceOrganizations'));
@@ -39,24 +40,12 @@ export default function InsurancePage() {
             </div>
           </div>
 
-          {/* Tabs — scrollable on mobile */}
-          <div className="flex gap-1 overflow-x-auto pb-0 scrollbar-hide -mb-px">
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0',
-                  tab === id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                )}
-              >
-                <Icon size={14} />
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* Tabs — scrollable on all devices */}
+          <ScrollableTabBar
+            tabs={tabs.map(({ id, label, icon }) => ({ id, label, icon }))}
+            activeTab={tab}
+            onTabChange={id => setTab(id as Tab)}
+          />
         </div>
 
         {/* Content */}

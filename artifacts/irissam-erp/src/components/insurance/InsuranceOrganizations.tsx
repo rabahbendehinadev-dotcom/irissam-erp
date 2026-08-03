@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import {
   useInsuranceOrgs, useCreateOrg, useUpdateOrg, useSuspendOrg,
   useReactivateOrg, useInsurancePlans, useCreatePlan
@@ -252,15 +253,17 @@ function OrgDetailDrawer({ org, onClose, onEdit }: { org: InsuranceOrg; onClose:
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-100 flex-shrink-0 px-4">
-          {(['plans','info'] as const).map(t => (
-            <button key={t} onClick={() => setDrawerTab(t)}
-              className={cn('px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-                drawerTab===t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600')}>
-              {t === 'plans' ? `Plans (${plans.length})` : 'Infos'}
-            </button>
-          ))}
+        {/* Tabs — scrollable */}
+        <div className="border-b border-gray-100 flex-shrink-0">
+          <ScrollableTabBar
+            tabs={[
+              { id: 'plans', label: `Plans (${plans.length})` },
+              { id: 'info',  label: 'Infos' },
+            ]}
+            activeTab={drawerTab}
+            onTabChange={id => setDrawerTab(id as 'plans' | 'info')}
+            className="px-2"
+          />
         </div>
 
         {/* Content */}

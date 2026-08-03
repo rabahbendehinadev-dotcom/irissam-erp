@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import {
   ClipboardList, Activity, Stethoscope, Brain, Pill,
   FlaskConical, Scan, FileText, Calendar, History, Shield,
@@ -552,34 +553,16 @@ export function ConsultationWorkspace({ consultation, onChange, onStatusChange }
         onPrint={handlePrint}
       />
 
-      {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 px-4 overflow-x-auto sticky top-[var(--header-h,105px)] z-20">
-        <div className="flex gap-0 min-w-max">
-          {tabs.map(tab => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 lg:px-4 py-3 text-xs sm:text-sm border-b-2 -mb-px transition-colors whitespace-nowrap',
-                  active
-                    ? 'border-blue-500 text-blue-700 font-semibold'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
-                )}
-              >
-                <Icon size={13} />
-                <span className="hidden sm:inline">{tab.label}</span>
-                {tab.badge !== undefined && tab.badge > 0 && (
-                  <span className="ml-0.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+      {/* Tab bar — scrollable on all devices */}
+      <div className="bg-white border-b border-gray-200 sticky top-[var(--header-h,105px)] z-20">
+        <ScrollableTabBar
+          tabs={tabs.map(tab => ({ id: tab.id, label: tab.label, icon: tab.icon, badge: tab.badge }))}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          iconSize={13}
+          mobileCompact
+          className="px-2"
+        />
       </div>
 
       {/* Tab content — all mounted, only active is visible (preserves state across tab switches) */}

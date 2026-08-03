@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
+import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import { PlusCircle, Download, AlertTriangle } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -155,14 +156,17 @@ function AdmissionDetailPanel({ admission, onClose }: { admission: Admission; on
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 flex-shrink-0">✕</button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-0 px-5 border-b border-gray-200">
-          {(['overview', 'timeline'] as const).map(t2 => (
-            <button key={t2} onClick={() => setTab(t2)}
-              className={`px-4 py-2.5 text-sm border-b-2 transition-colors ${tab === t2 ? 'border-blue-600 text-blue-700 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-              {t2 === 'overview' ? 'Vue générale' : t('adm.timeline.title')}
-            </button>
-          ))}
+        {/* Tabs — scrollable */}
+        <div className="border-b border-gray-200">
+          <ScrollableTabBar
+            tabs={[
+              { id: 'overview',  label: 'Vue générale' },
+              { id: 'timeline',  label: t('adm.timeline.title') },
+            ]}
+            activeTab={tab}
+            onTabChange={id => setTab(id as 'overview' | 'timeline')}
+            className="px-3"
+          />
         </div>
 
         {/* Content */}

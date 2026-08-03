@@ -12,6 +12,7 @@
  */
 import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageWrapper } from '@/components/shared/PageWrapper';
@@ -961,25 +962,18 @@ export default function PharmacyPage() {
           subtitle="Dispensation des médicaments et gestion du stock"
         />
 
-        {/* Tab nav */}
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5 w-fit">
-          {([
-            { key: 'prescriptions', label: 'Prescriptions', icon: <Pill className="w-4 h-4" /> },
-            { key: 'stock',         label: 'Stock',         icon: <Package className="w-4 h-4" /> },
-          ] as { key: Tab; label: string; icon: React.ReactNode }[]).map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                tab === t.key
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700',
-              )}
-            >
-              {t.icon}{t.label}
-            </button>
-          ))}
+        {/* Tab nav — pill variant */}
+        <div className="mb-5">
+          <ScrollableTabBar
+            variant="pill"
+            tabs={[
+              { id: 'prescriptions', label: 'Prescriptions', icon: <Pill className="w-4 h-4" /> },
+              { id: 'stock',         label: 'Stock',         icon: <Package className="w-4 h-4" /> },
+            ]}
+            activeTab={tab}
+            onTabChange={id => setTab(id as Tab)}
+            className="w-fit"
+          />
         </div>
 
         {tab === 'prescriptions' ? <PrescriptionsTab /> : <StockTab />}

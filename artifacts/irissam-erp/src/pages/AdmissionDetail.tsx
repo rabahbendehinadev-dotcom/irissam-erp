@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
+import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import {
   ArrowLeft, Edit, LogOut, ArrowRight, AlertTriangle,
   Stethoscope, Bed, MapPin, Calendar, Clock, User,
@@ -524,22 +525,15 @@ export default function AdmissionDetailPage() {
 
         {/* ── Tabs ── */}
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-          {/* Tab bar */}
-          <div className="flex border-b border-gray-200 overflow-x-auto">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-5 py-3 text-sm border-b-2 whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-600 text-blue-700 font-semibold bg-blue-50/40'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
+          {/* Tab bar — scrollable on all devices */}
+          <div className="border-b border-gray-200">
+            <ScrollableTabBar
+              tabs={TABS.map(({ id, label, icon }) => ({ id, label, icon }))}
+              activeTab={activeTab}
+              onTabChange={id => setActiveTab(id as Tab)}
+              iconSize={14}
+              className="px-2"
+            />
           </div>
 
           {/* Tab content */}
