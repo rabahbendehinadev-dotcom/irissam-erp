@@ -111,7 +111,10 @@ export class InsuranceService {
         );
         if (plan) {
           policyData.coveragePercent    = Number(plan.coverage_percent           ?? policyData.coveragePercent);
-          policyData.ceilingAmount      = plan.annual_ceiling ? Number(plan.annual_ceiling) : policyData.ceilingAmount;
+          // Policy-specific ceiling takes precedence; plan ceiling is only a fallback
+          if (policyData.ceilingAmount == null && plan.annual_ceiling) {
+            policyData.ceilingAmount = Number(plan.annual_ceiling);
+          }
           policyData.ticketModerateur   = Number(plan.ticket_moderateur_percent  ?? 0);
           policyData.franchiseAmount    = Number(plan.franchise_amount           ?? 0);
           policyData.excludedServices   = (plan.excluded_services as string[])   ?? [];
@@ -513,10 +516,10 @@ export class InsuranceService {
             `UPDATE invoices
                SET paid_amount     = paid_amount + $1,
                    remaining_amount = GREATEST(0, remaining_amount - $1),
-                   status = CASE
+                   status = (CASE
                      WHEN (remaining_amount - $1) <= 0.01 THEN 'paid'
                      ELSE 'partially_paid'
-                   END,
+                   END)::invoice_status,
                    updated_at = NOW()
              WHERE id = (SELECT invoice_id FROM insurance_claims WHERE id = $2)`,
             [toApply, clm.id],
@@ -570,10 +573,10 @@ export class InsuranceService {
           `UPDATE invoices
              SET paid_amount     = paid_amount + $1,
                  remaining_amount = GREATEST(0, remaining_amount - $1),
-                 status = CASE
+                 status = (CASE
                    WHEN (remaining_amount - $1) <= 0.01 THEN 'paid'
                    ELSE 'partially_paid'
-                 END,
+                 END)::invoice_status,
                  updated_at = NOW()
            WHERE id = (SELECT invoice_id FROM insurance_claims WHERE id = $2)`,
           [remaining, input.claimId],

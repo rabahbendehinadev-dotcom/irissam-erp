@@ -234,7 +234,7 @@ router.post("/claims/:id/mark-paid", requirePermission("insurance.claims.mark_pa
     );
     if (!updated) { res.status(404).json({ error: "Dossier introuvable" }); return; }
     await pool.query(
-      `UPDATE invoices SET paid_amount=paid_amount+$1, remaining_amount=GREATEST(0,remaining_amount-$1), status=CASE WHEN (remaining_amount-$1)<=0.01 THEN 'paid' ELSE 'partially_paid' END, updated_at=NOW() WHERE id=$2`,
+      `UPDATE invoices SET paid_amount=paid_amount+$1, remaining_amount=GREATEST(0,remaining_amount-$1), status=(CASE WHEN (remaining_amount-$1)<=0.01 THEN 'paid' ELSE 'partially_paid' END)::invoice_status, updated_at=NOW() WHERE id=$2`,
       [amountPaid, updated.invoice_id],
     );
     await auditService.log({ module: "system", action: "update", resourceType: "InsuranceClaim", resourceId: String(req.params.id), newValue: { status: "paid", amountPaid } }, a);
@@ -312,7 +312,7 @@ router.patch("/claims/:id/status", async (req: AuthenticatedRequest, res, next) 
     if (!claim) { res.status(404).json({ error: "Dossier introuvable" }); return; }
     if (status === "paid" && amountPaid) {
       await pool.query(
-        `UPDATE invoices SET paid_amount=paid_amount+$1, remaining_amount=GREATEST(0,remaining_amount-$1), status=CASE WHEN (remaining_amount-$1)<=0.01 THEN 'paid' ELSE 'partially_paid' END, updated_at=NOW() WHERE id=$2`,
+        `UPDATE invoices SET paid_amount=paid_amount+$1, remaining_amount=GREATEST(0,remaining_amount-$1), status=(CASE WHEN (remaining_amount-$1)<=0.01 THEN 'paid' ELSE 'partially_paid' END)::invoice_status, updated_at=NOW() WHERE id=$2`,
         [amountPaid, claim.invoice_id],
       );
     }

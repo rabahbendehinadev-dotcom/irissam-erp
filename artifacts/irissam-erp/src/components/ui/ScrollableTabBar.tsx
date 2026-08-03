@@ -13,7 +13,7 @@
  * • mobileCompact: hide labels on small screens (icon-only)
  */
 
-import { createElement, useCallback, useEffect, useRef, useState } from 'react';
+import React, { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -46,8 +46,22 @@ interface Props {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function isElementType(v: unknown): v is React.ElementType {
-  return typeof v === 'function';
+/**
+ * Returns true for anything that can be passed to React.createElement:
+ * - regular function components  (typeof === 'function')
+ * - class components             (typeof === 'function')
+ * - React.forwardRef wrappers    (typeof === 'object', has $$typeof + render)
+ * - React.memo wrappers          (typeof === 'object', has $$typeof + type)
+ *
+ * Pre-rendered React elements (<Icon size={13} />) are detected by
+ * React.isValidElement and are NOT element types.
+ */
+function isComponentType(v: unknown): v is React.ElementType {
+  if (v == null) return false;
+  if (React.isValidElement(v)) return false;          // already rendered
+  if (typeof v === 'function') return true;           // plain function/class component
+  if (typeof v === 'object' && '$$typeof' in (v as object)) return true; // forwardRef / memo
+  return false;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -153,8 +167,8 @@ export function ScrollableTabBar({
   // ── render icon ──────────────────────────────────────────────────────────────
   const renderIcon = (icon: React.ElementType | React.ReactNode) => {
     if (icon === undefined || icon === null) return null;
-    if (isElementType(icon)) return createElement(icon, { size: iconSize });
-    return icon as React.ReactNode;
+    if (isComponentType(icon)) return createElement(icon as React.ElementType, { size: iconSize });
+    return icon as React.ReactNode; // pre-rendered JSX element
   };
 
   // ── styles ───────────────────────────────────────────────────────────────────

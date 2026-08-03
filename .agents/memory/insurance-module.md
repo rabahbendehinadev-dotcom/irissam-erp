@@ -35,6 +35,16 @@ description: Full insurance/tiers-payant module — backend (Task #119) + fronte
 
 **Why:** PatientInsuranceDetail has both named and default export for backward compat with existing import sites.
 
+### Bug fixes applied (from E2E testing)
+1. **invoice_status cast** — All SQL updating `invoices.status` via CASE expression needed `::invoice_status` cast (4 occurrences: insurance-claims.ts ×2, insuranceService.ts ×2). Symptom: HTTP 500 on mark-paid and payment registration.
+2. **Plafond/ceiling priority** — `insuranceService.ts createClaimFromInvoice` was overriding the policy's specific ceiling with the plan's `annual_ceiling`. Fix: policy ceiling takes precedence; plan ceiling is only a fallback when policy has no ceiling.
+3. **ScrollableTabBar forwardRef** — Lucide icons are `React.forwardRef` objects (`typeof === 'object'`, has `{$$typeof, render}`), NOT plain functions. The old `isElementType` check used `typeof === 'function'` and missed them, causing "Objects are not valid as React child" crash. Fix: use `'$$typeof' in v` to detect component wrappers.
+
+### Policy API field names
+- POST /policies uses `validFrom`/`validUntil` (NOT `startDate`/`endDate`)
+- Expired `validUntil` in request body returns 422 immediately (backend guard)
+- Auth response field: `accessToken` (not `token`)
+
 ### Key patterns
 - Bottom-sheet modals: `items-end sm:items-center` + `rounded-t-2xl sm:rounded-2xl` on the panel
 - Amount formatting: `Number(n).toLocaleString('fr-DZ', {minimumFractionDigits:2, maximumFractionDigits:2})`
