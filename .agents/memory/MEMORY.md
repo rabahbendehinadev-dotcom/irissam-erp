@@ -21,3 +21,4 @@
 - [Medical Stock Module](medical-stock-module.md) — migrations 015+016, 12 sub-routers, FEFO consumptions, pg_trgm graceful fallback, 11 frontend tabs
 - [Biomedical Module](biomedical-module.md) — migrations 017+018, 12 sub-routers, 22 tables, import path fix (@workspace/db not ../../lib/db.js), MIGRATIONS array in migrations.ts is hardcoded
 - [Quality Module](quality-module.md) — migrations 019+020, 11 sub-routers, 12 frontend tabs, quality.* RBAC; roles table uses (name,display_name,description) — no is_active column
+- [Executive Dashboard](executive-dashboard.md) — migration 021, 11 sub-routes, 9 frontend tabs, 29 parallel KPI queries; requirePermission is named export; schema names differ (occupancy_beds, emergency_visits, employees, medical_batches, biomedical_work_orders)

@@ -31,6 +31,7 @@ import hrRouter                from "./hr/index";
 import medicalStockRouter      from "./medical-stock/index";
 import biomedicalRouter        from "./biomedical/index";
 import qualityRouter           from "./quality/index";
+import executiveDashboardRouter from "./executive-dashboard/index";
 import { requireAuth } from "../middleware/requireAuth";
 import { requirePermission } from "../middleware/requirePermission";
 
@@ -76,6 +77,7 @@ router.use("/hr",                  requireAuth, hrRouter);
 router.use("/medical-stock",       requireAuth, medicalStockRouter);
 router.use("/biomedical",          requireAuth, biomedicalRouter);
 router.use("/quality",             requireAuth, qualityRouter);
+router.use("/executive-dashboard", requireAuth, executiveDashboardRouter);
 // Notifications — stream does NOT require auth (SSE reconnects can't set headers)
 router.use("/notifications",       notificationsRouter);
 

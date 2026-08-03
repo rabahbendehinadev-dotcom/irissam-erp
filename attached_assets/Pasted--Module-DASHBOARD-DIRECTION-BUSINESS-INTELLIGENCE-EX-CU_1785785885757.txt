@@ -1,0 +1,444 @@
+ابدأ الآن تطوير Module كامل خاص بـ:
+
+DASHBOARD DIRECTION / BUSINESS INTELLIGENCE EXÉCUTIF
+
+داخل نظام IRISSAM HOSPITAL ERP.
+
+مهم جدًا:
+
+- لا تغيّر التصميم العام.
+- لا تضف Module آخر.
+- استعمل PostgreSQL الحقيقي فقط.
+- ممنوع Mock Data.
+- كل الأرقام تأتي من API حقيقية.
+- دعم Français / العربية RTL / English.
+- Responsive كامل.
+- PWA compatible.
+- RBAC executive.*
+- Audit على كل View أو Export حساس.
+- TypeScript = 0 errors.
+- Runtime SQL = 0 errors.
+- Zero White Screens.
+
+==================================================
+1. الهدف
+==================================================
+
+إنشاء لوحة قيادة تنفيذية مخصصة لـ:
+
+- Directeur général
+- Direction médicale
+- Direction administrative
+- Direction financière
+- Direction des soins
+- Direction RH
+- Responsable qualité
+- Responsable technique
+
+يجب أن تجمع البيانات من:
+
+- Patients
+- Admissions
+- Urgences
+- Hospitalisation
+- Bloc opératoire
+- Réanimation
+- Laboratoire
+- Imagerie
+- Pharmacie
+- Banque de sang
+- Stock médical
+- Biomédical
+- Facturation
+- Assurance
+- RH
+- Qualité & Risques
+
+==================================================
+2. مستويات العرض
+==================================================
+
+دعم الفلاتر حسب:
+
+- Site
+- Bâtiment
+- Étage
+- Service
+- Département
+- Période
+- Jour
+- Semaine
+- Mois
+- Trimestre
+- Année
+
+الفلاتر يجب أن تطبق على جميع الـKPIs والـCharts.
+
+==================================================
+3. KPIs تنفيذية
+==================================================
+
+اعرض على الأقل:
+
+- Total patients
+- Nouveaux patients
+- Admissions اليوم
+- Sorties اليوم
+- Taux d’occupation
+- Lits disponibles
+- Urgences en attente
+- Temps moyen d’attente
+- Consultations اليوم
+- Analyses اليوم
+- Examens imagerie
+- Interventions bloc
+- Taux d’utilisation bloc
+- ICU occupancy
+- Chiffre d’affaires اليوم
+- Chiffre d’affaires الشهر
+- Montant encaissé
+- Reste à recouvrer
+- Créances assurance
+- Claims en attente
+- Stock critique
+- Lots expirant
+- Équipements biomédicaux en panne
+- Maintenances en retard
+- Personnel présent
+- Personnel absent
+- Retards اليوم
+- Contrats expirant
+- Incidents qualité ouverts
+- CAPA en retard
+- Risques critiques
+
+==================================================
+4. Dashboard principal
+==================================================
+
+أنشئ صفحة:
+
+/executive-dashboard
+
+مع:
+
+- En-tête exécutif
+- Date/heure live
+- Site selector
+- Période selector
+- Bouton Actualiser
+- Bouton Export PDF
+- Bouton Export Excel
+- Mode Présentation plein écran
+
+==================================================
+5. Sections
+==================================================
+
+Section Activité médicale:
+
+- Admissions par jour
+- Consultations par service
+- Urgences par priorité
+- Sorties par motif
+- Durée moyenne de séjour
+- Top diagnostics
+- Top services
+
+Section Capacités:
+
+- Occupation lits
+- ICU
+- Bloc
+- Chambres
+- Services saturés
+- Prévision capacité 7 jours
+
+Section Finance:
+
+- Revenus
+- Paiements
+- Impayés
+- Assurance
+- CNAS
+- CASNOS
+- Part patient
+- Part organisme
+- Revenus par service
+- Évolution mensuelle
+
+Section RH:
+
+- Présence
+- Absence
+- Retards
+- Heures supplémentaires
+- Effectif prévu vs réel
+- Services sous-effectif
+
+Section Stock:
+
+- Valeur stock
+- Stock faible
+- Ruptures
+- Expirations
+- Top consommations
+- Commandes en attente
+
+Section Biomédical:
+
+- Équipements actifs
+- En panne
+- Maintenance due
+- Calibration expirée
+- MTBF
+- MTTR
+- Coût maintenance
+
+Section Qualité:
+
+- Incidents ouverts
+- Non-conformités
+- CAPA en retard
+- Audits planifiés
+- Risques critiques
+- Heatmap des risques
+
+==================================================
+6. Drill-down
+==================================================
+
+كل KPI أو Chart قابل للنقر.
+
+مثال:
+
+- الضغط على Urgences en attente
+  → يفتح تفاصيل المرضى المعنيين.
+
+- الضغط على Reste à recouvrer
+  → يفتح قائمة الفواتير غير المدفوعة.
+
+- الضغط على Stock critique
+  → يفتح المنتجات الحرجة.
+
+- الضغط على Personnel absent
+  → يفتح قائمة الغياب.
+
+- الضغط على Équipements en panne
+  → يفتح قائمة الأجهزة.
+
+استخدم Drawer أو Slide-over.
+
+==================================================
+7. Real-time
+==================================================
+
+تحديث البيانات:
+
+- Polling كل 30 ثانية افتراضيًا.
+- دعم SSE للأحداث الحرجة إن كانت موجودة.
+- زر Pause Live.
+- عرض:
+  Dernière mise à jour.
+
+لا تعيد تحميل الصفحة كاملة.
+
+==================================================
+8. Alerts exécutives
+==================================================
+
+أنشئ Panel خاص بالتنبيهات التنفيذية:
+
+- Occupation > 90%
+- ICU complet
+- Rupture stock critique
+- Équipement vital en panne
+- Incident qualité critique
+- Claims assurance متأخرة
+- Personnel sous-effectif
+- Revenu اليوم أقل من المعدل
+- Temps d’attente مرتفع
+
+كل Alert تحتوي على:
+
+- niveau
+- module
+- message
+- date
+- site
+- action
+- responsable
+
+==================================================
+9. API
+==================================================
+
+أنشئ APIs مجمعة:
+
+GET /api/executive-dashboard/overview
+GET /api/executive-dashboard/medical
+GET /api/executive-dashboard/capacity
+GET /api/executive-dashboard/finance
+GET /api/executive-dashboard/hr
+GET /api/executive-dashboard/stock
+GET /api/executive-dashboard/biomedical
+GET /api/executive-dashboard/quality
+GET /api/executive-dashboard/alerts
+GET /api/executive-dashboard/drilldown/:metric
+GET /api/executive-dashboard/export/pdf
+GET /api/executive-dashboard/export/excel
+
+==================================================
+10. Performance
+==================================================
+
+- Aggregations SQL محسنة.
+- Indexes حسب الحاجة.
+- Materialized views إذا لزم.
+- Cache قصير للـKPIs غير الحساسة.
+- لا تعمل 50 Query منفصلة بدون داعٍ.
+- Parallel queries مع حد معقول.
+- Response time أقل من 2 ثانية للـoverview.
+
+==================================================
+11. RBAC
+==================================================
+
+Permissions:
+
+- executive.view
+- executive.view_medical
+- executive.view_finance
+- executive.view_hr
+- executive.view_stock
+- executive.view_biomedical
+- executive.view_quality
+- executive.export_pdf
+- executive.export_excel
+- executive.view_sensitive
+- executive.configure_widgets
+
+الأدوار:
+
+- directeur_general
+- directeur_medical
+- directeur_financier
+- directeur_rh
+- directeur_soins
+- responsable_qualite
+
+كل Role يرى الأقسام المناسبة فقط.
+
+==================================================
+12. Export
+==================================================
+
+PDF:
+
+- شعار IRISSAM HOSPITAL
+- التاريخ
+- الفترة
+- الموقع
+- KPIs
+- Charts الأساسية
+- Alerts
+- ملخص تنفيذي
+
+Excel:
+
+- Sheet Overview
+- Sheet Medical
+- Sheet Finance
+- Sheet RH
+- Sheet Stock
+- Sheet Biomédical
+- Sheet Qualité
+
+==================================================
+13. Responsive
+==================================================
+
+Desktop:
+
+- Grid احترافية.
+- وضع Full Screen.
+
+Tablet:
+
+- 2 colonnes.
+
+Mobile:
+
+- KPI cards عمود واحد.
+- Charts stacked.
+- Drill-down bottom sheet.
+- Filters drawer.
+- لا horizontal overflow.
+
+==================================================
+14. الاختبارات
+==================================================
+
+TEST A:
+Overview يعرض بيانات حقيقية.
+
+TEST B:
+تغيير Site يغيّر جميع القيم.
+
+TEST C:
+تغيير الفترة يغيّر جميع Charts.
+
+TEST D:
+Drill-down يفتح تفاصيل صحيحة.
+
+TEST E:
+Role مالي لا يرى RH sensitive.
+
+TEST F:
+Role RH لا يرى finance sensitive.
+
+TEST G:
+Alert occupation >90% تظهر.
+
+TEST H:
+Export PDF يعمل.
+
+TEST I:
+Export Excel يعمل.
+
+TEST J:
+Polling يحدث البيانات بدون reload.
+
+TEST K:
+Mobile responsive يعمل.
+
+TEST L:
+Response overview أقل من 2s.
+
+TEST M:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+
+==================================================
+15. التقرير النهائي
+==================================================
+
+أعطني:
+
+- Migrations الجديدة.
+- Views وIndexes.
+- Routes وEndpoints.
+- Permissions والأدوار.
+- الصفحات والمكونات.
+- KPIs المطبقة.
+- Charts المطبقة.
+- Drill-downs.
+- نتائج TEST A–M.
+- زمن استجابة API.
+- عدد Placeholders المتبقية.
+- TypeScript = 0.
+- Runtime SQL = 0.
+- White Screens = 0.
+
+لا تبدأ Portail Patient أو Payroll أو GED قبل الموافقة على Dashboard Direction.
