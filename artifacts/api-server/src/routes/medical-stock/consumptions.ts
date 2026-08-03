@@ -115,8 +115,16 @@ router.post("/consumptions", requirePermission("stock.consumptions.create"),
             usedBatchId = batch.id;
           }
 
+          // Safety check after FEFO: ensure stock won't go negative
+          const refreshed = await client.query(
+            `SELECT quantity_on_hand FROM medical_items WHERE id=$1::uuid FOR UPDATE`, [it.item_id]);
+          const latestQty = Number(refreshed.rows[0]?.quantity_on_hand ?? 0);
+          if (latestQty < it.quantity) {
+            await client.query("ROLLBACK");
+            return void res.status(400).json({ error: `Stock insuffisant pour l'article ${it.item_id}`, available: latestQty });
+          }
           await client.query(`UPDATE medical_items SET quantity_on_hand = quantity_on_hand - $1, version=version+1 WHERE id=$2::uuid`, [it.quantity, it.item_id]);
-          const after = before - it.quantity;
+          const after = latestQty - it.quantity;
 
           await client.query(`
             INSERT INTO medical_consumption_items (consumption_id, item_id, batch_id, quantity, unit_cost, total_cost, notes)

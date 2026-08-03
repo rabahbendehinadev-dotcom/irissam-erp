@@ -59,23 +59,61 @@ router.post("/batches", requirePermission("stock.batches.manage"),
               supplier_id, manufacturer_id, storage_location, storage_bin, notes } = req.body;
       if (!item_id || !quantity_received)
         return void res.status(400).json({ error: "item_id et quantity_received requis" });
-      if (quantity_received <= 0)
+      if (Number(quantity_received) <= 0)
         return void res.status(400).json({ error: "La quantité doit être positive" });
 
-      const { rows } = await pool.query(`
-        INSERT INTO medical_batches (
-          item_id, lot_number, manufacture_date, expiry_date, received_date,
-          quantity_received, quantity_on_hand, unit_cost, purchase_price, selling_price,
-          supplier_id, manufacturer_id, storage_location, storage_bin, notes,
-          created_by, updated_by
-        ) VALUES ($1::uuid,$2,$3,$4,$5,$6,$6,$7,$8,$9,$10::uuid,$11::uuid,$12,$13,$14,$15::uuid,$15::uuid)
-        RETURNING *`,
-        [item_id, lot_number??null, manufacture_date??null, expiry_date??null,
-         received_date ?? new Date().toISOString().split('T')[0],
-         quantity_received, unit_cost??0, purchase_price??null, selling_price??null,
-         supplier_id??null, manufacturer_id??null, storage_location??null, storage_bin??null,
-         notes??null, act.userId]);
-      res.status(201).json(rows[0]);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+
+        // Lock item row for stock update
+        const itemRow = await client.query(
+          `SELECT quantity_on_hand, average_cost, unit_cost AS current_cost FROM medical_items WHERE id=$1::uuid AND deleted_at IS NULL FOR UPDATE`,
+          [item_id]);
+        if (!itemRow.rows[0]) {
+          await client.query("ROLLBACK");
+          return void res.status(404).json({ error: "Article non trouvé" });
+        }
+
+        const cost     = Number(unit_cost ?? itemRow.rows[0].current_cost ?? 0);
+        const curQty   = Number(itemRow.rows[0].quantity_on_hand);
+        const recQty   = Number(quantity_received);
+        const newQty   = curQty + recQty;
+        const curAvg   = Number(itemRow.rows[0].average_cost);
+        const newAvg   = newQty > 0 ? (curQty * curAvg + recQty * cost) / newQty : cost;
+
+        // Create batch
+        const { rows } = await client.query(`
+          INSERT INTO medical_batches (
+            item_id, lot_number, manufacture_date, expiry_date, received_date,
+            quantity_received, quantity_on_hand, unit_cost, purchase_price, selling_price,
+            supplier_id, manufacturer_id, storage_location, storage_bin, notes,
+            created_by, updated_by
+          ) VALUES ($1::uuid,$2,$3,$4,$5,$6,$6,$7,$8,$9,$10::uuid,$11::uuid,$12,$13,$14,$15::uuid,$15::uuid)
+          RETURNING *`,
+          [item_id, lot_number??null, manufacture_date??null, expiry_date??null,
+           received_date ?? new Date().toISOString().split('T')[0],
+           recQty, cost, purchase_price??null, selling_price??null,
+           supplier_id??null, manufacturer_id??null, storage_location??null, storage_bin??null,
+           notes??null, act.userId]);
+
+        // Update item stock
+        await client.query(
+          `UPDATE medical_items SET quantity_on_hand=$1, average_cost=$2, last_purchase_price=CASE WHEN $3>0 THEN $3 ELSE last_purchase_price END, version=version+1 WHERE id=$4::uuid`,
+          [newQty, newAvg, cost, item_id]);
+
+        // Register entree movement
+        await client.query(`
+          INSERT INTO medical_stock_movements (item_id, batch_id, movement_type, quantity, quantity_before, quantity_after, unit_cost, total_cost, reference_type, performed_by, notes)
+          VALUES ($1::uuid,$2::uuid,'entree',$3,$4,$5,$6,$7,'batch_entry',$8::uuid,$9)`,
+          [item_id, rows[0].id, recQty, curQty, newQty, cost, recQty * cost, act.userId, notes??null]);
+
+        await client.query("COMMIT");
+        res.status(201).json(rows[0]);
+      } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+      } finally { client.release(); }
     } catch (err) { next(err); }
   }
 );

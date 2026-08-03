@@ -1,0 +1,124 @@
+نفّذ اختبار End-to-End كامل لموديول Stock Médical مع قاعدة PostgreSQL الحقيقية.
+
+السيناريو المطلوب:
+
+1. إنشاء Catégorie:
+   Médicaments
+
+2. إنشاء Unité:
+   Boîte
+
+3. إنشاء Fournisseur:
+   Fournisseur Test
+
+4. إنشاء Article:
+   Amoxicilline 1g
+   Stock minimum = 10
+   Stock critique = 5
+   Stock maximum = 100
+
+5. إنشاء Bon de commande يحتوي:
+   - quantité = 50
+   - prix unitaire
+   - fournisseur
+
+6. تمرير دورة الطلب:
+   brouillon → soumis → approuvé → réceptionné
+
+7. التحقق بعد réception:
+   - إنشاء Lot تلقائي
+   - numéro de lot
+   - date expiration
+   - quantité reçue = 50
+   - stock disponible = 50
+   - mouvement entrée مسجل
+
+8. إنشاء Lot ثانٍ لنفس المنتج بتاريخ انتهاء أقرب.
+
+9. تسجيل Consommation بكمية 10:
+   - يجب استعمال FEFO
+   - يستهلك من أقرب Lot للانتهاء أولًا
+   - لا يسمح بكميات سالبة
+   - movement sortie مسجل
+
+10. إنشاء Transfer بين خدمتين:
+    - source stock ينقص
+    - destination stock يزيد
+    - داخل Transaction واحدة
+
+11. إنشاء Ajustement:
+    type = casse
+    quantité = -2
+    السبب إجباري
+    Audit مسجل
+
+12. إنشاء Session Inventaire:
+    - stock théorique
+    - stock physique مختلف
+    - validation تطبق الفرق
+    - adjustment movement ينشأ تلقائيًا
+
+13. اختبار Alertes:
+    - stock faible
+    - stock critique
+    - rupture
+    - lot expiré
+    - expiration proche
+
+14. اختبار Purchase Order réception جزئية:
+    - réception جزء من الكمية
+    - statut مناسب
+    - الباقي يبقى مفتوحًا
+
+15. اختبارات سلبية:
+
+A. استهلاك أكثر من stock disponible
+→ HTTP 409
+
+B. Lot expiré للاستعمال
+→ مرفوض أو مستبعد من FEFO
+
+C. Transfer أكبر من stock source
+→ HTTP 409
+
+D. Ajustement بدون سبب
+→ HTTP 400
+
+E. نفس réception تتسجل مرتين
+→ ممنوع Double Reception
+
+F. مستخدم بدون Permission
+→ HTTP 403
+
+G. Concurrency:
+محاولتا Consommation في نفس الوقت
+→ Row Lock
+→ stock لا يصبح سالبًا
+
+16. تحقق من Dashboard:
+- valeur totale
+- produits faibles
+- produits expirés
+- mouvements اليوم
+- top produits
+- top services consommateurs
+
+17. تحقق من:
+- Audit
+- Timeline
+- Notifications
+- Responsive mobile
+- Direct refresh على /medical-stock
+- 0 White Screens
+- 0 Runtime Errors
+- 0 TypeScript Errors
+- 0 Runtime SQL Errors
+
+أعطني تقريرًا نهائيًا يتضمن:
+- نتائج الاختبارات
+- الأخطاء المكتشفة
+- الإصلاحات المطبقة
+- التحقق من FEFO
+- التحقق من Row Locks
+- التحقق من Double Reception
+- التحقق من عدم وجود Stock négatif
