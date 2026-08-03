@@ -1,0 +1,611 @@
+ابدأ الآن تطوير Module كامل خاص بـ:
+
+GED / GESTION ÉLECTRONIQUE DES DOCUMENTS / ARCHIVAGE
+
+داخل نظام IRISSAM HOSPITAL ERP.
+
+مهم جدًا:
+
+- لا تغيّر التصميم العام.
+- لا تضف Module آخر.
+- استعمل PostgreSQL الحقيقي وObject Storage الحقيقي.
+- ممنوع Mock Data.
+- دعم Français / العربية RTL / English.
+- Responsive كامل.
+- PWA compatible.
+- RBAC documents.*
+- Audit كامل.
+- Versioning كامل.
+- لا تخزن الملفات الحساسة داخل Cache PWA.
+- TypeScript = 0 errors.
+- Runtime SQL = 0 errors.
+- 0 White Screens.
+
+==================================================
+1. الهدف
+==================================================
+
+إنشاء نظام موحد لإدارة كل وثائق المستشفى:
+
+- وثائق المرضى
+- تحاليل
+- تقارير الأشعة
+- الوصفات
+- تقارير العمليات
+- وثائق الاستشفاء
+- الفواتير
+- وصولات الدفع
+- وثائق التأمين
+- ملفات RH
+- العقود
+- الوثائق القانونية
+- وثائق الجودة
+- وثائق Biomédical
+- وثائق Stock
+- محاضر الاجتماعات
+- السياسات والإجراءات
+- الأرشيف الإداري
+
+==================================================
+2. الجداول
+==================================================
+
+راجع جدول attachments الحالي، ولا تنشئ نظامًا موازيًا مكررًا.
+
+أنشئ أو أكمل:
+
+document_folders
+document_records
+document_versions
+document_links
+document_tags
+document_access_rules
+document_approvals
+document_signatures
+document_workflows
+document_workflow_steps
+document_retention_rules
+document_archive_jobs
+document_shares
+document_download_logs
+document_watermarks
+document_comments
+document_notifications
+document_templates
+
+كل الجداول:
+
+- id UUID
+- siteId
+- createdAt
+- updatedAt
+- deletedAt
+- createdBy
+- updatedBy
+- version
+
+==================================================
+3. Document Record
+==================================================
+
+كل وثيقة تحتوي على:
+
+- documentNumber
+- title
+- description
+- category
+- module
+- entityType
+- entityId
+- patientId اختياري
+- employeeId اختياري
+- encounterId اختياري
+- invoiceId اختياري
+- fileName
+- originalFileName
+- mimeType
+- size
+- storageProvider
+- storageKey
+- checksum
+- versionNumber
+- confidentialityLevel
+- status
+- retentionUntil
+- expiresAt
+- archivedAt
+- signedAt
+- tags
+- metadata
+
+الحالات:
+
+- draft
+- uploaded
+- under_review
+- approved
+- rejected
+- signed
+- archived
+- expired
+- deleted_soft
+
+==================================================
+4. التصنيفات
+==================================================
+
+أنشئ تصنيفات رئيسية:
+
+- Patient
+- Médical
+- Laboratoire
+- Imagerie
+- Pharmacie
+- Hospitalisation
+- Bloc opératoire
+- Facturation
+- Assurance
+- RH
+- Biomédical
+- Stock
+- Qualité
+- Juridique
+- Administratif
+- Direction
+- Autre
+
+دعم التصنيفات الفرعية.
+
+==================================================
+5. التخزين
+==================================================
+
+استخدم Object Storage الحالي أو MinIO/S3-compatible.
+
+المطلوب:
+
+- Upload مباشر آمن.
+- Signed URLs مؤقتة للمعاينة والتحميل.
+- لا تعرض storageKey الحقيقي للFrontend.
+- Virus scanning hook placeholder قابل للتفعيل.
+- Checksum لمنع التكرار والفساد.
+- دعم ملفات:
+  - PDF
+  - Images
+  - DOCX
+  - XLSX
+  - TXT
+  - DICOM metadata link
+- حد أقصى لحجم الملف قابل للإعداد.
+- Chunked upload للملفات الكبيرة إن أمكن.
+
+==================================================
+6. Versioning
+==================================================
+
+كل تعديل على وثيقة ينشئ Version جديدة.
+
+المطلوب:
+
+- رقم نسخة.
+- من رفع النسخة.
+- التاريخ.
+- سبب التعديل.
+- مقارنة metadata.
+- استرجاع نسخة سابقة.
+- منع حذف النسخة الأصلية.
+- إبقاء checksum لكل نسخة.
+
+==================================================
+7. Workflow d’approbation
+==================================================
+
+أنشئ Workflow قابلًا للتخصيص:
+
+- Upload
+- Review
+- Approval
+- Signature
+- Publication
+- Archive
+
+كل Step يحتوي على:
+
+- role
+- user
+- dueDate
+- status
+- comment
+- decisionAt
+
+دعم:
+
+- موافقة فردية
+- موافقة متعددة
+- موافقة متسلسلة
+- رفض مع سبب
+- إعادة للمراجعة
+- Escalation عند التأخر
+
+==================================================
+8. Signature
+==================================================
+
+حضّر Signature électronique داخلية:
+
+- اسم الموقع
+- الدور
+- التاريخ والوقت
+- IP
+- hash الوثيقة
+- سبب التوقيع
+
+لا تدّع أنها توقيع قانوني معتمد خارجيًا.
+
+دعم:
+
+- Signature interne
+- Visa
+- Cachet placeholder
+- Signature multiple
+
+==================================================
+9. صلاحيات الوصول
+==================================================
+
+Confidentiality levels:
+
+- public_internal
+- staff
+- confidential
+- medical_confidential
+- hr_confidential
+- finance_confidential
+- direction_only
+
+طبّق Access Rules حسب:
+
+- Role
+- Site
+- Department
+- Service
+- Patient assignment
+- Employee self-access
+- Ownership
+- Document category
+
+كل مشاهدة أو تحميل لوثيقة حساسة تسجل في Audit.
+
+==================================================
+10. صفحة GED الرئيسية
+==================================================
+
+أنشئ صفحة:
+
+/documents
+
+تحتوي على:
+
+- Recherche globale
+- Arborescence dossiers
+- Filtres
+- Upload
+- Nouveau dossier
+- Documents récents
+- Favoris
+- Partagés avec moi
+- En attente d’approbation
+- Expirant bientôt
+- Archivés
+- Corbeille soft-delete
+
+عرض:
+
+- Grid
+- List
+- Table
+
+==================================================
+11. Document Viewer
+==================================================
+
+أنشئ Viewer احترافي:
+
+- PDF viewer
+- Image viewer
+- Metadata
+- Versions
+- Timeline
+- Commentaires
+- Approvals
+- Signatures
+- Links
+- Audit
+
+Actions:
+
+- Télécharger
+- Imprimer
+- Nouvelle version
+- Approuver
+- Rejeter
+- Signer
+- Archiver
+- Partager
+- Copier lien interne
+- Ajouter tag
+- Déplacer dossier
+
+==================================================
+12. الربط مع الموديولات
+==================================================
+
+اربط GED مع:
+
+- Patient Detail
+- Encounter Timeline
+- Laboratory
+- Imaging
+- Pharmacy
+- Admissions
+- Operating Room
+- Invoices
+- Payments
+- Insurance
+- RH
+- Biomédical
+- Stock
+- Quality
+
+داخل كل Module يظهر:
+
+- Documents liés
+- Upload document
+- Viewer
+- Historique
+- Permissions
+
+==================================================
+13. Patient Detail
+==================================================
+
+Tab Documents يجب أن يعرض:
+
+- Tous les documents
+- Médicaux
+- Analyses
+- Imagerie
+- Ordonnances
+- Hospitalisation
+- Factures
+- Assurance
+- Consentements
+
+مع:
+
+- Filters
+- Search
+- Preview
+- Download
+- Versioning
+- Audit
+
+==================================================
+14. Retention & Archivage
+==================================================
+
+أنشئ Rules:
+
+- مدة حفظ حسب نوع الوثيقة.
+- تنبيه قبل انتهاء مدة الحفظ.
+- Archive تلقائي.
+- Legal Hold لمنع الحذف.
+- Soft Delete فقط.
+- Purge نهائي بصلاحية خاصة جدًا وبعد موافقة مزدوجة.
+
+لا تنفذ Purge تلقائي دون Review.
+
+==================================================
+15. Notifications
+==================================================
+
+أنشئ Notifications عند:
+
+- وثيقة تنتظر الموافقة.
+- طلب توقيع.
+- وثيقة قرب انتهاء الصلاحية.
+- Workflow متأخر.
+- Version جديدة.
+- وثيقة مرفوضة.
+- مشاركة وثيقة.
+- محاولة وصول مرفوضة.
+- Retention قرب الانتهاء.
+
+==================================================
+16. RBAC
+==================================================
+
+أضف Permissions:
+
+- documents.view
+- documents.upload
+- documents.create_folder
+- documents.update_metadata
+- documents.new_version
+- documents.download
+- documents.print
+- documents.share
+- documents.approve
+- documents.reject
+- documents.sign
+- documents.archive
+- documents.restore
+- documents.delete_soft
+- documents.purge
+- documents.view_audit
+- documents.manage_workflows
+- documents.manage_retention
+- documents.manage_access
+- documents.export
+
+كل Endpoint محمي في Backend.
+
+==================================================
+17. APIs
+==================================================
+
+أنشئ APIs:
+
+GET /api/documents
+GET /api/documents/:id
+POST /api/documents
+POST /api/documents/:id/versions
+PATCH /api/documents/:id
+POST /api/documents/:id/approve
+POST /api/documents/:id/reject
+POST /api/documents/:id/sign
+POST /api/documents/:id/archive
+POST /api/documents/:id/restore
+DELETE /api/documents/:id
+GET /api/documents/:id/download-url
+GET /api/documents/:id/preview-url
+GET /api/documents/:id/audit
+GET /api/document-folders
+POST /api/document-folders
+GET /api/document-workflows
+POST /api/document-workflows
+GET /api/document-retention-rules
+POST /api/document-shares
+
+==================================================
+18. Security
+==================================================
+
+- Signed URLs قصيرة المدة.
+- MIME validation.
+- Extension validation.
+- File size validation.
+- Checksum.
+- منع path traversal.
+- منع direct object access بدون permission.
+- لا log لمحتوى الوثيقة.
+- لا Cache للملفات الطبية في Service Worker.
+- CSP صحيحة.
+- HTTPS فقط.
+
+==================================================
+19. Responsive
+==================================================
+
+Desktop:
+- Split view folders + documents + preview.
+
+Tablet:
+- Drawer folders.
+
+Mobile:
+- Cards.
+- Bottom sheets.
+- Full-screen viewer.
+- Upload progress.
+- Safe Area.
+- لا horizontal overflow.
+
+==================================================
+20. Dashboard Documents
+==================================================
+
+KPIs:
+
+- Total documents
+- Uploaded aujourd’hui
+- En attente approbation
+- À signer
+- Expirant bientôt
+- Archivés
+- Stockage utilisé
+- Documents sensibles consultés
+
+Charts:
+
+- Documents par module
+- Documents par type
+- Uploads mensuels
+- Approvals délai moyen
+- Stockage par catégorie
+
+==================================================
+21. اختبارات القبول
+==================================================
+
+TEST A:
+Upload PDF patient
+→ يظهر داخل Patient Detail.
+
+TEST B:
+رفع نفس الملف مرتين
+→ checksum يكشف duplicate.
+
+TEST C:
+إنشاء Version جديدة
+→ النسخة القديمة تبقى محفوظة.
+
+TEST D:
+User بدون permission
+→ 403.
+
+TEST E:
+Signed URL تنتهي بعد المدة.
+
+TEST F:
+Workflow approval كامل.
+
+TEST G:
+Reject بدون سبب
+→ 400.
+
+TEST H:
+Signature تسجل hash والمستخدم والوقت.
+
+TEST I:
+Document confidential
+→ غير ظاهر لمستخدم غير مخول.
+
+TEST J:
+Archive ثم Restore يعملان.
+
+TEST K:
+Soft Delete لا يحذف الملف فعليًا.
+
+TEST L:
+Audit يسجل View وDownload وPrint.
+
+TEST M:
+Mobile viewer يعمل.
+
+TEST N:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+
+==================================================
+22. التقرير النهائي
+==================================================
+
+أعطني:
+
+- Migrations.
+- الجداول.
+- Object Storage strategy.
+- Routes.
+- Permissions.
+- الصفحات والمكونات.
+- Workflows.
+- Retention rules.
+- نتائج TEST A–N.
+- عدد Placeholders المتبقية.
+- TypeScript = 0.
+- Runtime SQL = 0.
+- White Screens = 0.
+
+لا تبدأ Payroll أو Portail Patient قبل الموافقة على GED.

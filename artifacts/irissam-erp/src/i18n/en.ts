@@ -16,6 +16,8 @@ export default {
   "nav.blood_bank": "Blood Bank",
   "nav.medical_stock": "Medical Stock",
   "nav.biomedical": "Biomedical",
+  "nav.documents": "DMS / Documents",
+  "nav.group.documents": "DMS & ARCHIVES",
   "nav.executive": "Executive Dashboard",
   "nav.group.executive": "EXECUTIVE / BI",
   "nav.quality": "Quality & Risk",

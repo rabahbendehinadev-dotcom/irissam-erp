@@ -34,6 +34,8 @@ import qualityRouter           from "./quality/index";
 import executiveDashboardRouter from "./executive-dashboard/index";
 import { requireAuth } from "../middleware/requireAuth";
 import { requirePermission } from "../middleware/requirePermission";
+import documentsRouter from "./documents/index";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -80,5 +82,9 @@ router.use("/quality",             requireAuth, qualityRouter);
 router.use("/executive-dashboard", requireAuth, executiveDashboardRouter);
 // Notifications — stream does NOT require auth (SSE reconnects can't set headers)
 router.use("/notifications",       notificationsRouter);
+// GED — Gestion Électronique des Documents
+router.use("/documents",           requireAuth, documentsRouter);
+// Object Storage (presigned upload URLs + file serving)
+router.use(storageRouter);
 
 export default router;

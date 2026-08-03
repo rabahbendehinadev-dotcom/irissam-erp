@@ -16,6 +16,8 @@ export default {
   "nav.blood_bank": "بنك الدم",
   "nav.medical_stock": "المخزون الطبي",
   "nav.biomedical": "الهندسة الطبية",
+  "nav.documents": "إدارة الوثائق",
+  "nav.group.documents": "الوثائق والأرشيف",
   "nav.executive": "لوحة قيادة الإدارة",
   "nav.group.executive": "الإدارة / ذكاء الأعمال",
   "nav.quality": "الجودة والمخاطر",

@@ -16,6 +16,8 @@ export default {
   "nav.blood_bank": "Banque de sang",
   "nav.medical_stock": "Stock médical",
   "nav.biomedical": "Biomédical",
+  "nav.documents": "GED / Documents",
+  "nav.group.documents": "GED & ARCHIVAGE",
   "nav.executive": "Tableau de Bord Direction",
   "nav.group.executive": "DIRECTION / BI",
   "nav.quality": "Qualité & Risques",
