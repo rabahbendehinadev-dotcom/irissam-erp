@@ -2,13 +2,16 @@ import { Link, useLocation } from "wouter";
 import { useLanguage } from "@/i18n";
 import { cn } from "@/lib/utils";
 import logoPath from "@assets/9e2f711d-0744-437b-a151-78a356a73edf_1785616056682.png";
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import {
   LayoutDashboard, Users, Calendar, ClipboardList, AlertTriangle,
   Stethoscope, Bed, Scissors, HeartPulse, Baby, FlaskConical, Scan,
   Pill, Droplets, Package, Microscope, UserCheck, Users2, DollarSign,
   Truck, FolderOpen, BarChart3, Settings, ChevronLeft, Bell, Shield
 } from "lucide-react";
+
+/** sessionStorage key — kept separate from page scroll keys */
+const SIDEBAR_SCROLL_KEY = "irissam_sidebarScrollTop";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -22,8 +25,56 @@ interface SidebarProps {
 export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileClose }: SidebarProps) {
   const { t, isRTL } = useLanguage();
   const [location] = useLocation();
+  const navRef = useRef<HTMLDivElement>(null);
 
-  // Close on navigation (mobile)
+  // ── Scroll persistence ───────────────────────────────────────────────────
+  // Restore saved scroll position on every mount (Sidebar remounts on each
+  // page navigation because each page renders its own DashboardLayout).
+  // If no saved position exists, scroll the active item into view instead.
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const saved = sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
+    if (saved !== null) {
+      el.scrollTop = parseInt(saved, 10);
+      // Safety: if the active item ended up off-screen despite the restored
+      // position (e.g. list changed), bring it into view without jumping.
+      requestAnimationFrame(() => {
+        const active = el.querySelector<HTMLElement>('[data-sidebar-active="true"]');
+        if (active) {
+          const elRect     = el.getBoundingClientRect();
+          const itemRect   = active.getBoundingClientRect();
+          const isVisible  = itemRect.top >= elRect.top && itemRect.bottom <= elRect.bottom;
+          if (!isVisible) active.scrollIntoView({ block: "nearest" });
+        }
+      });
+    } else {
+      // First visit — scroll active item into view without snapping to top
+      requestAnimationFrame(() => {
+        const active = el.querySelector<HTMLElement>('[data-sidebar-active="true"]');
+        active?.scrollIntoView({ block: "nearest" });
+      });
+    }
+  }, []); // run once on mount only
+
+  // Save scroll position whenever the user scrolls
+  const handleNavScroll = useCallback(() => {
+    if (navRef.current) {
+      sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(navRef.current.scrollTop));
+    }
+  }, []);
+
+  // Also save on unmount (catches the case where the user never scrolled)
+  useEffect(() => {
+    return () => {
+      if (navRef.current) {
+        sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(navRef.current.scrollTop));
+      }
+    };
+  }, []);
+  // ────────────────────────────────────────────────────────────────────────
+
+  // Close on navigation (mobile) — intentionally does NOT reset scroll
   useEffect(() => {
     if (onMobileClose) onMobileClose();
   }, [location]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -131,6 +182,8 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
           - paddingBottom: safe-area-inset-bottom : clears home indicator bar
       */}
       <div
+        ref={navRef}
+        onScroll={handleNavScroll}
         className="flex-1 py-4 scrollbar-hide"
         style={{
           overflowY: "scroll",
@@ -153,7 +206,9 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
                 return (
                   <li key={j}>
                     <Link href={item.path}>
-                      <span className={cn(
+                      <span
+                        data-sidebar-active={isActive ? "true" : undefined}
+                        className={cn(
                         "flex items-center gap-3 px-4 py-2.5 lg:py-2 text-sm transition-colors relative min-h-[44px] lg:min-h-0",
                         collapsed ? "lg:justify-center" : "justify-start",
                         isActive
