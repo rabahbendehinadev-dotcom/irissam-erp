@@ -48,7 +48,7 @@ router.get('/runs/:id', requirePermission('payroll.periods.view'), async (req: A
        FROM payroll_employee_runs per
        JOIN employees e ON e.id = per.employee_id
        LEFT JOIN employee_profiles ep ON ep.employee_id = e.id
-       LEFT JOIN departments d ON d.id = ep.department_id
+       LEFT JOIN hr_departments d ON d.id = ep.department_id
        LEFT JOIN employee_positions pos ON pos.id = ep.position_id
        WHERE per.run_id = $1
        ORDER BY e.last_name, e.first_name`,
@@ -107,9 +107,9 @@ router.post('/runs/:id/collect', requirePermission('payroll.runs.calculate'), as
       `SELECT DISTINCT e.id
        FROM employees e
        JOIN employee_contracts ec ON ec.employee_id = e.id
-       WHERE e.status = 'active'
+       WHERE e.status = 'actif'
          AND e.deleted_at IS NULL
-         AND ec.status = 'active'
+         AND ec.status = 'actif'
          AND ec.deleted_at IS NULL`,
     );
 
@@ -149,7 +149,7 @@ router.post('/runs/:id/calculate', requirePermission('payroll.runs.calculate'), 
     const empRes = await client.query(
       `SELECT DISTINCT e.id
        FROM employees e
-       WHERE e.status = 'active' AND e.deleted_at IS NULL`,
+       WHERE e.status = 'actif' AND e.deleted_at IS NULL`,
     );
 
     const results: Array<{ employeeId: string; employeeRunId: string; success: boolean }> = [];
@@ -158,17 +158,22 @@ router.post('/runs/:id/calculate', requirePermission('payroll.runs.calculate'), 
     let totalAnomalies = 0, totalCritical = 0;
 
     for (const emp of empRes.rows) {
+      await client.query('SAVEPOINT calc_emp');
       try {
         const result = await calculateEmployee(client, req.params.id, emp.id, run.period_id, req.auth!.userId);
+        await client.query('RELEASE SAVEPOINT calc_emp');
         results.push({ employeeId: emp.id, employeeRunId: result.employeeRunId, success: result.success });
         totalAnomalies += result.anomalies.length;
         totalCritical += result.anomalies.filter(a => a.severity === 'critical').length;
       } catch (calcErr: any) {
+        console.error('[CALC_ERROR] employee=%s step=%s err=%s', emp.id, (calcErr as any)._step ?? '?', calcErr.message, calcErr.stack);
+        await client.query('ROLLBACK TO SAVEPOINT calc_emp');
         await client.query(
           `INSERT INTO payroll_anomalies (run_id, employee_id, code, message, severity)
            VALUES ($1,$2,'CALC_ERROR',$3,'critical') ON CONFLICT DO NOTHING`,
-          [req.params.id, emp.id, `Erreur calcul: ${calcErr.message}`],
+          [req.params.id, emp.id, `Erreur calcul [${(calcErr as any)._step ?? '?'}]: ${(calcErr as any).message}`],
         );
+        await client.query('RELEASE SAVEPOINT calc_emp');
         totalCritical++;
       }
     }
@@ -398,9 +403,9 @@ router.get('/employees/:id', requirePermission('payroll.view_sensitive'), async 
               ep.department_id, ep.position_id, d.name AS department, pos.name AS position,
               ep.payment_method, ep.bank_account_number
        FROM employees e
-       LEFT JOIN employee_contracts ec ON ec.employee_id = e.id AND ec.status = 'active'
+       LEFT JOIN employee_contracts ec ON ec.employee_id = e.id AND ec.status = 'actif'
        LEFT JOIN employee_profiles ep ON ep.employee_id = e.id
-       LEFT JOIN departments d ON d.id = ep.department_id
+       LEFT JOIN hr_departments d ON d.id = ep.department_id
        LEFT JOIN employee_positions pos ON pos.id = ep.position_id
        WHERE e.id = $1 AND e.deleted_at IS NULL
        LIMIT 1`,

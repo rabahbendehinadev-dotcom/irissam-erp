@@ -11,13 +11,12 @@ router.get('/bank-export', requirePermission('payroll.bank_export'), async (req:
     const { runId, orderId, format = 'csv' } = req.query;
     if (!runId && !orderId) return res.status(400).json({ error: 'runId or orderId required' });
 
-    const whereClause = orderId
-      ? `ppoi.order_id = '${orderId}'`
-      : `per.run_id = '${runId}'`;
-
-    const rows = await pool.query(
-      `SELECT e.matricule, e.first_name, e.last_name,
-              COALESCE(ppoi.bank_account, ep.bank_account_number, '') AS bank_account,
+    // Parameterized to prevent SQL injection
+    let sqlQuery: string;
+    let sqlParams: string[];
+    if (orderId) {
+      sqlQuery = `SELECT e.matricule, e.first_name, e.last_name,
+              COALESCE(ppoi.bank_account, per.bank_account, '') AS bank_account,
               per.net AS amount,
               ps.payslip_number AS reference,
               pp.month, pp.year
@@ -28,9 +27,27 @@ router.get('/bank-export', requirePermission('payroll.bank_export'), async (req:
        LEFT JOIN payroll_payment_order_items ppoi ON ppoi.employee_run_id = per.id
        JOIN payroll_runs pr ON pr.id = per.run_id
        JOIN payroll_periods pp ON pp.id = pr.period_id
-       WHERE ${whereClause} AND per.excluded = false AND per.net > 0
-       ORDER BY e.last_name, e.first_name`,
-    );
+       WHERE ppoi.order_id = $1 AND per.excluded = false AND per.net > 0
+       ORDER BY e.last_name, e.first_name`;
+      sqlParams = [orderId as string];
+    } else {
+      sqlQuery = `SELECT e.matricule, e.first_name, e.last_name,
+              COALESCE(ppoi.bank_account, per.bank_account, '') AS bank_account,
+              per.net AS amount,
+              ps.payslip_number AS reference,
+              pp.month, pp.year
+       FROM payroll_employee_runs per
+       JOIN employees e ON e.id = per.employee_id
+       LEFT JOIN employee_profiles ep ON ep.employee_id = e.id
+       LEFT JOIN payroll_payslips ps ON ps.employee_run_id = per.id
+       LEFT JOIN payroll_payment_order_items ppoi ON ppoi.employee_run_id = per.id
+       JOIN payroll_runs pr ON pr.id = per.run_id
+       JOIN payroll_periods pp ON pp.id = pr.period_id
+       WHERE per.run_id = $1 AND per.excluded = false AND per.net > 0
+       ORDER BY e.last_name, e.first_name`;
+      sqlParams = [runId as string];
+    }
+    const rows = await pool.query(sqlQuery, sqlParams);
 
     if (format === 'csv') {
       const header = 'matricule,nom,prenom,compte_bancaire,montant_net,reference\n';

@@ -30,15 +30,26 @@ router.get('/components/:id', requirePermission('payroll.components.view'), asyn
 
 router.post('/components', requirePermission('payroll.components.manage'), async (req: AuthenticatedRequest, res) => {
   try {
-    const { code, name, nameAr, nameEn, type, calculationMethod, fixedAmount, percentage, taxable,
-            socialSecurityApplicable, active, priority, effectiveFrom, effectiveTo } = req.body;
+    const body = req.body;
+    const code = body.code; const name = body.name; const type = body.type;
+    const nameAr = body.nameAr ?? body.name_ar ?? null;
+    const nameEn = body.nameEn ?? body.name_en ?? null;
+    const calculationMethod = body.calculationMethod ?? body.calculation_method ?? 'fixed';
+    const fixedAmount      = body.fixedAmount      ?? body.fixed_amount      ?? 0;
+    const percentage       = body.percentage       ?? body.percentage        ?? 0;
+    const taxable = body.taxable !== false;
+    const socialSecurityApplicable = (body.socialSecurityApplicable ?? body.social_security_applicable) !== false;
+    const active   = body.active !== false;
+    const priority = body.priority ?? 100;
+    const effectiveFrom = body.effectiveFrom ?? body.effective_from ?? '2000-01-01';
+    const effectiveTo   = body.effectiveTo   ?? body.effective_to   ?? null;
     if (!code || !name || !type) return res.status(400).json({ error: 'code, name, type required' });
     const r = await pool.query(
       `INSERT INTO payroll_salary_components
          (code,name,name_ar,name_en,type,calculation_method,fixed_amount,percentage,taxable,social_security_applicable,active,priority,effective_from,effective_to,created_by,updated_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15) RETURNING *`,
-      [code,name,nameAr||null,nameEn||null,type,calculationMethod||'fixed',fixedAmount||0,percentage||0,
-       taxable!==false,socialSecurityApplicable!==false,active!==false,priority||100,effectiveFrom||'today',effectiveTo||null,req.auth!.userId],
+      [code,name,nameAr,nameEn,type,calculationMethod,fixedAmount,percentage,
+       taxable,socialSecurityApplicable,active,priority,effectiveFrom,effectiveTo,req.auth!.userId],
     );
     await pool.query(
       `INSERT INTO payroll_audit_events (user_id,user_role,action,entity_type,entity_id,after_state) VALUES ($1,$2,'create_component','payroll_salary_components',$3,$4)`,

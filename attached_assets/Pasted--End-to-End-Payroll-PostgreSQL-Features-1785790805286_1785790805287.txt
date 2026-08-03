@@ -1,0 +1,268 @@
+نفّذ الآن اختبار End-to-End كامل لموديول Payroll مع قاعدة PostgreSQL الحقيقية.
+
+ممنوع إضافة Features جديدة.
+المطلوب فقط اختبار المنطق المالي، الـWorkflow، الصلاحيات، والـPDF.
+
+==================================================
+1. سيناريو الموظف الأساسي
+==================================================
+
+أنشئ موظفًا تجريبيًا لديه:
+
+- عقد نشط
+- Salaire de base = 80 000 DZD
+- Prime de risque = 10 000 DZD
+- Prime de garde = 5 000 DZD
+- 10 ساعات إضافية
+- غياب يوم واحد
+- تأخر 120 دقيقة
+- Avance = 15 000 DZD
+- Prêt بقسط شهري = 8 000 DZD
+
+أنشئ Period شهرية ثم Payroll Run.
+
+==================================================
+2. Workflow كامل
+==================================================
+
+اختبر:
+
+1. Create Period
+2. Create Payroll Run
+3. Collect Data
+4. Validate Attendance
+5. Calculate
+6. Review Anomalies
+7. HR Approve
+8. Finance Approve
+9. Lock
+10. Generate Payslips
+11. Create Payment Order
+12. Mark Paid
+
+كل Transition يجب أن:
+
+- يغيّر Status الصحيح
+- يسجل المستخدم والوقت
+- ينشئ Audit
+- يمنع القفز غير المسموح بين الحالات
+
+==================================================
+3. التحقق من الحساب
+==================================================
+
+تحقق من:
+
+- Salaire brut
+- Salaire de base
+- Primes
+- Overtime
+- Absence deduction
+- Late deduction
+- Avance deduction
+- Loan installment
+- CNAS
+- IRG
+- Net à payer
+
+كل الحسابات يجب أن تأتي من PostgreSQL NUMERIC، وليس من Float JavaScript.
+
+اعرض جدولًا يوضح:
+
+- المبلغ المتوقع
+- المبلغ المحسوب
+- الفرق
+
+الفرق يجب أن يكون 0.00 DZD.
+
+==================================================
+4. Anomalies
+==================================================
+
+اختبر الحالات التالية:
+
+A. موظف بدون عقد نشط
+→ Anomaly critique
+
+B. موظف بدون salaire de base
+→ Anomaly critique
+
+C. Check-out مفقود
+→ Anomaly
+
+D. Overtime غير معتمد
+→ لا يدخل في الحساب
+
+E. Net salary سلبي
+→ Payroll blocked
+
+F. Salary variation أكثر من الحد المسموح مقارنة بالشهر السابق
+→ Warning
+
+ممنوع اعتماد Run إذا توجد Anomalies critiques.
+
+==================================================
+5. Advances وLoans
+==================================================
+
+اختبر:
+
+- Avance تُقتطع مرة واحدة فقط.
+- Loan installment تُقتطع مرة واحدة فقط.
+- إعادة تشغيل Calculate لا تضاعف الاقتطاع.
+- Loan remainingAmount يتحدث.
+- عند وصول القرض إلى 0 يصبح completed.
+- لا يوجد over-deduction.
+
+==================================================
+6. Double Calculation وDouble Payment
+==================================================
+
+TEST A:
+تشغيل Calculate مرتين لنفس Run
+→ لا تنشأ أسطر مكررة.
+
+TEST B:
+Mark Paid مرتين
+→ الثانية HTTP 409.
+
+TEST C:
+محاولتا Mark Paid في نفس اللحظة
+→ Row Lock يمنع الدفع المزدوج.
+
+TEST D:
+Generate Payslips مرتين
+→ لا تتولد Bulletins مكررة.
+
+==================================================
+7. Lock
+==================================================
+
+بعد Lock:
+
+- تعديل Salary Component → مرفوض
+- تعديل Employee Run → مرفوض
+- إعادة Calculate → مرفوض
+- تغيير Attendance لا يغيّر Run المقفول
+- أي تعديل استثنائي يحتاج Permission خاصة ويُسجل في Audit
+
+==================================================
+8. Payslip PDF
+==================================================
+
+تحقق من:
+
+- شعار IRISSAM HOSPITAL
+- Matricule
+- Fonction
+- Département
+- Période
+- Gains
+- Retenues
+- Brut
+- CNAS
+- IRG
+- Net
+- QR/Barcode
+- Signature placeholders
+- العربية RTL
+- Français
+- English
+
+الملف يجب أن يبدأ بـ %PDF.
+
+==================================================
+9. Payment Order وBank Export
+==================================================
+
+اختبر:
+
+- إنشاء Payment Order
+- إجمالي المبلغ يساوي مجموع Net Pay
+- عدد الموظفين صحيح
+- CSV UTF-8 BOM
+- Excel يفتح النص الفرنسي بطريقة صحيحة
+- الحسابات البنكية الناقصة تظهر كـAnomaly
+- لا يُرسل موظف غير معتمد إلى Bank Export
+
+==================================================
+10. RBAC
+==================================================
+
+اختبر:
+
+- payroll_manager → كامل الصلاحيات
+- payroll_officer → حساب ومراجعة حسب الصلاحيات
+- finance_manager → Finance Approve + Payment Orders
+- hr_manager → HR Approve
+- employee → يرى Payslip الخاص به فقط
+- مستخدم بدون payroll.view_sensitive → لا يرى أجور الآخرين
+- مستخدم بدون payroll.runs.mark_paid → HTTP 403
+
+==================================================
+11. Dashboard
+==================================================
+
+تحقق من:
+
+- Masse salariale
+- Brut total
+- Net total
+- Primes
+- Retenues
+- Overtime
+- Avances
+- Prêts
+- Employés payés
+- Employés non payés
+- Anomalies ouvertes
+- Variation الشهرية
+
+كل القيم أرقام سليمة:
+- لا NaN
+- لا Infinity
+- لا null في KPIs الأساسية
+
+==================================================
+12. Responsive
+==================================================
+
+اختبر:
+
+- Desktop
+- iPhone
+- Android
+- Tablet
+- PWA Standalone
+
+تحقق من:
+
+- Tables تتحول Cards
+- Modals Bottom Sheets
+- Payslip Viewer Full Screen
+- Tabs scrollable
+- لا Horizontal Overflow
+- لا White Screen
+
+==================================================
+13. نتائج مطلوبة
+==================================================
+
+أعطني تقريرًا نهائيًا يشمل:
+
+- عدد الاختبارات الكلي
+- عدد الناجحة
+- عدد الفاشلة
+- الأخطاء المكتشفة
+- الإصلاحات المطبقة
+- جدول Expected vs Calculated
+- إثبات عدم Double Deduction
+- إثبات عدم Double Payment
+- إثبات Row Locks
+- إثبات Payroll Lock
+- نتيجة Payslip PDF
+- نتيجة Bank Export
+- نتائج RBAC
+- 0 TypeScript Errors
+- 0 Runtime SQL Errors
+- 0 White Screens

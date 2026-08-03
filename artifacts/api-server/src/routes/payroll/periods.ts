@@ -49,6 +49,13 @@ router.post('/periods', requirePermission('payroll.periods.create'), async (req:
     const { month, year, startDate, endDate, paymentDate, notes } = req.body;
     if (!month || !year || !startDate || !endDate)
       return res.status(400).json({ error: 'month, year, startDate, endDate are required' });
+    // Application-level duplicate check (UNIQUE constraint allows multiple NULL site_id)
+    const dup = await pool.query(
+      `SELECT id FROM payroll_periods WHERE month = $1 AND year = $2 AND deleted_at IS NULL LIMIT 1`,
+      [month, year],
+    );
+    if (dup.rows.length > 0)
+      return res.status(409).json({ error: 'Une période existe déjà pour ce mois/année' });
     const r = await pool.query(
       `INSERT INTO payroll_periods (month, year, start_date, end_date, payment_date, notes, created_by, updated_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$7) RETURNING *`,

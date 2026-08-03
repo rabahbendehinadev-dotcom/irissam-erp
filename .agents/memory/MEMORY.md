@@ -24,3 +24,4 @@
 - [Executive Dashboard](executive-dashboard.md) — migration 021, 11 sub-routes, 9 frontend tabs, 29 parallel KPI queries; requirePermission is named export; schema names differ (occupancy_beds, emergency_visits, employees, medical_batches, biomedical_work_orders)
 - [GED Module](ged-module.md) — migrations 022+023, 17 tables, GCS Object Storage, 8 sub-routes; permissions table has NO display_name; storage.ts needs inline safeParse (no zod); hooks from "react" not "preact/hooks"
 - [Payroll Module](payroll-module.md) — migrations 024+025, 11 sub-routers, 10 frontend tabs; sequence before table rule; all finance in NUMERIC via PG; import '@workspace/db'
+- [Payroll Module E2E](payroll-e2e-bugs.md) — 9 bugs fixed to reach 75/75; key: enum mismatches, camelCase vs snake_case body keys, NOT NULL schema columns, tiered OT calculation

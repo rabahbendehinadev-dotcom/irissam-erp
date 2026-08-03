@@ -19,9 +19,16 @@ export async function calculateEmployee(
   userId: string,
 ): Promise<EngineResult> {
   const anomalies: EngineResult['anomalies'] = [];
+  let _step = 'init';
+  const q = async (step: string, sql: string, params?: any[]) => {
+    _step = step;
+    return client.query(sql, params);
+  };
+
+  try {
 
   // ── 1. Get settings ──────────────────────────────────────────────────────
-  const settingsRes = await client.query(
+  const settingsRes = await q('settings',
     `SELECT working_days_per_month, working_hours_per_day,
             overtime_rate_25, overtime_rate_50, overtime_rate_100,
             night_shift_rate, guard_12h_rate, guard_24h_rate,
@@ -40,7 +47,7 @@ export async function calculateEmployee(
   const wphd = parseFloat(s.working_hours_per_day);
 
   // ── 2. Get period dates ──────────────────────────────────────────────────
-  const periodRes = await client.query(
+  const periodRes = await q('s2',
     `SELECT start_date, end_date, month, year FROM payroll_periods WHERE id = $1`,
     [periodId],
   );
@@ -48,11 +55,11 @@ export async function calculateEmployee(
   if (!period) throw new Error('Period not found');
 
   // ── 3. Get active contract ────────────────────────────────────────────────
-  const contractRes = await client.query(
+  const contractRes = await q('s3',
     `SELECT ec.id, ec.salary_base, ec.type, ec.is_full_time, ec.weekly_hours
      FROM employee_contracts ec
      WHERE ec.employee_id = $1
-       AND ec.status = 'active'
+       AND ec.status = 'actif'
        AND ec.start_date <= $2
        AND (ec.end_date IS NULL OR ec.end_date >= $3)
      ORDER BY ec.start_date DESC LIMIT 1`,
@@ -64,7 +71,7 @@ export async function calculateEmployee(
   if (contractRes.rows.length === 0) {
     anomalies.push({ code: 'NO_ACTIVE_CONTRACT', message: 'Aucun contrat actif pour cette période', severity: 'critical' });
     // Try employee_profiles as fallback
-    const profRes = await client.query(
+    const profRes = await q('s4',
       `SELECT salary_base FROM employee_profiles WHERE employee_id = $1 LIMIT 1`,
       [employeeId],
     );
@@ -81,7 +88,7 @@ export async function calculateEmployee(
   }
 
   // ── 4. Attendance snapshot ────────────────────────────────────────────────
-  const attendRes = await client.query(
+  const attendRes = await q('s5',
     `SELECT
        COUNT(*) FILTER (WHERE status = 'present' OR total_worked_minutes > 0) AS days_worked,
        COALESCE(SUM(total_worked_minutes), 0) AS total_worked_minutes,
@@ -104,26 +111,26 @@ export async function calculateEmployee(
   }
 
   // ── 5. Absence / Leave snapshot ───────────────────────────────────────────
-  const absRes = await client.query(
+  const absRes = await q('s6',
     `SELECT
        COALESCE(SUM(
-         GREATEST(0, (LEAST(date_to, $3::date) - GREATEST(date_from, $2::date))::integer + 1)
+         GREATEST(0, (LEAST(date_to, $3) - GREATEST(date_from, $2))::integer + 1)
        ), 0) AS absence_days
      FROM absence_records
      WHERE employee_id = $1
-       AND status IN ('approved','closed')
+       AND status IN ('approuvee')
        AND date_from <= $3 AND date_to >= $2`,
     [employeeId, period.start_date, period.end_date],
   );
   const daysAbsent = parseFloat(absRes.rows[0].absence_days) || 0;
 
-  const leaveRes = await client.query(
+  const leaveRes = await q('s7',
     `SELECT
-       COALESCE(SUM(number_of_days) FILTER (WHERE leave_type NOT IN ('unpaid','sans_solde')), 0) AS paid_leave_days,
-       COALESCE(SUM(number_of_days) FILTER (WHERE leave_type IN ('unpaid','sans_solde')), 0)     AS unpaid_leave_days
+       COALESCE(SUM(number_of_days) FILTER (WHERE leave_type != 'sans_solde'), 0) AS paid_leave_days,
+       COALESCE(SUM(number_of_days) FILTER (WHERE leave_type = 'sans_solde'), 0)     AS unpaid_leave_days
      FROM leave_requests
      WHERE employee_id = $1
-       AND status = 'approved'
+       AND status = 'approuvee'
        AND date_from <= $3 AND date_to >= $2`,
     [employeeId, period.start_date, period.end_date],
   );
@@ -131,17 +138,17 @@ export async function calculateEmployee(
   const daysUnpaidLeave = parseFloat(leaveRes.rows[0].unpaid_leave_days) || 0;
 
   // ── 6. Overtime records (approved) ───────────────────────────────────────
-  const otRes = await client.query(
+  const otRes = await q('s8',
     `SELECT id, record_date, overtime_hours, compensation_type
      FROM overtime_records
      WHERE employee_id = $1
-       AND status = 'approved'
+       AND status = 'approuvee'
        AND record_date BETWEEN $2 AND $3`,
     [employeeId, period.start_date, period.end_date],
   );
-  const pendingOT = await client.query(
+  const pendingOT = await q('s9',
     `SELECT COUNT(*) AS cnt FROM overtime_records
-     WHERE employee_id = $1 AND status = 'pending' AND record_date BETWEEN $2 AND $3`,
+     WHERE employee_id = $1 AND status = 'soumise' AND record_date BETWEEN $2 AND $3`,
     [employeeId, period.start_date, period.end_date],
   );
   if (parseInt(pendingOT.rows[0].cnt) > 0) {
@@ -154,7 +161,7 @@ export async function calculateEmployee(
   const hourlyRateNum = salaryBase > 0 ? (salaryBase / (wdpm * wphd)) : 0;
 
   // ── 8. Upsert payroll_employee_runs ──────────────────────────────────────
-  const perRes = await client.query(
+  const perRes = await q('s10',
     `INSERT INTO payroll_employee_runs
        (run_id, employee_id, contract_id, working_days, days_worked, days_absent,
         days_paid_leave, days_unpaid_leave, minutes_late, overtime_minutes,
@@ -183,28 +190,28 @@ export async function calculateEmployee(
   const employeeRunId: string = perRes.rows[0].id;
 
   // ── 9. Clear previous lines ───────────────────────────────────────────────
-  await client.query(`DELETE FROM payroll_earnings WHERE employee_run_id = $1`, [employeeRunId]);
-  await client.query(`DELETE FROM payroll_deductions WHERE employee_run_id = $1`, [employeeRunId]);
-  await client.query(`DELETE FROM payroll_overtime_lines WHERE employee_run_id = $1`, [employeeRunId]);
-  await client.query(`DELETE FROM payroll_absence_lines WHERE employee_run_id = $1`, [employeeRunId]);
+  await q('s11',`DELETE FROM payroll_earnings WHERE employee_run_id = $1`, [employeeRunId]);
+  await q('s12',`DELETE FROM payroll_deductions WHERE employee_run_id = $1`, [employeeRunId]);
+  await q('s13',`DELETE FROM payroll_overtime_lines WHERE employee_run_id = $1`, [employeeRunId]);
+  await q('s14',`DELETE FROM payroll_absence_lines WHERE employee_run_id = $1`, [employeeRunId]);
 
   // ── 10. Earnings ──────────────────────────────────────────────────────────
   let totalEarnings = 0;
 
-  // Salary base (pro-rated if absences)
+  // Salary base — full month on earnings side; deductions handle absences separately
+  // (standard Algerian payslip format: show full base, then deduct)
   if (salaryBase > 0) {
-    const effectiveDays = Math.max(0, wdpm - daysAbsent - daysUnpaidLeave);
-    const baseAmount = +(dailyRateNum * effectiveDays).toFixed(2);
-    await client.query(
+    const baseAmount = salaryBase;
+    await q('s15',
       `INSERT INTO payroll_earnings (employee_run_id, component_code, component_name, quantity, unit_amount, amount, taxable, social_sec)
        VALUES ($1,'SAL_BASE','Salaire de base',$2,$3,$4,true,true)`,
-      [employeeRunId, effectiveDays.toFixed(4), dailyRateNum.toFixed(2), baseAmount.toFixed(2)],
+      [employeeRunId, wdpm.toFixed(4), dailyRateNum.toFixed(2), baseAmount.toFixed(2)],
     );
     totalEarnings += baseAmount;
   }
 
   // Active salary components (non-base earnings)
-  const compRes = await client.query(
+  const compRes = await q('s16',
     `SELECT * FROM payroll_salary_components
      WHERE type = 'earning' AND active = true AND code != 'SAL_BASE'
        AND (effective_to IS NULL OR effective_to >= $1)
@@ -227,7 +234,7 @@ export async function calculateEmployee(
       continue; // hourly_rate and formula handled separately
     }
     if (amount <= 0) continue;
-    await client.query(
+    await q('s17',
       `INSERT INTO payroll_earnings (employee_run_id, component_id, component_code, component_name, quantity, unit_amount, amount, taxable, social_sec)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
       [employeeRunId, comp.id, comp.code, comp.name, qty.toFixed(4), amount.toFixed(2), amount.toFixed(2), comp.taxable, comp.social_security_applicable],
@@ -235,35 +242,40 @@ export async function calculateEmployee(
     totalEarnings += amount;
   }
 
-  // Overtime lines
+  // Overtime lines — tiered: first 8h at rate_25, next 8h at rate_50, beyond at rate_100
   for (const ot of otRes.rows) {
     const otHours = parseFloat(ot.overtime_hours) || 0;
     if (otHours <= 0) continue;
-    // Determine multiplier: first 8h at 25%, next at 50%, rest at 100%
-    const rate25 = parseFloat(s.overtime_rate_25);
-    const multiplier = otHours <= 8 ? rate25 : (otHours <= 16 ? parseFloat(s.overtime_rate_50) : parseFloat(s.overtime_rate_100));
-    const otAmount = +(hourlyRateNum * multiplier * otHours).toFixed(2);
-    await client.query(
+    const rate25  = parseFloat(s.overtime_rate_25);
+    const rate50  = parseFloat(s.overtime_rate_50);
+    const rate100 = parseFloat(s.overtime_rate_100);
+    const h25  = Math.min(otHours, 8);
+    const h50  = Math.max(0, Math.min(otHours - 8, 8));
+    const h100 = Math.max(0, otHours - 16);
+    const otAmount = +(hourlyRateNum * (h25 * rate25 + h50 * rate50 + h100 * rate100)).toFixed(2);
+    // Store the dominant multiplier for payroll_overtime_lines reporting
+    const dominantMultiplier = h100 > 0 ? rate100 : (h50 > 0 ? rate50 : rate25);
+    await q('s18',
       `INSERT INTO payroll_overtime_lines (employee_run_id, overtime_record_id, record_date, overtime_hours, rate_multiplier, hourly_base, amount)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [employeeRunId, ot.id, ot.record_date, otHours.toFixed(2), multiplier.toFixed(4), hourlyRateNum.toFixed(2), otAmount.toFixed(2)],
+      [employeeRunId, ot.id, ot.record_date, otHours.toFixed(2), dominantMultiplier.toFixed(4), hourlyRateNum.toFixed(2), otAmount.toFixed(2)],
     );
-    await client.query(
+    await q('s19',
       `INSERT INTO payroll_earnings (employee_run_id, component_code, component_name, quantity, unit_amount, amount, taxable, social_sec)
        VALUES ($1,'HEURES_SUP','Heures supplémentaires',$2,$3,$4,true,true)`,
-      [employeeRunId, otHours.toFixed(4), (hourlyRateNum * multiplier).toFixed(2), otAmount.toFixed(2)],
+      [employeeRunId, otHours.toFixed(4), (otAmount / otHours).toFixed(2), otAmount.toFixed(2)],
     );
     totalEarnings += otAmount;
   }
 
   // Bonuses
-  const bonusRes = await client.query(
+  const bonusRes = await q('s20',
     `SELECT * FROM payroll_bonuses WHERE employee_id = $1 AND run_id = $2 AND deleted_at IS NULL`,
     [employeeId, runId],
   );
   for (const b of bonusRes.rows) {
     const bAmt = parseFloat(b.amount);
-    await client.query(
+    await q('s21',
       `INSERT INTO payroll_earnings (employee_run_id, component_code, component_name, quantity, unit_amount, amount, taxable, social_sec)
        VALUES ($1,'BONUS','Bonus',1,$2,$2,$3,false)`,
       [employeeRunId, bAmt.toFixed(2), b.taxable],
@@ -272,13 +284,13 @@ export async function calculateEmployee(
   }
 
   // Adjustments (earning type)
-  const adjResE = await client.query(
+  const adjResE = await q('s22',
     `SELECT * FROM payroll_adjustments WHERE employee_id = $1 AND run_id = $2 AND type = 'earning' AND deleted_at IS NULL`,
     [employeeId, runId],
   );
   for (const adj of adjResE.rows) {
     const aAmt = parseFloat(adj.amount);
-    await client.query(
+    await q('s23',
       `INSERT INTO payroll_earnings (employee_run_id, component_code, component_name, quantity, unit_amount, amount, taxable, social_sec)
        VALUES ($1,'RAPPEL',$2,1,$3,$3,true,true)`,
       [employeeRunId, adj.description, aAmt.toFixed(2)],
@@ -294,7 +306,7 @@ export async function calculateEmployee(
   // Absence deduction
   if (daysAbsent > 0) {
     const absAmt = +(dailyRateNum * daysAbsent).toFixed(2);
-    await client.query(
+    await q('s24',
       `INSERT INTO payroll_deductions (employee_run_id, component_code, component_name, quantity, unit_amount, amount)
        VALUES ($1,'DED_ABSENCE','Absence',$2,$3,$4)`,
       [employeeRunId, daysAbsent.toFixed(4), dailyRateNum.toFixed(2), absAmt.toFixed(2)],
@@ -305,7 +317,7 @@ export async function calculateEmployee(
   // Unpaid leave deduction
   if (daysUnpaidLeave > 0) {
     const ulAmt = +(dailyRateNum * daysUnpaidLeave).toFixed(2);
-    await client.query(
+    await q('s25',
       `INSERT INTO payroll_deductions (employee_run_id, component_code, component_name, quantity, unit_amount, amount)
        VALUES ($1,'DED_CONGE_SS','Congé sans solde',$2,$3,$4)`,
       [employeeRunId, daysUnpaidLeave.toFixed(4), dailyRateNum.toFixed(2), ulAmt.toFixed(2)],
@@ -317,7 +329,7 @@ export async function calculateEmployee(
   if (lateMinutes > 0 && s.late_deduction_method === 'pro_rata') {
     const minuteRate = hourlyRateNum / 60;
     const lateAmt = +(minuteRate * lateMinutes).toFixed(2);
-    await client.query(
+    await q('s26',
       `INSERT INTO payroll_deductions (employee_run_id, component_code, component_name, quantity, unit_amount, amount)
        VALUES ($1,'DED_RETARD','Retard',$2,$3,$4)`,
       [employeeRunId, lateMinutes.toFixed(4), minuteRate.toFixed(2), lateAmt.toFixed(2)],
@@ -326,13 +338,13 @@ export async function calculateEmployee(
   }
 
   // Adjustments (deduction type)
-  const adjResD = await client.query(
+  const adjResD = await q('s27',
     `SELECT * FROM payroll_adjustments WHERE employee_id = $1 AND run_id = $2 AND type = 'deduction' AND deleted_at IS NULL`,
     [employeeId, runId],
   );
   for (const adj of adjResD.rows) {
     const aAmt = Math.abs(parseFloat(adj.amount));
-    await client.query(
+    await q('s28',
       `INSERT INTO payroll_deductions (employee_run_id, component_code, component_name, quantity, unit_amount, amount)
        VALUES ($1,'AUTRE_DED',$2,1,$3,$3)`,
       [employeeRunId, adj.description, aAmt.toFixed(2)],
@@ -342,7 +354,7 @@ export async function calculateEmployee(
 
   // ── 12. Advances ──────────────────────────────────────────────────────────
   let totalAdvances = 0;
-  const advRes = await client.query(
+  const advRes = await q('s29',
     `SELECT id, amount FROM payroll_advances
      WHERE employee_id = $1
        AND status = 'approved'
@@ -351,7 +363,7 @@ export async function calculateEmployee(
   );
   for (const adv of advRes.rows) {
     const advAmt = parseFloat(adv.amount);
-    await client.query(
+    await q('s30',
       `INSERT INTO payroll_deductions (employee_run_id, component_code, component_name, quantity, unit_amount, amount)
        VALUES ($1,'DED_AVANCE','Avance',1,$2,$2)`,
       [employeeRunId, advAmt.toFixed(2)],
@@ -359,7 +371,7 @@ export async function calculateEmployee(
     totalDeductions += advAmt;
     totalAdvances += advAmt;
     // Mark advance as deducted
-    await client.query(
+    await q('s31',
       `UPDATE payroll_advances SET status = 'fully_deducted', deducted_amount = $1, deducted_at = now(), deducted_in_run_id = $2 WHERE id = $3`,
       [advAmt.toFixed(2), runId, adv.id],
     );
@@ -367,7 +379,7 @@ export async function calculateEmployee(
 
   // ── 13. Loans ─────────────────────────────────────────────────────────────
   let totalLoans = 0;
-  const loanRes = await client.query(
+  const loanRes = await q('s32',
     `SELECT l.id, l.installment_amount, l.remaining_amount,
             (SELECT COUNT(*) FROM payroll_loan_installments WHERE loan_id = l.id) AS paid_count
      FROM payroll_loans l
@@ -380,27 +392,27 @@ export async function calculateEmployee(
     const installAmt = Math.min(parseFloat(loan.installment_amount), parseFloat(loan.remaining_amount));
     if (installAmt <= 0) continue;
     // Check for duplicate installment this run
-    const dupCheck = await client.query(
+    const dupCheck = await q('s33',
       `SELECT id FROM payroll_loan_installments WHERE loan_id = $1 AND run_id = $2`,
       [loan.id, runId],
     );
     if (dupCheck.rows.length > 0) continue; // Already deducted
 
     const installNo = parseInt(loan.paid_count) + 1;
-    await client.query(
+    await q('s34',
       `INSERT INTO payroll_loan_installments (loan_id, employee_run_id, run_id, installment_no, amount, status, paid_at)
        VALUES ($1,$2,$3,$4,$5,'paid',now())`,
       [loan.id, employeeRunId, runId, installNo, installAmt.toFixed(2)],
     );
     const newRemaining = Math.max(0, parseFloat(loan.remaining_amount) - installAmt);
     const newStatus = newRemaining <= 0 ? 'completed' : 'active';
-    await client.query(
+    await q('s35',
       `UPDATE payroll_loans SET remaining_amount = $1, paid_installments = paid_installments + 1, status = $2, updated_at = now(),
-       completed_at = CASE WHEN $2 = 'completed' THEN now() ELSE NULL END
-       WHERE id = $3`,
-      [newRemaining.toFixed(2), newStatus, loan.id],
+       completed_at = CASE WHEN $3 THEN now() ELSE NULL END
+       WHERE id = $4`,
+      [newRemaining.toFixed(2), newStatus, newRemaining <= 0, loan.id],
     );
-    await client.query(
+    await q('s36',
       `INSERT INTO payroll_deductions (employee_run_id, component_code, component_name, quantity, unit_amount, amount)
        VALUES ($1,'DED_PRET','Prêt - remboursement',1,$2,$2)`,
       [employeeRunId, installAmt.toFixed(2)],
@@ -410,13 +422,13 @@ export async function calculateEmployee(
   }
 
   // ── 14. Social security (CNAS employee 9%) ────────────────────────────────
-  const ssRes = await client.query(
+  const ssRes = await q('s37',
     `SELECT employee_rate FROM payroll_social_security_rules WHERE code = 'CNAS_EMP' AND active = true LIMIT 1`,
   );
   const ssRate = ssRes.rows.length > 0 ? parseFloat(ssRes.rows[0].employee_rate) : 0.09;
   const cotisations = +(brut * ssRate).toFixed(2);
   if (cotisations > 0) {
-    await client.query(
+    await q('s38',
       `INSERT INTO payroll_deductions (employee_run_id, component_code, component_name, quantity, unit_amount, amount)
        VALUES ($1,'DED_SOCIALE','Cotisation CNAS',1,$2,$2)`,
       [employeeRunId, cotisations.toFixed(2)],
@@ -426,7 +438,7 @@ export async function calculateEmployee(
 
   // ── 15. IRG (income tax) — progressive brackets ───────────────────────────
   const taxableIncome = Math.max(0, brut - cotisations);
-  const taxRulesRes = await client.query(
+  const taxRulesRes = await q('s39',
     `SELECT bracket_min, bracket_max, rate, fixed_amount
      FROM payroll_tax_rules
      WHERE active = true AND deleted_at IS NULL
@@ -434,17 +446,19 @@ export async function calculateEmployee(
      ORDER BY bracket_min`,
     [period.start_date],
   );
+  // Progressive (cumulative) brackets — each bracket taxes only its slice
   let tax = 0;
   for (const bracket of taxRulesRes.rows) {
     const bMin = parseFloat(bracket.bracket_min);
     const bMax = bracket.bracket_max ? parseFloat(bracket.bracket_max) : Infinity;
     if (taxableIncome > bMin) {
       const taxable = Math.min(taxableIncome, bMax) - bMin;
-      tax = +(taxable * parseFloat(bracket.rate) + parseFloat(bracket.fixed_amount)).toFixed(2);
+      tax += taxable * parseFloat(bracket.rate) + parseFloat(bracket.fixed_amount);
     }
   }
+  tax = +tax.toFixed(2);
   if (tax > 0) {
-    await client.query(
+    await q('s40',
       `INSERT INTO payroll_deductions (employee_run_id, component_code, component_name, quantity, unit_amount, amount)
        VALUES ($1,'DED_IMPOT','Impôt sur le revenu (IRG)',1,$2,$2)`,
       [employeeRunId, tax.toFixed(2)],
@@ -463,7 +477,7 @@ export async function calculateEmployee(
   // ── 17. Update employee run totals ────────────────────────────────────────
   const hasAnomalies = anomalies.length > 0;
   const criticalCount = anomalies.filter(a => a.severity === 'critical').length;
-  await client.query(
+  await q('s41',
     `UPDATE payroll_employee_runs SET
        total_earnings = $2, total_deductions = $3, total_advances = $4, total_loans = $5,
        brut = $6, cotisations = $7, tax = $8, net = $9,
@@ -481,7 +495,7 @@ export async function calculateEmployee(
 
   // ── 18. Insert anomalies ──────────────────────────────────────────────────
   for (const a of anomalies) {
-    await client.query(
+    await q('s42',
       `INSERT INTO payroll_anomalies (run_id, employee_id, employee_run_id, code, message, severity)
        VALUES ($1,$2,$3,$4,$5,$6)
        ON CONFLICT DO NOTHING`,
@@ -490,4 +504,8 @@ export async function calculateEmployee(
   }
 
   return { employeeRunId, success: criticalCount === 0, anomalies };
+  } catch (e: any) {
+    (e as any)._step = _step;
+    throw e;
+  }
 }

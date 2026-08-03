@@ -57,9 +57,9 @@ router.get('/payslips/:id/pdf', requirePermission('payroll.payslips.view'), asyn
        JOIN payroll_runs pr ON pr.id = ps.run_id
        JOIN payroll_periods pp ON pp.id = pr.period_id
        LEFT JOIN employee_profiles ep ON ep.employee_id = e.id
-       LEFT JOIN departments d ON d.id = ep.department_id
+       LEFT JOIN hr_departments d ON d.id = ep.department_id
        LEFT JOIN employee_positions pos ON pos.id = ep.position_id
-       LEFT JOIN employee_contracts ec ON ec.employee_id = e.id AND ec.status = 'active'
+       LEFT JOIN employee_contracts ec ON ec.employee_id = e.id AND ec.status = 'actif'
        WHERE ps.id = $1`,
       [req.params.id],
     );
