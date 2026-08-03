@@ -52,7 +52,9 @@ export default function PatientsPage() {
   const rawPatients = useMemo((): Patient[] => {
     if (isLoading) return [];
     if (isError) return MOCK_PATIENTS;
-    return Array.isArray(apiPatients) ? apiPatients as unknown as Patient[] : [];
+    // Filter out any null/undefined elements that a malformed API response might include
+    const list = Array.isArray(apiPatients) ? (apiPatients as unknown as Patient[]) : [];
+    return list.filter((p): p is Patient => p != null && typeof p === 'object');
   }, [apiPatients, isLoading, isError]);
 
   const handleSort = (field: string) => {
@@ -76,13 +78,14 @@ export default function PatientsPage() {
         return true;
       })
       .sort((a, b) => {
+        // Guard: always return a string even if a field is null/undefined in API data
         const val = (x: Patient): string => {
           switch (sortField) {
-            case 'lastName':    return x.lastName + x.firstName;
-            case 'dateOfBirth': return x.dateOfBirth;
-            case 'status':      return x.status;
-            case 'createdAt':   return x.createdAt;
-            default:            return x.lastName;
+            case 'lastName':    return `${x.lastName ?? ''}${x.firstName ?? ''}`;
+            case 'dateOfBirth': return x.dateOfBirth ?? '';
+            case 'status':      return x.status ?? '';
+            case 'createdAt':   return x.createdAt ?? '';
+            default:            return x.lastName ?? '';
           }
         };
         const cmp = val(a).localeCompare(val(b), 'fr');

@@ -58,7 +58,7 @@ export function PatientTable({
 }: Props) {
   const { t } = useLanguage();
 
-  if (patients.length === 0) {
+  if (!Array.isArray(patients) || patients.length === 0) {
     return (
       <EmptyState
         icon={<Users size={40} />}
