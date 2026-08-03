@@ -13,14 +13,35 @@ export function DashboardLayout({ children, noPadding = false }: { children: Rea
 
   // Close sidebar on route change (handled inside Sidebar via onClose callback)
 
-  // Prevent body scroll when mobile sidebar is open
+  // iOS-safe scroll lock:
+  // Setting overflow:hidden on <body> freezes ALL touch scrolling on iOS,
+  // including inside fixed elements like the sidebar drawer.
+  // Instead, we use position:fixed + top offset which freezes the background
+  // page WITHOUT touching fixed-position children's scroll.
   useEffect(() => {
     if (mobileSidebarOpen) {
-      document.body.style.overflow = "hidden";
+      const scrollY = window.scrollY;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+      document.body.style.overflowY = "scroll"; // keep scrollbar width stable
+      document.body.dataset.lockedScrollY = String(scrollY);
     } else {
-      document.body.style.overflow = "";
+      const scrollY = parseInt(document.body.dataset.lockedScrollY ?? "0", 10);
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflowY = "";
+      delete document.body.dataset.lockedScrollY;
+      window.scrollTo(0, scrollY);
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflowY = "";
+      delete document.body.dataset.lockedScrollY;
+    };
   }, [mobileSidebarOpen]);
 
   return (

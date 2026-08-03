@@ -86,9 +86,17 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
         !isRTL && (mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"),
         isRTL  && (mobileOpen ? "translate-x-0" :  "translate-x-full lg:translate-x-0"),
       )}
+      // Sidebar spans full height including behind status bar; header pushes content down
+      style={{ touchAction: "pan-y" }}
     >
-      {/* Header */}
-      <div className="flex h-14 items-center justify-between px-3 border-b border-white/10 shrink-0">
+      {/* Header — padded for iOS status bar / Dynamic Island */}
+      <div
+        className="flex items-center justify-between px-3 border-b border-white/10 shrink-0"
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          minHeight: "calc(3.5rem + env(safe-area-inset-top))",
+        }}
+      >
         <div className="flex items-center gap-2 overflow-hidden">
           <img src={logoPath} alt="Logo" className="w-8 h-8 rounded shrink-0 object-contain bg-white p-0.5" />
           {/* Always show name on mobile (not collapsed), hide when collapsed on desktop */}
@@ -110,8 +118,21 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
         </button>
       </div>
 
-      {/* Nav */}
-      <div className="flex-1 overflow-y-auto py-4 scrollbar-hide">
+      {/* Nav — iOS-safe scrollable container
+          - overflowY: scroll (not auto) : more reliable on iOS Safari
+          - WebkitOverflowScrolling: touch : momentum scroll on iPhone
+          - overscrollBehavior: contain : stops scroll bleeding to background page
+          - paddingBottom: safe-area-inset-bottom : clears home indicator bar
+      */}
+      <div
+        className="flex-1 py-4 scrollbar-hide"
+        style={{
+          overflowY: "scroll",
+          WebkitOverflowScrolling: "touch" as React.CSSProperties["WebkitOverflowScrolling"],
+          overscrollBehavior: "contain",
+          paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+        }}
+      >
         {navGroups.map((group, i) => (
           <div key={i} className="mb-6">
             {!collapsed && (
