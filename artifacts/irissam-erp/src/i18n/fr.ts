@@ -56,6 +56,7 @@ export default {
   "nav.archives": "GED & Archives",
   "nav.reports": "Rapports & BI",
   "nav.settings": "Paramètres",
+  "nav.superAdmin": "Super Administration",
   "nav.alerts": "Alertes",
   "nav.collapse": "Réduire",
   "nav.expand": "Agrandir",

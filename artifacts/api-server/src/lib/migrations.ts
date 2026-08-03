@@ -49,6 +49,8 @@ const MIGRATIONS = [
   "023_ged_permissions.sql",
   "024_payroll_module.sql",
   "025_payroll_permissions.sql",
+  "026_super_admin_tables.sql",
+  "027_super_admin_permissions.sql",
 ];
 
 async function ensureTrackingTable(client: PoolClient): Promise<void> {

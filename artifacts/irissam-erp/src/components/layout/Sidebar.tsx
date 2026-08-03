@@ -3,6 +3,7 @@ import { useLanguage } from "@/i18n";
 import { cn } from "@/lib/utils";
 import logoPath from "@assets/9e2f711d-0744-437b-a151-78a356a73edf_1785616056682.png";
 import { useEffect, useRef, useCallback } from "react";
+import { useAuth } from "@/store/AuthContext";
 import {
   LayoutDashboard, Users, Calendar, ClipboardList, AlertTriangle,
   Stethoscope, Bed, Scissors, HeartPulse, Baby, FlaskConical, Scan,
@@ -25,6 +26,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileClose }: SidebarProps) {
   const { t, isRTL } = useLanguage();
+  const { user } = useAuth();
   const [location] = useLocation();
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -153,6 +155,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
         { path: "/archives",  icon: FolderOpen,label: "nav.archives" },
         { path: "/reports",   icon: BarChart3, label: "nav.reports" },
         { path: "/settings",  icon: Settings,  label: "nav.settings" },
+        { path: "/super-admin", icon: Shield, label: "nav.superAdmin", roleRequired: ["super_admin","system_administrator"] },
       ]
     }
   ];
@@ -225,7 +228,11 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
               </h3>
             )}
             <ul className="space-y-0.5">
-              {group.items.map((item, j) => {
+              {group.items.filter(item => {
+                if (!(item as any).roleRequired) return true;
+                const role = user?.role ?? "";
+                return ((item as any).roleRequired as string[]).includes(role);
+              }).map((item, j) => {
                 const isActive = location === item.path ||
                   (item.path !== "/" && location.startsWith(item.path));
                 return (

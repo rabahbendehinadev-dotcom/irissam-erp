@@ -56,6 +56,7 @@ export default {
   "nav.archives": "الأرشيف",
   "nav.reports": "التقارير",
   "nav.settings": "الإعدادات",
+  "nav.superAdmin": "مركز التحكم",
   "nav.alerts": "التنبيهات",
   "nav.collapse": "طي القائمة",
   "nav.expand": "توسيع القائمة",

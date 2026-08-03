@@ -37,6 +37,8 @@ import { requirePermission } from "../middleware/requirePermission";
 import documentsRouter from "./documents/index";
 import payrollRouter    from "./payroll/index";
 import storageRouter from "./storage";
+import systemRouter from "./system/index.js";
+import { maintenanceGuard } from "../middleware/maintenanceGuard.js";
 
 const router: IRouter = Router();
 
@@ -89,5 +91,7 @@ router.use("/documents",           requireAuth, documentsRouter);
 router.use("/payroll",             requireAuth, payrollRouter);
 // Object Storage (presigned upload URLs + file serving)
 router.use(storageRouter);
+// System / Super-Admin Control Center
+router.use("/system", maintenanceGuard, systemRouter);
 
 export default router;

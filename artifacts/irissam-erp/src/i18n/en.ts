@@ -56,6 +56,7 @@ export default {
   "nav.archives": "Archives & DMS",
   "nav.reports": "Reports & BI",
   "nav.settings": "Settings",
+  "nav.superAdmin": "System Control",
   "nav.alerts": "Alerts",
   "nav.collapse": "Collapse",
   "nav.expand": "Expand",

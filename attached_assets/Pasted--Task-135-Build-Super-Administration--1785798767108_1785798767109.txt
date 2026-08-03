@@ -1,0 +1,84 @@
+موافق على Task #135.
+
+ابدأ الـBuild، لكن لا تعتبر Super Administration مكتملة إلا بعد تنفيذ اختبارات أمان وتشغيل فعلية على Production-like environment.
+
+الشروط الإلزامية:
+
+1. اختبر جميع الـ22 Endpoint فعليًا، وليس Compile فقط.
+2. اختبر Step-up Authentication على:
+   - Apply Migration
+   - Restore Plan
+   - Delete Backup
+   - Revoke All Sessions
+   - Create API Key
+   - Change Integration Secret
+   - Enable Maintenance Mode
+
+3. API Keys:
+   - تظهر كاملة مرة واحدة فقط.
+   - لا يمكن استرجاعها بعد الإنشاء.
+   - تُخزن Hash.
+   - المفتاح الملغى يُرفض فورًا.
+
+4. Maintenance Mode:
+   - مستخدم عادي يحصل على 503 + SYSTEM_MAINTENANCE.
+   - super_admin يدخل عادي.
+   - /api/auth/login و/health يبقوا متاحين حسب السياسة.
+   - لا يحدث Redirect Loop في Frontend.
+
+5. Sessions:
+   - Revoke Session يبطل Refresh Token فورًا.
+   - Revoke All يعمل.
+   - Current Session تكون مميزة.
+
+6. Secrets:
+   - ممنوع رجوع SMTP password أو API secrets أو webhook secret أو tokens في أي Response.
+   - القيم تظهر Masked فقط.
+
+7. Logs:
+   - تأكد من Redaction لكلمات المرور، Tokens، Cookies والبيانات الطبية الحساسة.
+   - لا تعرض SQL connection string.
+
+8. Webhooks:
+   - HMAC signature صحيحة.
+   - Retry يعمل.
+   - Delivery logs بدون بيانات حساسة كاملة.
+
+9. Backups:
+   - Verify checksum يعمل.
+   - Restore يبقى Workflow آمن ولا ينفذ تلقائيًا دون الموافقات المطلوبة.
+   - لا تضف Restore وهمي يوحي أنه تم التنفيذ فعليًا.
+
+10. Database:
+   - لا تسمح SQL Console حر.
+   - لا تسمح DROP/TRUNCATE من الواجهة.
+   - Long-query cancel يحتاج Permission وStep-up.
+
+11. Frontend:
+   - 17 Tabs كاملة.
+   - Responsive Mobile/Tablet/Desktop.
+   - Loading / Empty / Error States.
+   - PageErrorBoundary.
+   - لا White Screen.
+
+12. اختبارات القبول النهائية:
+   - RBAC 403
+   - Step-up timeout
+   - Session revoke
+   - API key one-time reveal
+   - Maintenance Mode
+   - Secret masking
+   - Audit logging
+   - Webhook HMAC
+   - Backup verification
+   - Mobile responsive
+   - TypeScript = 0
+   - Runtime SQL = 0
+   - White Screens = 0
+
+بعد الانتهاء أعطني تقريرًا واضحًا:
+- ما تم اختباره فعليًا
+- ما هو Simulation فقط
+- ما هو Placeholder
+- الأخطاء المكتشفة والإصلاحات
+- نتائج جميع الاختبارات
