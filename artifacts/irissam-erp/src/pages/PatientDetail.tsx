@@ -517,9 +517,9 @@ export default function PatientDetailPage() {
 
       {/* Archive confirmation */}
       {archiving && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setArchiving(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
+          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 w-full sm:max-w-sm max-h-[95dvh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
                 <AlertTriangle size={18} className="text-red-600" />

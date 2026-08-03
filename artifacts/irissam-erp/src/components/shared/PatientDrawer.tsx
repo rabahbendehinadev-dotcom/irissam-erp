@@ -54,7 +54,7 @@ export function PatientDrawer({ patientId, onClose }: PatientDrawerProps) {
     if (!patientId) return null;
     const mock = MOCK_PATIENTS.find(p => p.id === patientId);
     if (mock) return mock;
-    const apiMatch = (apiPatients ?? []).find(
+    const apiMatch = (Array.isArray(apiPatients) ? apiPatients : []).find(
       (p) => (p as unknown as Record<string, unknown>).id === patientId,
     );
     return apiMatch ? apiToDrawerPatient(apiMatch as unknown as Record<string, unknown>) : null;

@@ -47,6 +47,10 @@ Closes on route change via `useEffect` on `location`.
 - Listens to `window.offline`/`window.online` events
 - "Back online" confirmation auto-hides after 3s
 
+## iOS Body Scroll Lock (CRITICAL)
+`document.body.style.overflow = "hidden"` freezes ALL touch scroll on iOS including inside `position:fixed` drawers.
+**Fix in DashboardLayout.tsx**: use `position:fixed + top:-${scrollY}px + width:100%` instead. Restore scroll on close with `window.scrollTo(0, savedY)`.
+
 ## Modal Mobile Convention
 
 All modals use bottom-sheet pattern on mobile:

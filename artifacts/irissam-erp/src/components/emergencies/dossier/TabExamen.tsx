@@ -126,15 +126,15 @@ export function TabExamen() {
             </button>
           </div>
           <div className="px-4 py-3 space-y-1.5">
-            {exam.differentialDiagnoses.length === 0 && !showDiffInput && (
+            {(Array.isArray(exam.differentialDiagnoses) ? exam.differentialDiagnoses : []).length === 0 && !showDiffInput && (
               <p className="text-xs text-gray-300 italic">Aucun</p>
             )}
-            {exam.differentialDiagnoses.map((d, i) => (
+            {(Array.isArray(exam.differentialDiagnoses) ? exam.differentialDiagnoses : []).map((d, i) => (
               <div key={i} className="flex items-center gap-2 group">
                 <span className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[9px] font-bold flex items-center justify-center flex-shrink-0">{i+1}</span>
                 <span className="text-xs text-gray-700 flex-1">{d}</span>
                 <button
-                  onClick={() => update({ differentialDiagnoses: exam.differentialDiagnoses.filter((_,j)=>j!==i) })}
+                  onClick={() => update({ differentialDiagnoses: (Array.isArray(exam.differentialDiagnoses) ? exam.differentialDiagnoses : []).filter((_,j)=>j!==i) })}
                   className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"
                 >
                   <Minus size={10} />
