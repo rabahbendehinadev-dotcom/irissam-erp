@@ -1,0 +1,563 @@
+ممتاز، GED راهي مكتملة فعليًا وبمستوى قوي: تخزين GCS، صلاحيات، Versioning، Workflow، Signature داخلية، Audit، Retention وSoft Delete.
+
+الخطوة المنطقية الآن هي Payroll / Gestion de la Paie لأن Module RH راهو جاهز وعندو الحضور، الغياب، العطل، العقود والساعات الإضافية.
+
+انسخ هذا البرومبت وابعثه:
+
+ابدأ الآن تطوير Module كامل خاص بـ:
+PAIE / PAYROLL / GESTION DES SALAIRES
+داخل نظام IRISSAM HOSPITAL ERP.
+مهم جدًا:
+- لا تغيّر التصميم العام.
+- لا تبدأ أي Module آخر.
+- استعمل PostgreSQL الحقيقي فقط.
+- ممنوع Mock Data.
+- اربط Payroll مباشرة مع Module RH الحقيقي.
+- دعم Français / العربية RTL / English.
+- Responsive كامل.
+- PWA compatible.
+- RBAC payroll.*
+- Audit كامل.
+- جميع الحسابات المالية تكون Backend باستخدام NUMERIC/DECIMAL.
+- جميع العمليات الحساسة داخل PostgreSQL Transactions.
+- TypeScript = 0 errors.
+- Runtime SQL = 0 errors.
+- 0 White Screens.
+==================================================
+1. الهدف
+==================================================
+إنشاء نظام متكامل لإدارة:
+- الأجور الشهرية
+- الراتب الأساسي
+- المنح
+- التعويضات
+- الساعات الإضافية
+- الغيابات
+- التأخرات
+- العطل غير المدفوعة
+- الاقتطاعات
+- السلف
+- القروض
+- المكافآت
+- التسويات
+- كشوف الرواتب
+- أوامر الدفع
+- التحويلات البنكية
+- التقارير المالية للموظفين
+- تاريخ الرواتب
+==================================================
+2. مصدر البيانات
+==================================================
+Payroll يجب أن يقرأ تلقائيًا من:
+- employees
+- employee_contracts
+- attendance_records
+- absence_records
+- leave_requests
+- overtime_records
+- late_records
+- employee_assignments
+- employee_positions
+لا تسمح بإدخال الراتب من Frontend فقط دون Validation Backend.
+==================================================
+3. الجداول
+==================================================
+أنشئ أو أكمل:
+payroll_periods
+payroll_runs
+payroll_employee_runs
+payroll_salary_components
+payroll_employee_components
+payroll_earnings
+payroll_deductions
+payroll_overtime_lines
+payroll_absence_lines
+payroll_advances
+payroll_loans
+payroll_loan_installments
+payroll_bonuses
+payroll_adjustments
+payroll_payslips
+payroll_payment_orders
+payroll_payment_order_items
+payroll_bank_exports
+payroll_settings
+payroll_tax_rules
+payroll_social_security_rules
+payroll_audit_events
+كل الجداول:
+- id UUID
+- siteId
+- createdAt
+- updatedAt
+- deletedAt
+- createdBy
+- updatedBy
+- version
+==================================================
+4. فترات الرواتب
+==================================================
+أنشئ Payroll Period:
+- month
+- year
+- startDate
+- endDate
+- paymentDate
+- status
+- siteId
+- notes
+الحالات:
+- draft
+- collecting_data
+- calculated
+- under_review
+- approved
+- locked
+- paid
+- cancelled
+ممنوع تعديل Period بعد locked إلا بصلاحية استثنائية مع Audit.
+==================================================
+5. مكونات الراتب
+==================================================
+أنشئ Salary Components مرنة.
+أنواع Earnings:
+- Salaire de base
+- Prime de garde
+- Prime de nuit
+- Prime de risque
+- Prime de responsabilité
+- Prime de rendement
+- Indemnité transport
+- Indemnité repas
+- Heures supplémentaires
+- Bonus
+- Rappel
+- Autre gain
+أنواع Deductions:
+- Absence
+- Retard
+- Congé sans solde
+- Avance
+- Prêt
+- Retenue disciplinaire
+- Retenue sociale
+- Impôt
+- Autre retenue
+كل Component تحتوي على:
+- code
+- name
+- type
+- calculationMethod
+- fixedAmount
+- percentage
+- taxable
+- socialSecurityApplicable
+- active
+- priority
+- effectiveFrom
+- effectiveTo
+==================================================
+6. Payroll Engine
+==================================================
+أنشئ Payroll Engine Server-side.
+لكل موظف احسب:
+- salaireBase
+- joursTravaillés
+- joursAbsence
+- joursCongéPayé
+- joursCongéSansSolde
+- minutesRetard
+- heuresSupplémentaires
+- gardes
+- primes
+- bonus
+- avances
+- prêts
+- retenues
+- salaireBrut
+- cotisations
+- impôts
+- salaireNet
+ممنوع استخدام Float JavaScript.
+استعمل NUMERIC/DECIMAL.
+أضف Rounding Rules واضحة وقابلة للإعداد.
+==================================================
+7. الحساب حسب الحضور
+==================================================
+اربط الحساب مع الحضور الحقيقي:
+- Check-in / Check-out
+- totalWorkedMinutes
+- overtimeMinutes
+- lateMinutes
+- absenceDays
+- unpaidLeaveDays
+- nightShifts
+- 12h / 24h guards
+قواعد الحساب يجب أن تكون قابلة للإعداد من Payroll Settings.
+==================================================
+8. Workflow Payroll Run
+==================================================
+Workflow:
+1. إنشاء Payroll Run
+2. Collect Data
+3. Validate Attendance
+4. Calculate
+5. Review Anomalies
+6. HR Approval
+7. Finance Approval
+8. Lock
+9. Generate Payslips
+10. Create Payment Order
+11. Mark Paid
+كل Transition:
+- Permission
+- User
+- Date
+- Comment
+- Audit
+==================================================
+9. Anomalies
+==================================================
+اعرض Anomalies قبل اعتماد الرواتب:
+- موظف بدون عقد نشط
+- راتب أساسي غير محدد
+- حضور ناقص
+- Check-out مفقود
+- ساعات إضافية غير معتمدة
+- غياب غير مصنف
+- Loan installment غير صالح
+- Salary component منتهي
+- Net salary سلبي
+- راتب مختلف بشكل كبير عن الشهر السابق
+ممنوع اعتماد Payroll Run مع Anomalies حرجة.
+==================================================
+10. السلف والقروض
+==================================================
+Advances:
+- employeeId
+- amount
+- requestDate
+- deductionPeriod
+- status
+- approvedBy
+- reason
+Loans:
+- employeeId
+- totalAmount
+- installmentAmount
+- numberOfInstallments
+- startPeriod
+- remainingAmount
+- status
+عند Payroll:
+- اقتطاع القسط تلقائيًا
+- تحديث remainingAmount
+- إغلاق القرض عند الصفر
+- Transaction كاملة
+==================================================
+11. Payslip
+==================================================
+أنشئ كشف راتب PDF احترافي:
+- شعار IRISSAM HOSPITAL
+- بيانات الموظف
+- Matricule
+- Fonction
+- Département
+- Période
+- Salaire de base
+- Gains
+- Retenues
+- Brut
+- Cotisations
+- Net à payer
+- Mode de paiement
+- QR Code أو Barcode
+- مكان توقيع RH
+- مكان توقيع Finance
+- Cachet
+دعم:
+- Français
+- العربية RTL
+- English
+Routes:
+GET /api/payroll/payslips/:id/pdf
+GET /api/payroll/employees/:employeeId/history
+GET /api/payroll/employees/:employeeId/annual-statement-pdf
+==================================================
+12. Payment Orders
+==================================================
+أنشئ:
+- Ordre de virement
+- Liste espèces
+- Chèque
+- Virement bancaire
+Payment Order يحتوي على:
+- number
+- payrollRunId
+- method
+- totalAmount
+- employeeCount
+- bank
+- status
+- approvedBy
+- paidAt
+الحالات:
+- draft
+- approved
+- sent_to_bank
+- partially_paid
+- paid
+- rejected
+==================================================
+13. Bank Export
+==================================================
+حضّر Export بنكي عام:
+- CSV
+- Excel
+- Fixed-width optional
+- employeeName
+- bankAccount
+- amount
+- reference
+لا تدّعي توافقًا رسميًا مع بنك معين دون Specification موثقة.
+==================================================
+14. Frontend
+==================================================
+أنشئ صفحات:
+- Dashboard Paie
+- Périodes
+- Payroll Runs
+- Calcul des salaires
+- Anomalies
+- Bulletins de paie
+- Avances
+- Prêts
+- Composants de salaire
+- Ordres de paiement
+- Paramètres
+- Rapports
+==================================================
+15. Dashboard Paie
+==================================================
+KPIs:
+- Masse salariale
+- Salaire brut total
+- Salaire net total
+- Primes
+- Heures supplémentaires
+- Retenues
+- Avances
+- Prêts
+- Employés payés
+- Employés non payés
+- Anomalies ouvertes
+- Variation vs mois précédent
+Charts:
+- Masse salariale mensuelle
+- Répartition par département
+- Gains vs retenues
+- Heures supplémentaires
+- Coût par catégorie personnel
+- Évolution salaire moyen
+==================================================
+16. Employee Detail
+==================================================
+داخل Employee Detail أضف Tabs:
+- Salaire
+- Bulletins
+- Avances
+- Prêts
+- Historique paie
+عرض:
+- Salaire base
+- Components actifs
+- Dernier net payé
+- Moyenne 6 mois
+- Solde avances
+- Solde prêts
+- Payslips PDF
+==================================================
+17. Permissions
+==================================================
+أضف:
+- payroll.view
+- payroll.dashboard.view
+- payroll.periods.view
+- payroll.periods.create
+- payroll.periods.update
+- payroll.runs.create
+- payroll.runs.calculate
+- payroll.runs.review
+- payroll.runs.hr_approve
+- payroll.runs.finance_approve
+- payroll.runs.lock
+- payroll.runs.mark_paid
+- payroll.payslips.view
+- payroll.payslips.print
+- payroll.components.view
+- payroll.components.manage
+- payroll.advances.view
+- payroll.advances.manage
+- payroll.loans.view
+- payroll.loans.manage
+- payroll.payment_orders.view
+- payroll.payment_orders.create
+- payroll.payment_orders.approve
+- payroll.bank_export
+- payroll.reports.view
+- payroll.settings.manage
+- payroll.view_sensitive
+الأدوار:
+- payroll_manager
+- payroll_officer
+- finance_manager
+- hr_manager
+- employee
+الموظف يرى كشفه فقط.
+==================================================
+18. Data Scope
+==================================================
+- Employee يرى بياناته فقط.
+- Manager لا يرى تفاصيل الرواتب إلا إذا عنده Permission.
+- HR يرى العقود والحضور.
+- Finance يرى الحسابات والأوامر.
+- Payroll Manager يرى كامل العملية.
+- Super Admin يرى الكل.
+==================================================
+19. Audit
+==================================================
+سجل:
+- إنشاء Period
+- تشغيل Calculation
+- تعديل Salary Component
+- إضافة Bonus
+- إضافة Deduction
+- اعتماد HR
+- اعتماد Finance
+- Lock Payroll
+- Generate Payslip
+- View Payslip
+- Print Payslip
+- Bank Export
+- Mark Paid
+- تعديل راتب
+- إضافة Advance
+- إضافة Loan
+- إلغاء Payroll
+==================================================
+20. Transactions & Locks
+==================================================
+استعمل Transaction وRow Locks في:
+- Payroll Calculation
+- Approval
+- Lock
+- Generate Payslips
+- Loan deductions
+- Advance deductions
+- Payment Order
+- Mark Paid
+منع:
+- Double Calculation
+- Double Payment
+- تعديل Payroll locked
+- Net salary سلبي
+- Loan over-deduction
+==================================================
+21. APIs
+==================================================
+أنشئ:
+/api/payroll/dashboard
+/api/payroll/periods
+/api/payroll/runs
+/api/payroll/runs/:id/collect
+/api/payroll/runs/:id/calculate
+/api/payroll/runs/:id/review
+/api/payroll/runs/:id/hr-approve
+/api/payroll/runs/:id/finance-approve
+/api/payroll/runs/:id/lock
+/api/payroll/runs/:id/generate-payslips
+/api/payroll/runs/:id/mark-paid
+/api/payroll/employees/:id
+/api/payroll/payslips
+/api/payroll/components
+/api/payroll/advances
+/api/payroll/loans
+/api/payroll/payment-orders
+/api/payroll/bank-export
+/api/payroll/reports
+/api/payroll/settings
+==================================================
+22. Responsive
+==================================================
+Mobile:
+- Tables → Cards
+- Modals → Bottom Sheets
+- Payslip Viewer → Full Screen
+- Tabs → ScrollableTabBar
+- Filters → Drawer
+- لا horizontal overflow
+- Safe Area كاملة
+==================================================
+23. Tests d’acceptation
+==================================================
+TEST A:
+إنشاء Period + Run
+→ يعمل.
+TEST B:
+موظف بدون عقد
+→ Anomaly critique.
+TEST C:
+حساب موظف مع overtime وabsence
+→ brut/net صحيحان.
+TEST D:
+Advance وLoan installment
+→ يقتطعان مرة واحدة فقط.
+TEST E:
+Net salary سلبي
+→ مرفوض.
+TEST F:
+HR approve ثم Finance approve
+→ workflow صحيح.
+TEST G:
+Lock
+→ أي تعديل بعده HTTP 409.
+TEST H:
+Generate Payslips
+→ PDF لكل موظف.
+TEST I:
+Double Payment
+→ ممنوع.
+TEST J:
+Employee يرى Payslip الخاص به فقط.
+TEST K:
+User بدون payroll.view_sensitive
+→ لا يرى راتب موظف آخر.
+TEST L:
+Bank export يعمل.
+TEST M:
+Dashboard KPIs صحيحة.
+TEST N:
+Mobile responsive يعمل.
+TEST O:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+==================================================
+24. Rapport final
+==================================================
+أعطني:
+- Migrations
+- الجداول
+- Payroll Engine
+- Rules
+- Endpoints
+- Permissions
+- Pages
+- Payslip PDF
+- Payment Orders
+- Tests A–O
+- Placeholders المتبقية
+- TypeScript = 0
+- Runtime SQL = 0
+- White Screens = 0
+لا تبدأ Portail Patient أو Mobile Apps قبل الموافقة على Payroll.

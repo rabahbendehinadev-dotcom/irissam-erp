@@ -35,6 +35,7 @@ import executiveDashboardRouter from "./executive-dashboard/index";
 import { requireAuth } from "../middleware/requireAuth";
 import { requirePermission } from "../middleware/requirePermission";
 import documentsRouter from "./documents/index";
+import payrollRouter    from "./payroll/index";
 import storageRouter from "./storage";
 
 const router: IRouter = Router();
@@ -84,6 +85,8 @@ router.use("/executive-dashboard", requireAuth, executiveDashboardRouter);
 router.use("/notifications",       notificationsRouter);
 // GED — Gestion Électronique des Documents
 router.use("/documents",           requireAuth, documentsRouter);
+// Paie / Payroll
+router.use("/payroll",             requireAuth, payrollRouter);
 // Object Storage (presigned upload URLs + file serving)
 router.use(storageRouter);
 

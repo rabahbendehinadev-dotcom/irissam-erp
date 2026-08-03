@@ -23,3 +23,4 @@
 - [Quality Module](quality-module.md) — migrations 019+020, 11 sub-routers, 12 frontend tabs, quality.* RBAC; roles table uses (name,display_name,description) — no is_active column
 - [Executive Dashboard](executive-dashboard.md) — migration 021, 11 sub-routes, 9 frontend tabs, 29 parallel KPI queries; requirePermission is named export; schema names differ (occupancy_beds, emergency_visits, employees, medical_batches, biomedical_work_orders)
 - [GED Module](ged-module.md) — migrations 022+023, 17 tables, GCS Object Storage, 8 sub-routes; permissions table has NO display_name; storage.ts needs inline safeParse (no zod); hooks from "react" not "preact/hooks"
+- [Payroll Module](payroll-module.md) — migrations 024+025, 11 sub-routers, 10 frontend tabs; sequence before table rule; all finance in NUMERIC via PG; import '@workspace/db'
