@@ -1,0 +1,764 @@
+درك نبدأو بـ Super Administration / Centre de contrôle du système. هذا هو الموديول اللي يخلّيك تراقب السيرفر، قاعدة البيانات، الجلسات، النسخ الاحتياطية، الأخطاء والأمان من مكان واحد.
+
+انسخ هذا البرومبت وابعثه لـ Replit:
+
+ابدأ الآن تطوير Module كامل خاص بـ:
+SUPER ADMINISTRATION / SYSTEM CONTROL CENTER
+داخل نظام IRISSAM HOSPITAL ERP.
+مهم جدًا:
+- لا تغيّر التصميم العام للنظام.
+- لا تبدأ أي Module آخر.
+- استعمل PostgreSQL الحقيقي والـAPI الحقيقي.
+- ممنوع Mock Data في Production.
+- هذا الموديول متاح فقط لـ:
+  - super_admin
+  - system_administrator
+  - مستخدمين عندهم Permissions صريحة.
+- لا تعرض Secrets أو Passwords أو Tokens كاملة داخل الواجهة.
+- جميع العمليات الحساسة تحتاج Confirmation واضحة.
+- العمليات الخطيرة تحتاج إعادة إدخال كلمة المرور أو Step-up Authentication.
+- دعم Français / العربية RTL / English.
+- Responsive كامل على Desktop / Tablet / Mobile / PWA.
+- جميع العمليات تسجل في Audit.
+- TypeScript = 0 errors.
+- Runtime SQL = 0 errors.
+- 0 White Screens.
+==================================================
+1. الهدف من الموديول
+==================================================
+إنشاء مركز تحكم مركزي لإدارة ومراقبة:
+- حالة النظام
+- حالة الـAPI
+- قاعدة PostgreSQL
+- Object Storage
+- Service Worker ونسخة التطبيق
+- الجلسات والمستخدمين المتصلين
+- Background Jobs
+- Scheduled Jobs
+- Notifications Queue
+- Email / SMTP
+- SMS
+- WhatsApp Integration
+- Backups
+- Restore
+- Logs
+- Audit Explorer
+- Security Center
+- API Keys
+- Webhooks
+- Feature Flags
+- Maintenance Mode
+- System Settings
+- Multi-site configuration
+- Health Monitoring
+- Error Monitoring
+- Rate Limiting
+- Database Migrations
+- Version Management
+==================================================
+2. صفحة System Overview
+==================================================
+أنشئ صفحة:
+/super-admin
+تحتوي على Dashboard مركزي.
+KPIs:
+- System Status
+- API Status
+- Database Status
+- Object Storage Status
+- SSE / Notifications Status
+- Active Users
+- Active Sessions
+- Requests per minute
+- Error rate
+- Average response time
+- Database connections
+- Storage usage
+- Failed jobs
+- Pending jobs
+- Last backup
+- Last successful migration
+- Current application version
+- Service Worker version
+- Security alerts
+الحالات:
+- Healthy
+- Degraded
+- Down
+- Maintenance
+- Unknown
+كل Card قابلة للضغط وتفتح تفاصيل Drill-down.
+==================================================
+3. Health Checks
+==================================================
+أنشئ Health Engine حقيقي.
+Endpoints:
+GET /api/system/health
+GET /api/system/health/database
+GET /api/system/health/storage
+GET /api/system/health/notifications
+GET /api/system/health/email
+GET /api/system/health/background-jobs
+كل Check يعرض:
+- status
+- checkedAt
+- responseTime
+- errorCode
+- message
+- dependencies
+- lastSuccessAt
+- lastFailureAt
+لا تعرض Connection String أو Secrets.
+==================================================
+4. Database Monitoring
+==================================================
+أنشئ صفحة:
+Database
+تعرض:
+- Database name
+- PostgreSQL version
+- Size
+- Connections active
+- Connections idle
+- Maximum connections
+- Long-running queries
+- Locks
+- Deadlocks
+- Slow queries
+- Tables sizes
+- Index usage
+- Missing indexes suggestions
+- Migrations applied
+- Pending migrations
+- Last vacuum
+- Last analyze
+Actions:
+- Refresh
+- Cancel long query بصلاحية خاصة
+- Run safe analyze
+- View migration history
+- Export health report
+ممنوع:
+- تنفيذ SQL حر من الواجهة.
+- DROP أو TRUNCATE من الواجهة.
+- عرض Database Password.
+==================================================
+5. Migration Center
+==================================================
+أنشئ إدارة Migrations:
+- Migration number
+- File
+- Applied at
+- Duration
+- Checksum
+- Status
+- Error
+- Applied by
+- Environment
+Actions:
+- Verify migrations
+- Dry run
+- Apply pending migration
+- View SQL read-only
+- Export report
+القواعد:
+- لا تعدّل Migration مطبقة.
+- كل Migration جديدة فقط.
+- Backup إجباري قبل Migration حساسة.
+- Lock لمنع تشغيل Migration مرتين.
+- Rollback فقط إذا Migration لديها خطة Rollback موثقة.
+==================================================
+6. Backups
+==================================================
+أنشئ صفحة:
+Backups & Restore
+أنواع النسخ:
+- PostgreSQL backup
+- Object Storage metadata backup
+- Configuration backup
+- Full system backup
+كل Backup يحتوي على:
+- backupNumber
+- type
+- startedAt
+- completedAt
+- size
+- status
+- storageLocation
+- checksum
+- retentionUntil
+- encrypted
+- initiatedBy
+- notes
+الحالات:
+- queued
+- running
+- completed
+- failed
+- expired
+- deleted
+Actions:
+- Create backup
+- Download manifest
+- Verify checksum
+- Restore test
+- Mark protected
+- Delete بعد Confirmation وصلاحية
+==================================================
+7. Restore Safety
+==================================================
+Restore عملية حساسة جدًا.
+المطلوب:
+- ممنوع Restore مباشر على Production بدون:
+  1. إعادة إدخال كلمة المرور.
+  2. Confirmation Phrase.
+  3. Backup حديث.
+  4. Maintenance Mode.
+  5. Permission system.restore.
+- إنشاء Restore Plan.
+- Dry-run Validation.
+- Check schema compatibility.
+- تسجيل كل خطوة في Audit.
+- منع Restore إذا يوجد Users نشطون إلا بصلاحية استثنائية.
+لا تنفذ Restore فعليًا تلقائيًا في هذه المرحلة إذا البيئة لا تسمح؛ حضّر Workflow وValidation وواجهة إدارة آمنة.
+==================================================
+8. Background Jobs & Scheduler
+==================================================
+أنشئ:
+Jobs Monitor
+يشمل:
+- Notifications jobs
+- Email jobs
+- SMS jobs
+- PDF generation
+- Reports
+- Insurance alerts
+- Contract expiration alerts
+- Document retention jobs
+- Payroll jobs
+- Backup jobs
+- Cleanup jobs
+كل Job:
+- id
+- type
+- status
+- priority
+- attempts
+- maxAttempts
+- scheduledAt
+- startedAt
+- completedAt
+- failedAt
+- errorMessage
+- payload summary بدون بيانات حساسة
+- createdBy
+Actions:
+- Retry
+- Cancel
+- View logs
+- Pause queue
+- Resume queue
+الحالات:
+- pending
+- scheduled
+- running
+- completed
+- failed
+- cancelled
+- retrying
+==================================================
+9. Logs Explorer
+==================================================
+أنشئ صفحة:
+System Logs
+أنواع Logs:
+- Application
+- API
+- Authentication
+- Security
+- Database
+- Background Jobs
+- Notifications
+- Audit
+- Integrations
+- PWA
+- Deployment
+الفلاتر:
+- Level
+- Module
+- Date
+- User
+- Request ID
+- Status code
+- Environment
+مستويات:
+- debug
+- info
+- warning
+- error
+- critical
+مهم:
+- لا تعرض Passwords.
+- لا تعرض Tokens.
+- لا تعرض Cookies.
+- لا تعرض نصوص طبية كاملة.
+- طبق Redaction على البيانات الحساسة.
+- دعم Correlation ID لكل Request.
+==================================================
+10. Audit Explorer
+==================================================
+أنشئ Audit Explorer مركزي يعرض:
+- User
+- Role
+- Action
+- Module
+- Entity
+- PatientId عند الحاجة
+- EncounterId
+- Old value summary
+- New value summary
+- IP
+- Device
+- Date
+- Result
+- Failure reason
+الفلاتر:
+- User
+- Module
+- Action
+- Date range
+- Patient
+- Encounter
+- Site
+- Success / Failed
+Actions:
+- Export PDF
+- Export CSV
+- View details
+- Print
+كل مشاهدة Audit حساسة تسجل بدورها.
+==================================================
+11. User Sessions
+==================================================
+أنشئ صفحة:
+Active Sessions
+تعرض:
+- User
+- Role
+- Device
+- Browser
+- IP
+- Created at
+- Last activity
+- Current session
+- Site
+- Status
+Actions:
+- Revoke one session
+- Revoke all other sessions
+- Revoke all sessions for user
+- Block account
+- Require password reset
+ممنوع عرض Refresh Token.
+==================================================
+12. Security Center
+==================================================
+أنشئ Dashboard أمان يعرض:
+- Failed login attempts
+- Locked accounts
+- Suspicious IPs
+- Rate-limit events
+- Permission denied events
+- CSRF failures
+- Invalid tokens
+- Session revocations
+- Sensitive document access
+- Export attempts
+- Brute-force alerts
+Actions:
+- Unlock account
+- Suspend account
+- Revoke sessions
+- Block IP مؤقتًا
+- Add IP to allowlist
+- Require password change
+==================================================
+13. Rate Limiting
+==================================================
+أنشئ إدارة Policies:
+- Login
+- Refresh
+- Password reset
+- Patient search
+- Export
+- PDF generation
+- File downloads
+- API public endpoints
+- Admin endpoints
+كل Policy:
+- limit
+- window
+- role override
+- enabled
+- action on exceeded
+- alert threshold
+لا تسمح بتعطيل Rate Limit على Login في Production.
+==================================================
+14. API Keys
+==================================================
+أنشئ إدارة API Keys:
+- name
+- key prefix
+- hashedKey
+- scopes
+- siteId
+- expiresAt
+- lastUsedAt
+- createdBy
+- revokedAt
+- status
+القواعد:
+- المفتاح يظهر كامل مرة واحدة فقط عند الإنشاء.
+- يخزن Hashed.
+- يمكن Revocation.
+- Scopes دقيقة.
+- Rate limit لكل Key.
+- Audit لكل استعمال أو فشل.
+==================================================
+15. Webhooks
+==================================================
+أنشئ إدارة Webhooks:
+- name
+- endpointUrl
+- events
+- secret hashed/encrypted
+- active
+- retryPolicy
+- lastDeliveryAt
+- lastStatus
+- failureCount
+Events أمثلة:
+- patient.created
+- admission.created
+- lab.result.validated
+- invoice.paid
+- claim.approved
+- stock.low
+- employee.created
+أضف:
+- Test Webhook
+- Delivery Logs
+- Retry
+- Signature HMAC
+لا ترسل بيانات طبية حساسة إلا إذا Scope وConsent يسمحان.
+==================================================
+16. Integrations Settings
+==================================================
+أنشئ إعدادات:
+- SMTP
+- SMS Provider
+- WhatsApp Provider
+- Object Storage
+- PACS
+- HL7
+- FHIR
+- Badge Devices
+- Payment Gateway
+- CNAS / CASNOS API future
+كل Integration تعرض:
+- status
+- configured
+- lastTestAt
+- lastSuccessAt
+- lastError
+- environment
+Secrets:
+- مشفرة في Backend.
+- تظهر Masked.
+- لا ترجع للFrontend كاملة.
+- Test Connection endpoint آمن.
+==================================================
+17. Feature Flags
+==================================================
+أنشئ Feature Flags:
+- key
+- name
+- description
+- enabled
+- environment
+- siteId
+- rolloutPercentage
+- allowedRoles
+- updatedBy
+- updatedAt
+أمثلة:
+- portal_patient
+- portal_doctor
+- offline_editing
+- biometric_login
+- external_pacs
+- advanced_analytics
+- maintenance_mode
+كل تغيير يسجل Audit.
+==================================================
+18. Maintenance Mode
+==================================================
+أنشئ Maintenance Mode حقيقي.
+الحقول:
+- enabled
+- message
+- startAt
+- endAt
+- allowedRoles
+- allowedIPs
+- updatedBy
+عند التفعيل:
+- المستخدمون العاديون يشوفو صفحة Maintenance.
+- Super Admin يبقى يدخل.
+- Background jobs المهمة تستمر حسب Policy.
+- API ترجع 503 مع code:
+  SYSTEM_MAINTENANCE
+- لا تطرد المستخدم أثناء عملية طبية حساسة بدون Warning مسبق.
+==================================================
+19. Application Version
+==================================================
+اعرض:
+- Application version
+- Build ID
+- Git commit short hash إن توفر
+- Build date
+- Database migration version
+- Service Worker build ID
+- API version
+- Environment
+أضف Release Notes داخل النظام.
+==================================================
+20. System Settings
+==================================================
+أنشئ إدارة مركزية:
+- Hospital name
+- Logo
+- Address
+- Contact
+- Currency
+- Timezone
+- Date format
+- Default language
+- Patient MRN format
+- Encounter number format
+- Invoice number format
+- Admission number format
+- Backup retention
+- Session duration
+- Password policy
+- Notification settings
+- PWA settings
+استعمل Validation قوية.
+==================================================
+21. Multi-site Configuration
+==================================================
+أنشئ إدارة:
+- Sites
+- Buildings
+- Floors
+- Departments
+- Services
+- Rooms
+- Beds
+- Operating Rooms
+- ICU
+- Storage locations
+مع:
+- Activate / Suspend
+- Capacity
+- Responsible
+- Contact
+- Working hours
+منع حذف Entity مرتبطة ببيانات؛ استعمل Archive/Suspend.
+==================================================
+22. Permissions
+==================================================
+أضف Permissions:
+- system.view
+- system.health.view
+- system.database.view
+- system.database.manage
+- system.migrations.view
+- system.migrations.apply
+- system.backups.view
+- system.backups.create
+- system.backups.restore
+- system.jobs.view
+- system.jobs.retry
+- system.jobs.cancel
+- system.logs.view
+- system.audit.view
+- system.sessions.view
+- system.sessions.revoke
+- system.security.view
+- system.security.manage
+- system.api_keys.view
+- system.api_keys.create
+- system.api_keys.revoke
+- system.webhooks.view
+- system.webhooks.manage
+- system.integrations.view
+- system.integrations.manage
+- system.feature_flags.view
+- system.feature_flags.manage
+- system.maintenance.view
+- system.maintenance.manage
+- system.settings.view
+- system.settings.manage
+- system.release_notes.view
+كل Endpoint محمي في Backend.
+==================================================
+23. Step-up Authentication
+==================================================
+العمليات التالية تحتاج إعادة إدخال Password أو MFA:
+- Restore
+- Apply Migration
+- Revoke all sessions
+- Create API Key
+- Change Integration Secret
+- Enable Maintenance Mode
+- Delete Backup
+- Change Password Policy
+Token Step-up صالح لمدة قصيرة فقط.
+==================================================
+24. APIs
+==================================================
+أنشئ APIs منظمة:
+/api/system/overview
+/api/system/health
+/api/system/database
+/api/system/migrations
+/api/system/backups
+/api/system/backups/:id/verify
+/api/system/backups/:id/restore-plan
+/api/system/jobs
+/api/system/jobs/:id/retry
+/api/system/jobs/:id/cancel
+/api/system/logs
+/api/system/audit
+/api/system/sessions
+/api/system/sessions/:id/revoke
+/api/system/security
+/api/system/api-keys
+/api/system/webhooks
+/api/system/integrations
+/api/system/feature-flags
+/api/system/maintenance
+/api/system/version
+/api/system/settings
+/api/system/release-notes
+/api/system/step-up-auth
+==================================================
+25. Frontend
+==================================================
+أنشئ صفحة Super Administration تحتوي Tabs:
+- Overview
+- Health
+- Database
+- Migrations
+- Backups
+- Jobs
+- Logs
+- Audit
+- Sessions
+- Security
+- API Keys
+- Webhooks
+- Integrations
+- Feature Flags
+- Maintenance
+- Settings
+- Version & Releases
+استعمل:
+- ScrollableTabBar
+- Lazy Loading
+- PageErrorBoundary
+- Loading / Empty / Error
+- Responsive Cards
+- Bottom Sheets Mobile
+- Confirm Dialogs قوية
+==================================================
+26. Responsive
+==================================================
+Desktop:
+- جداول وCharts كاملة.
+- Split Views عند الحاجة.
+Mobile:
+- Cards بدل Tables.
+- Bottom Sheets.
+- Filters Drawer.
+- لا Horizontal Overflow.
+- Safe Area.
+- Actions الحساسة واضحة وصعبة الضغط بالخطأ.
+==================================================
+27. اختبارات القبول
+==================================================
+TEST A:
+System Overview يعرض Health حقيقي.
+TEST B:
+Database password لا يظهر في API أو UI.
+TEST C:
+User بدون system.database.view
+→ HTTP 403.
+TEST D:
+Revoke Session
+→ الجلسة تصبح invalid فورًا.
+TEST E:
+Create API Key
+→ المفتاح يظهر مرة واحدة فقط ويخزن Hashed.
+TEST F:
+Maintenance Mode
+→ مستخدم عادي يرى صفحة Maintenance.
+→ Super Admin يدخل.
+TEST G:
+Service Worker version تظهر.
+TEST H:
+Old caches لا تتسبب في نسخة قديمة.
+TEST I:
+Logs لا تحتوي Tokens أو Passwords.
+TEST J:
+Backup verification يعمل.
+TEST K:
+Restore يتطلب Step-up Authentication.
+TEST L:
+Apply Migration يتطلب Step-up Authentication.
+TEST M:
+Feature Flag يتغير ويُسجل في Audit.
+TEST N:
+Webhook HMAC signature صحيحة.
+TEST O:
+SMTP Test Connection لا يعرض Secret.
+TEST P:
+Mobile Responsive يعمل.
+TEST Q:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+==================================================
+28. التقرير النهائي
+==================================================
+بعد الانتهاء أعطني:
+- Migrations الجديدة.
+- الجداول.
+- Endpoints.
+- Permissions.
+- Health Checks.
+- Backup Strategy.
+- Job Engine.
+- Security Controls.
+- Step-up Authentication.
+- Secrets strategy.
+- Frontend pages.
+- نتائج TEST A–Q.
+- Placeholders المتبقية.
+- TypeScript = 0.
+- Runtime SQL = 0.
+- White Screens = 0.
+لا تبدأ Portail Patient أو Portail Médecin قبل الموافقة على Super Administration.
+
+خليه يبدأ بهذا الموديول فقط. بعد ما يكمل، ما نقبلوش مباشرة حتى يدير اختبار E2E للأمان، الجلسات، Maintenance Mode، Backup وAPI Keys.
