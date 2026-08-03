@@ -1,153 +1,143 @@
-import { createSignal, createResource, For, Show } from "solid-js";
-import { getCAPAs, createCAPA, advanceCAPA } from "@/services/api/quality";
+import { useState, useEffect } from "react";
+import { getCapas, createCapa, transitionCapa } from "@/services/api/quality";
 
 const STATUS_BADGE: Record<string,string> = {
-  ouverte:"bg-blue-100 text-blue-700", en_cours:"bg-amber-100 text-amber-700",
-  en_verification:"bg-indigo-100 text-indigo-700", efficace:"bg-emerald-100 text-emerald-700",
-  inefficace:"bg-red-100 text-red-700", annulee:"bg-gray-100 text-gray-500",
+  ouvert:"bg-blue-100 text-blue-700", en_cours:"bg-amber-100 text-amber-700",
+  valide:"bg-indigo-100 text-indigo-700", clos:"bg-emerald-100 text-emerald-700",
+  abandonne:"bg-gray-100 text-gray-500",
 };
-const NEXT_LABEL: Record<string,string> = {
-  ouverte:"Démarrer", en_cours:"Mettre en vérification", en_verification:"Valider efficace",
+const TYPE_BADGE: Record<string,string> = {
+  corrective:"bg-orange-100 text-orange-700", preventive:"bg-teal-100 text-teal-700",
+  amelioration:"bg-purple-100 text-purple-700",
+};
+const TRANSITIONS: Record<string,{action:string;label:string}> = {
+  ouvert:   { action:"start",    label:"Démarrer" },
+  en_cours: { action:"validate", label:"Valider" },
+  valide:   { action:"close",    label:"Clôturer" },
 };
 
 export default function CapaPage() {
-  const [page, setPage] = createSignal(1);
-  const [q, setQ] = createSignal("");
-  const [capaType, setCapaType] = createSignal<"corrective"|"preventive">("corrective");
-  const [statusF, setStatusF] = createSignal("");
-  const [overdue, setOverdue] = createSignal(false);
-  const [showCreate, setShowCreate] = createSignal(false);
-  const [form, setForm] = createSignal<Record<string,any>>({ capa_type:"corrective" });
+  const [page, setPage] = useState(1);
+  const [statusF, setStatusF] = useState("");
+  const [typeF, setTypeF] = useState("");
+  const [priorityF, setPriorityF] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState<Record<string,any>>({ type: "corrective", priority: "normale" });
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
 
-  const [data, { refetch }] = createResource(
-    () => ({ page: page(), q: q(), status: statusF(), capa_type: capaType(), overdue: overdue() ? "1" : "" }),
-    p => getCAPAs({ ...p, limit: 20 })
-  );
+  useEffect(() => {
+    setLoading(true);
+    getCapas({ page, status: statusF, type: typeF, priority: priorityF, limit: 20 })
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [page, statusF, typeF, priorityF, tick]);
 
-  const handleCreate = async (e: Event) => {
-    e.preventDefault();
-    try { await createCAPA(form()); setShowCreate(false); setForm({ capa_type:"corrective" }); refetch(); }
-    catch(err: any) { alert(err?.response?.data?.error ?? "Erreur"); }
-  };
-
-  const handleAdvance = async (capa: any) => {
-    if (!confirm(`Avancer "${capa.reference}" ?`)) return;
-    try { await advanceCAPA(capa.id, { capa_type: capa.capa_type }); refetch(); }
-    catch { alert("Erreur avancement"); }
-  };
-
+  const refetch = () => setTick(t => t + 1);
   const f = (k: string) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));
 
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try { await createCapa(form); setShowCreate(false); setForm({ type:"corrective", priority:"normale" }); refetch(); }
+    catch { alert("Erreur création CAPA"); }
+  };
+
+  const handleTransition = async (capa: any) => {
+    const tr = TRANSITIONS[capa.status]; if (!tr) return;
+    const notes = prompt(`Notes (${tr.label}) :`, ""); if (notes === null) return;
+    try { await transitionCapa(capa.id, tr.action, { notes }); refetch(); }
+    catch { alert("Erreur transition"); }
+  };
+
   return (
-    <div class="space-y-4">
-      {/* Type switcher */}
-      <div class="flex bg-gray-100 rounded-xl p-1 gap-1 max-w-sm">
-        {(["corrective","preventive"] as const).map(t => (
-          <button onClick={() => setCapaType(t)}
-            class={`flex-1 py-1.5 text-sm rounded-lg font-medium transition-all ${capaType()===t ? "bg-white shadow-sm text-indigo-700" : "text-gray-500 hover:text-gray-700"}`}>
-            {t === "corrective" ? "Corrective (CA)" : "Préventive (PA)"}
-          </button>
-        ))}
-      </div>
-
-      <div class="flex flex-col sm:flex-row gap-2">
-        <input type="search" placeholder="Rechercher CAPA…" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          value={q()} onInput={e => { setQ(e.currentTarget.value); setPage(1); }} />
-        <select class="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={statusF()} onChange={e => setStatusF(e.currentTarget.value)}>
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={statusF} onChange={e => setStatusF(e.target.value)}>
           <option value="">Tous statuts</option>
-          {["ouverte","en_cours","en_verification","efficace","inefficace","annulee"].map(s => <option value={s}>{s.replace(/_/g," ")}</option>)}
+          {["ouvert","en_cours","valide","clos","abandonne"].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <label class="flex items-center gap-2 px-3 py-2 border border-red-300 rounded-lg text-sm cursor-pointer">
-          <input type="checkbox" checked={overdue()} onChange={e => setOverdue(e.currentTarget.checked)} />
-          <span class="text-red-600 text-xs font-medium">En retard</span>
-        </label>
-        <button onClick={() => setShowCreate(true)} class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 whitespace-nowrap">
-          + Nouvelle CAPA
-        </button>
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={typeF} onChange={e => setTypeF(e.target.value)}>
+          <option value="">Tous types</option>
+          {["corrective","preventive","amelioration"].map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={priorityF} onChange={e => setPriorityF(e.target.value)}>
+          <option value="">Toutes priorités</option>
+          {["faible","normale","haute","critique"].map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <button onClick={() => setShowCreate(true)} className="ml-auto bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">+ Nouvelle CAPA</button>
       </div>
-
-      <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50 border-b">
-              <tr>
-                {["Référence","Titre","Type","Statut","Responsable","Échéance","Coût est.","Action"].map(h =>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>)}
-              </tr>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>{["N°","Titre","Type","Priorité","Statut","Responsable","Date limite","Actions"].map(h =>
+                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>)}</tr>
             </thead>
-            <tbody class="divide-y divide-gray-50">
-              <Show when={data.loading}><tr><td colspan="8" class="text-center py-10 text-gray-400">Chargement…</td></tr></Show>
-              <Show when={!data.loading && !data()?.data?.length}><tr><td colspan="8" class="text-center py-10 text-gray-400">Aucune CAPA</td></tr></Show>
-              <For each={data()?.data}>
-                {(capa: any) => {
-                  const isOverdue = capa.due_date && new Date(capa.due_date) < new Date()
-                    && !["efficace","inefficace","annulee"].includes(capa.status);
-                  return (
-                    <tr class={`hover:bg-gray-50 ${isOverdue ? "bg-red-50/30" : ""}`}>
-                      <td class="px-4 py-3 font-mono text-xs text-indigo-700 font-semibold">{capa.reference}</td>
-                      <td class="px-4 py-3 font-medium text-gray-900 text-sm max-w-xs truncate">{capa.title}</td>
-                      <td class="px-4 py-3"><span class={`px-2 py-0.5 rounded-full text-xs font-medium ${capa.capa_type==="corrective" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}`}>{capa.capa_type}</span></td>
-                      <td class="px-4 py-3"><span class={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[capa.status]??""}`}>{capa.status?.replace(/_/g," ")}</span></td>
-                      <td class="px-4 py-3 text-xs text-gray-600">{capa.responsible_name ?? "—"}</td>
-                      <td class={`px-4 py-3 text-xs ${isOverdue ? "text-red-600 font-bold" : "text-gray-500"}`}>{capa.due_date ? new Date(capa.due_date).toLocaleDateString("fr-DZ") : "—"}</td>
-                      <td class="px-4 py-3 text-xs text-gray-600">{capa.estimated_cost ? Number(capa.estimated_cost).toLocaleString("fr-DZ")+" DA" : "—"}</td>
-                      <td class="px-4 py-3">
-                        <Show when={NEXT_LABEL[capa.status]}>
-                          <button onClick={() => handleAdvance(capa)} class="text-xs text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap">{NEXT_LABEL[capa.status]} →</button>
-                        </Show>
-                      </td>
-                    </tr>
-                  );
-                }}
-              </For>
+            <tbody className="divide-y divide-gray-50">
+              {loading && <tr><td colSpan={8} className="text-center py-10 text-gray-400">Chargement…</td></tr>}
+              {!loading && !data?.data?.length && <tr><td colSpan={8} className="text-center py-10 text-gray-400">Aucune CAPA</td></tr>}
+              {data?.data?.map((c: any) => {
+                const isOverdue = c.due_date && new Date(c.due_date) < new Date() && !["clos","abandonne"].includes(c.status);
+                return (
+                  <tr key={c.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-mono text-xs">{c.capa_number}</td>
+                    <td className="px-4 py-3 text-xs font-medium text-gray-900 max-w-48">{c.title}</td>
+                    <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[c.type]??""}`}>{c.type}</span></td>
+                    <td className="px-4 py-3 text-xs capitalize text-gray-600">{c.priority}</td>
+                    <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[c.status]??""}`}>{c.status}</span></td>
+                    <td className="px-4 py-3 text-xs text-gray-600">{c.responsible_name ?? "—"}</td>
+                    <td className={`px-4 py-3 text-xs ${isOverdue?"text-red-600 font-bold":"text-gray-500"}`}>{c.due_date ? new Date(c.due_date).toLocaleDateString("fr-DZ") : "—"}</td>
+                    <td className="px-4 py-3">{TRANSITIONS[c.status] && (
+                      <button onClick={() => handleTransition(c)} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">{TRANSITIONS[c.status].label} →</button>
+                    )}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-        <div class="flex items-center justify-between px-4 py-3 border-t text-xs text-gray-500">
-          <span>Total: {data()?.total ?? 0}</span>
-          <div class="flex gap-2">
-            <button disabled={page()===1} onClick={() => setPage(p=>p-1)} class="px-3 py-1 border rounded-lg disabled:opacity-40">Préc.</button>
-            <span>{page()}</span>
-            <button disabled={(data()?.total??0)<=page()*20} onClick={() => setPage(p=>p+1)} class="px-3 py-1 border rounded-lg disabled:opacity-40">Suiv.</button>
+        <div className="flex items-center justify-between px-4 py-3 border-t text-xs text-gray-500">
+          <span>Total: {data?.total ?? 0}</span>
+          <div className="flex gap-2">
+            <button disabled={page===1} onClick={() => setPage(p=>p-1)} className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40">Préc.</button>
+            <span>{page}</span>
+            <button disabled={(data?.total??0)<=page*20} onClick={() => setPage(p=>p+1)} className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40">Suiv.</button>
           </div>
         </div>
       </div>
-
-      <Show when={showCreate()}>
-        <div class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
-          <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between p-6 border-b">
-              <h2 class="text-lg font-semibold">Nouvelle CAPA</h2>
-              <button onClick={() => setShowCreate(false)} class="text-gray-400">✕</button>
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-lg font-semibold">Nouvelle CAPA</h2>
+              <button onClick={() => setShowCreate(false)} className="text-gray-400">✕</button>
             </div>
-            <form onSubmit={handleCreate} class="p-6 space-y-4">
-              <div><label class="text-xs font-medium text-gray-600">Titre *</label>
-                <input required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form().title ?? ""} onInput={f("title")} /></div>
-              <div class="grid grid-cols-2 gap-3">
-                <div><label class="text-xs font-medium text-gray-600">Type</label>
-                  <select class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form().capa_type ?? "corrective"} onChange={e => setForm(p=>({...p,capa_type:e.currentTarget.value}))}>
-                    <option value="corrective">Corrective</option>
-                    <option value="preventive">Préventive</option>
-                  </select></div>
-                <div><label class="text-xs font-medium text-gray-600">Échéance *</label>
-                  <input required type="date" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form().due_date ?? ""} onInput={f("due_date")} /></div>
-                <div><label class="text-xs font-medium text-gray-600">Responsable</label>
-                  <input class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form().responsible_name ?? ""} onInput={f("responsible_name")} /></div>
-                <div><label class="text-xs font-medium text-gray-600">Service</label>
-                  <input class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form().department ?? ""} onInput={f("department")} /></div>
-                <div class="col-span-2"><label class="text-xs font-medium text-gray-600">Coût estimé (DA)</label>
-                  <input type="number" min="0" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form().estimated_cost ?? ""} onInput={f("estimated_cost")} /></div>
+            <form onSubmit={handleCreate} className="p-6 space-y-4">
+              <div><label className="text-xs font-medium text-gray-600">Titre *</label>
+                <input required className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.title ?? ""} onChange={f("title")} /></div>
+              <div><label className="text-xs font-medium text-gray-600">Description du problème *</label>
+                <textarea required rows={3} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.problem_description ?? ""} onChange={f("problem_description")} /></div>
+              <div><label className="text-xs font-medium text-gray-600">Action planifiée</label>
+                <textarea rows={2} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.planned_action ?? ""} onChange={f("planned_action")} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs font-medium text-gray-600">Type</label>
+                  <select className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.type ?? "corrective"} onChange={e => setForm(p=>({...p,type:e.target.value}))}>
+                    {["corrective","preventive","amelioration"].map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                <div><label className="text-xs font-medium text-gray-600">Priorité</label>
+                  <select className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.priority ?? "normale"} onChange={e => setForm(p=>({...p,priority:e.target.value}))}>
+                    {["faible","normale","haute","critique"].map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                <div><label className="text-xs font-medium text-gray-600">Date limite</label>
+                  <input type="date" className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.due_date ?? ""} onChange={f("due_date")} /></div>
               </div>
-              <div><label class="text-xs font-medium text-gray-600">Description</label>
-                <textarea rows="3" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form().description ?? ""} onInput={f("description")} /></div>
-              <div class="flex justify-end gap-3">
-                <button type="button" onClick={() => setShowCreate(false)} class="px-4 py-2 text-sm border border-gray-300 rounded-lg">Annuler</button>
-                <button type="submit" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Créer</button>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg">Annuler</button>
+                <button type="submit" className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Créer CAPA</button>
               </div>
             </form>
           </div>
         </div>
-      </Show>
+      )}
     </div>
   );
 }

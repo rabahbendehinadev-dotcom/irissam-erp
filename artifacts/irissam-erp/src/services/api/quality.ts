@@ -1,4 +1,4 @@
-import apiClient from "@/lib/api-client";
+import { apiClient } from "@/lib/api-client";
 
 const BASE = "/quality";
 
@@ -123,3 +123,57 @@ export const createImprovement = (d: Record<string,any>) =>
   apiClient.post(`${BASE}/improvements`, d).then(r => r.data);
 export const updateImprovement = (id: string, d: Record<string,any>) =>
   apiClient.patch(`${BASE}/improvements/${id}`, d).then(r => r.data);
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+export const getQualityAnalytics = () =>
+  apiClient.get(`${BASE}/dashboard`).then(r => ({
+    ...r.data,
+    incident_trend:     r.data?.incidents_by_month ?? [],
+    nc_by_department:   r.data?.nc_by_type ?? [],
+    capa_effectiveness: r.data?.capa_by_status ?? [],
+    risk_distribution:  [],
+    audit_scores:       [],
+    indicator_summary:  {},
+    risk_matrix:        r.data?.risk_matrix ?? [],
+  }));
+
+// ── Component aliases ─────────────────────────────────────────────────────────
+export const getQualityIncidents   = getIncidents;
+export const createQualityIncident = createIncident;
+export const transitionQualityIncident = (id: string, _action: string, data?: Record<string,any>) =>
+  apiClient.post(`${BASE}/incidents/${id}/advance`, data ?? {}).then(r => r.data);
+
+export const getNonConformities  = getNCs;
+export const createNonConformity = createNC;
+export const transitionNC = (id: string, _action: string, data?: Record<string,any>) =>
+  apiClient.post(`${BASE}/non-conformities/${id}/advance`, data ?? {}).then(r => r.data);
+
+export const getCapas    = getCAPAs;
+export const createCapa  = createCAPA;
+export const transitionCapa = (id: string, _action: string, data?: Record<string,any>) =>
+  advanceCAPA(id, data ?? {});
+
+export const getRiskMatrix = getRiskHeatmap;
+
+export const transitionAudit = (id: string, action: string, data?: Record<string,any>) =>
+  apiClient.post(`${BASE}/audits/${id}/${action}`, data ?? {}).then(r => r.data);
+
+export const getQualityDocuments   = getDocuments;
+export const createQualityDocument = createDocument;
+export const publishQualityDocument = (id: string) => updateDocument(id, { status: "publie" });
+export const archiveQualityDocument = (id: string) => updateDocument(id, { status: "archive" });
+
+export const getIndicatorHistory  = getIndicatorValues;
+export const recordIndicatorValue = addIndicatorValue;
+
+export const createCommittee = (d: Record<string,any>) =>
+  apiClient.post(`${BASE}/meetings/committees`, d).then(r => r.data);
+export const closeMeeting = (id: string, data?: Record<string,any>) =>
+  addMinutes(id, data ?? {});
+
+export const getChecklistDetail = getChecklist;
+export const recordChecklistItem = (_checklistId: string, itemId: string, d: Record<string,any>) =>
+  updateChecklistItem(itemId, d);
+
+export const transitionImprovement = (id: string, action: string, data?: Record<string,any>) =>
+  apiClient.post(`${BASE}/improvements/${id}/${action}`, data ?? {}).then(r => r.data);

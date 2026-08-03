@@ -1,173 +1,223 @@
-import { createResource } from "solid-js";
-import { getQualityDashboard } from "@/services/api/quality";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, Legend, Cell, PieChart, Pie,
-} from "recharts";
+import { useState, useEffect } from "react";
+import { getQualityAnalytics } from "@/services/api/quality";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Cell } from "recharts";
 
-const COLORS = ["#6366F1","#10B981","#F59E0B","#EF4444","#8B5CF6","#06B6D4","#EC4899","#F97316"];
-const SEV_COLORS: Record<string,string> = {
-  mineur: "#10B981", modere: "#F59E0B", grave: "#EF4444", critique: "#7C3AED",
-};
+const COLORS = ["#6366F1","#10B981","#F59E0B","#EF4444","#8B5CF6","#EC4899","#06B6D4","#F97316"];
+
+function riskColor(score: number) {
+  if (score >= 15) return "#EF4444";
+  if (score >= 9)  return "#F97316";
+  if (score >= 5)  return "#F59E0B";
+  return "#10B981";
+}
 
 export default function QualityAnalyticsPage() {
-  const [data] = createResource(getQualityDashboard);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const incidentsByMonth = () => (data()?.incidentsByMonth ?? []).map((r: any) => ({
-    month: r.month, "Total": Number(r.total), "Graves/Critiques": Number(r.severe),
-  }));
-  const byType = () => (data()?.byType ?? []).map((r: any) => ({ name: r.name.replace(/_/g," "), value: Number(r.value) }));
-  const bySeverity = () => (data()?.bySeverity ?? []).map((r: any) => ({ name: r.name, value: Number(r.value) }));
-  const capaStatus = () => {
-    const raw: any[] = data()?.capaStatus ?? [];
-    const map: Record<string, any> = {};
-    raw.forEach(r => {
-      if (!map[r.status]) map[r.status] = { status: r.status.replace(/_/g," "), Corrective: 0, Préventive: 0 };
-      map[r.status][r.capa_type === "corrective" ? "Corrective" : "Préventive"] = Number(r.cnt);
+  useEffect(() => {
+    getQualityAnalytics()
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const incidentTrend    = data?.incident_trend ?? [];
+  const ncByDepartment   = data?.nc_by_department ?? [];
+  const capaEffectiveness= data?.capa_effectiveness ?? [];
+  const riskDistribution = data?.risk_distribution ?? [];
+  const auditScores      = data?.audit_scores ?? [];
+  const indicatorSummary = data?.indicator_summary ?? {};
+  const riskMatrix       = data?.risk_matrix ?? [];
+
+  const heatCells = Array.from({ length: 5 }, (_, pi) => {
+    const prob = 5 - pi;
+    return Array.from({ length: 5 }, (_, ii) => {
+      const impact = ii + 1;
+      const cell = riskMatrix.find((r: any) => Number(r.probability) === prob && Number(r.impact) === impact);
+      return { prob, impact, count: cell?.count ?? 0, score: prob * impact };
     });
-    return Object.values(map);
-  };
-  const heatmap = () => data()?.riskHeatmap ?? [];
-  const indicators = () => (data()?.indicators ?? []).filter((i: any) => i.last_value !== null).map((i: any) => ({
-    name: i.name.length > 20 ? i.name.slice(0,20)+"…" : i.name,
-    Valeur: Number(i.last_value),
-    Cible: i.target_value ? Number(i.target_value) : undefined,
-  }));
+  });
 
-  function heatColor(c: number) {
-    if (c >= 20) return "bg-red-600 text-white";
-    if (c >= 15) return "bg-red-400 text-white";
-    if (c >= 10) return "bg-orange-400 text-white";
-    if (c >= 5)  return "bg-yellow-300 text-gray-800";
-    return "bg-green-200 text-gray-700";
-  }
-
-  const heatCells = () => {
-    const map: Record<string, any> = {};
-    for (const r of heatmap()) { map[`${r.probability}-${r.impact}`] = r; }
-    return map;
-  };
+  if (loading) return (
+    <div className="flex items-center justify-center py-20 text-gray-400">
+      <div className="text-center"><div className="text-4xl mb-3">📊</div><p className="text-sm">Chargement des analytics qualité…</p></div>
+    </div>
+  );
 
   return (
-    <div class="space-y-6">
-      {/* Incidents trend */}
-      <div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-        <h3 class="text-sm font-semibold text-gray-700 mb-4">Tendance mensuelle des incidents (12 mois)</h3>
-        <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={incidentsByMonth()}>
-            <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip />
-            <Legend />
-            <Line type="monotone" dataKey="Total" stroke="#6366F1" strokeWidth={2} dot={{ r:3 }} />
-            <Line type="monotone" dataKey="Graves/Critiques" stroke="#EF4444" strokeWidth={2} dot={{ r:3 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+    <div className="space-y-6">
+      {/* Indicator KPI summary */}
+      {indicatorSummary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label:"Indicateurs actifs",    value: indicatorSummary.active ?? 0,     color:"text-indigo-600",  bg:"bg-indigo-50" },
+            { label:"En cible",              value: indicatorSummary.on_target ?? 0,   color:"text-emerald-600", bg:"bg-emerald-50" },
+            { label:"Hors cible",            value: indicatorSummary.off_target ?? 0,  color:"text-red-600",     bg:"bg-red-50" },
+            { label:"Sans données (30j)",    value: indicatorSummary.no_data ?? 0,     color:"text-gray-500",    bg:"bg-gray-50" },
+          ].map(k => (
+            <div key={k.label} className={`${k.bg} rounded-xl p-4`}>
+              <p className={`text-2xl font-bold ${k.color}`}>{k.value}</p>
+              <p className="text-xs text-gray-600 mt-0.5">{k.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* By type */}
-        <div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-          <h3 class="text-sm font-semibold text-gray-700 mb-4">Incidents par type (90j)</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={byType()} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
-                label={({ name, percent }: any) => `${name} ${(percent*100).toFixed(0)}%`}>
-                {byType().map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Pie>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Incident trend */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">Tendance incidents (12 mois)</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={incidentTrend.map((r: any) => ({
+              mois: `${r.month}/${String(r.year).slice(2)}`,
+              Incidents: r.count,
+              Clôturés: r.closed_count ?? 0,
+            }))}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+              <XAxis dataKey="mois" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip />
-            </PieChart>
+              <Line type="monotone" dataKey="Incidents" stroke="#EF4444" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="Clôturés" stroke="#10B981" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+            </LineChart>
           </ResponsiveContainer>
         </div>
 
-        {/* By severity */}
-        <div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-          <h3 class="text-sm font-semibold text-gray-700 mb-4">Incidents ouverts par sévérité</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={bySeverity()}>
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+        {/* NC by department */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">Non-conformités par service</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={ncByDepartment.map((r: any) => ({
+              service: r.department?.length > 14 ? r.department.slice(0,14)+"…" : (r.department ?? "N/A"),
+              NC: r.count,
+            }))}>
+              <XAxis dataKey="service" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="value" radius={[6,6,0,0]}>
-                {bySeverity().map((r: any, i: number) =>
-                  <Cell key={i} fill={SEV_COLORS[r.name] ?? COLORS[i % COLORS.length]} />)}
+              <Bar dataKey="NC" radius={[4,4,0,0]}>
+                {ncByDepartment.map((_: any, i: number) =>
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                )}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
+
+        {/* CAPA effectiveness */}
+        {capaEffectiveness.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Efficacité CAPA par type</h3>
+            <div className="space-y-3">
+              {capaEffectiveness.map((r: any) => {
+                const closed = Number(r.closed_count);
+                const total  = Number(r.total_count);
+                const pct    = total ? Math.round(closed / total * 100) : 0;
+                return (
+                  <div key={r.type} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 w-24 capitalize">{r.type}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-3">
+                      <div className={`h-3 rounded-full ${pct>=80?"bg-emerald-500":pct>=50?"bg-amber-500":"bg-red-500"}`}
+                        style={{ width:`${pct}%` }} />
+                    </div>
+                    <span className="text-xs font-bold text-gray-700 w-12 text-right">{pct}% ({closed}/{total})</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Risk distribution */}
+        {riskDistribution.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Distribution des risques par catégorie</h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={riskDistribution.map((r: any) => ({
+                catégorie: r.category,
+                Risques: r.count,
+                "Score moy.": Number(r.avg_score).toFixed(1),
+              }))}>
+                <XAxis dataKey="catégorie" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="Risques" radius={[4,4,0,0]}>
+                  {riskDistribution.map((r: any, i: number) =>
+                    <Cell key={i} fill={riskColor(Number(r.avg_score))} />
+                  )}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
-      {/* CAPA status */}
-      <div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-        <h3 class="text-sm font-semibold text-gray-700 mb-4">CAPA — répartition par statut</h3>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={capaStatus()}>
-            <XAxis dataKey="status" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="Corrective" fill="#6366F1" radius={[4,4,0,0]} stackId="a" />
-            <Bar dataKey="Préventive" fill="#10B981" radius={[4,4,0,0]} stackId="a" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Indicators bar */}
-      <div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-        <h3 class="text-sm font-semibold text-gray-700 mb-4">Indicateurs qualité — dernière valeur vs cible</h3>
-        <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={indicators()}>
-            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="Valeur" fill="#6366F1" radius={[4,4,0,0]} />
-            <Bar dataKey="Cible" fill="#10B981" radius={[4,4,0,0]} fillOpacity={0.5} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Risk heatmap full */}
-      <div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-        <h3 class="text-sm font-semibold text-gray-700 mb-4">Matrice des risques (heatmap 5×5)</h3>
-        <div class="flex gap-8 items-start">
-          <div>
-            <p class="text-xs text-gray-500 mb-2 text-center">← Impact →</p>
-            <table class="border-collapse text-xs">
-              <thead>
-                <tr>
-                  <th class="w-16 h-8 text-gray-400 text-right pr-2">P\I</th>
-                  {[1,2,3,4,5].map(i => <th class="w-14 h-8 text-center text-gray-500 font-semibold">{i}</th>)}
-                </tr>
+      {/* Audit scores */}
+      {auditScores.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Résultats des audits récents</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>{["Audit","Type","Service","Clôturé le","NC","Observations","Score"].map(h =>
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>)}</tr>
               </thead>
-              <tbody>
-                {[5,4,3,2,1].map(p => (
-                  <tr>
-                    <td class="text-right pr-2 text-gray-500 font-semibold">{p}</td>
-                    {[1,2,3,4,5].map(i => {
-                      const cell = heatCells()[`${p}-${i}`];
-                      const crit = p * i;
-                      return (
-                        <td class={`w-14 h-14 text-center rounded-md border-2 border-white ${heatColor(crit)} relative group`}>
-                          {cell ? (
-                            <div>
-                              <span class="font-bold text-lg">{cell.risk_count}</span>
-                              <span class="hidden group-hover:block absolute z-10 left-full top-0 ml-1 bg-gray-900 text-white text-xs rounded-lg px-2 py-1 w-40 whitespace-normal">
-                                {cell.risk_titles?.slice(0,3).join(", ")}
-                              </span>
-                            </div>
-                          ) : <span class="opacity-20">·</span>}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-gray-50">
+                {auditScores.map((a: any) => {
+                  const score = a.score ?? null;
+                  const sc = score !== null ? (score >= 80 ? "text-emerald-600" : score >= 60 ? "text-amber-600" : "text-red-600") : "text-gray-400";
+                  return (
+                    <tr key={a.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-xs font-medium text-gray-900">{a.title}</td>
+                      <td className="px-4 py-3 text-xs capitalize text-gray-600">{a.type}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{a.department ?? "—"}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{a.closed_at ? new Date(a.closed_at).toLocaleDateString("fr-DZ") : "—"}</td>
+                      <td className="px-4 py-3 text-xs text-center text-orange-600 font-semibold">{a.nc_count ?? 0}</td>
+                      <td className="px-4 py-3 text-xs text-center text-blue-600">{a.observations ?? 0}</td>
+                      <td className={`px-4 py-3 text-xs font-bold ${sc}`}>{score !== null ? `${score}/100` : "—"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-            <div class="flex gap-2 mt-3 text-xs text-gray-500 flex-wrap">
-              {[["≥20 — Inacceptable","bg-red-600"],["15–19 — Critique","bg-red-400"],["10–14 — Élevé","bg-orange-400"],["5–9 — Modéré","bg-yellow-300"],["<5 — Faible","bg-green-200"]].map(([l,c]) =>
-                <span class="flex items-center gap-1"><span class={`w-3 h-3 rounded-sm ${c}`}/>{l}</span>)}
-            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Risk heatmap */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Matrice des risques consolidée</h3>
+        <div className="overflow-x-auto">
+          <table className="text-xs border-collapse">
+            <thead>
+              <tr>
+                <th className="p-2 text-gray-400 font-normal">Prob ↓ / Impact →</th>
+                {["1-Mineur","2-Modéré","3-Majeur","4-Critique","5-Catastrophique"].map(h =>
+                  <th key={h} className="p-2 text-center text-gray-500 font-medium w-24">{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {heatCells.map((row, ri) => (
+                <tr key={ri}>
+                  <td className="p-2 text-center font-medium text-gray-500">{5-ri}</td>
+                  {row.map(cell => (
+                    <td key={cell.impact} className={`p-3 text-center font-bold rounded m-0.5 ${
+                      cell.score>=15 ? "bg-red-500 text-white" :
+                      cell.score>=9  ? "bg-orange-400 text-white" :
+                      cell.score>=5  ? "bg-amber-300 text-gray-900" :
+                      "bg-emerald-200 text-gray-900"
+                    }`}>
+                      {cell.count || "—"}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="flex gap-4 mt-3 text-xs">
+            <span className="flex items-center gap-1"><span className="w-4 h-3 bg-emerald-200 rounded inline-block"/> Faible (&lt;5)</span>
+            <span className="flex items-center gap-1"><span className="w-4 h-3 bg-amber-300 rounded inline-block"/> Modéré (5-8)</span>
+            <span className="flex items-center gap-1"><span className="w-4 h-3 bg-orange-400 rounded inline-block"/> Élevé (9-14)</span>
+            <span className="flex items-center gap-1"><span className="w-4 h-3 bg-red-500 rounded inline-block"/> Critique (≥15)</span>
           </div>
         </div>
       </div>

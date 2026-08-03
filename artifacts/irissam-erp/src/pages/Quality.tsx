@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import ScrollableTabBar from '@/components/ui/ScrollableTabBar';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import { useTranslation } from '@/i18n';
 
 const QualityDashboard       = lazy(() => import('@/components/quality/QualityDashboard'));

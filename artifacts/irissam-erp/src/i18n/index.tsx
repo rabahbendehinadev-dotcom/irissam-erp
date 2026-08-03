@@ -49,3 +49,7 @@ export function useLanguage() {
   }
   return context;
 }
+
+// Aliases used across the app
+export const useI18n = useLanguage;
+export const useTranslation = useLanguage;
