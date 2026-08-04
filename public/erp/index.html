@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <script>var __SW_BUILD_ID__="1785882881760";</script>
+
+    <meta charset="UTF-8" />
+    <!-- Viewport: no user-scale to prevent accidental zooms; viewport-fit=cover for iPhone notch -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+
+    <title>IRISSAM HOSPITAL ERP</title>
+    <meta name="description" content="Système de Gestion Hospitalière IRISSAM — Patients, Admissions, Consultations, Facturation." />
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!-- PWA / Theme -->
+    <meta name="theme-color" content="#1B2A4A" />
+    <meta name="background-color" content="#1B2A4A" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+
+    <!-- Apple / iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="IRISSAM ERP" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+
+    <!-- Android / Generic PWA -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="IRISSAM ERP" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="IRISSAM HOSPITAL ERP" />
+    <meta property="og:description" content="Système de Gestion Hospitalière" />
+    <meta property="og:type" content="website" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Service Worker registration + update detection -->
+    <script>
+      (function () {
+        if (!('serviceWorker' in navigator)) return;
+
+        // __SW_BUILD_ID__ is injected by the Vite swBuildIdPlugin at build time.
+        // In dev it is set by the same plugin via transformIndexHtml.
+        var buildId = (typeof __SW_BUILD_ID__ !== 'undefined' ? __SW_BUILD_ID__ : null) || '1';
+
+        // One-time reload guard: prevent infinite reload loops after controllerchange
+        var RELOAD_FLAG = 'sw_reloading';
+        if (sessionStorage.getItem(RELOAD_FLAG)) {
+          sessionStorage.removeItem(RELOAD_FLAG);
+        }
+
+        window.addEventListener('load', function () {
+          navigator.serviceWorker
+            .register('./sw.js?v=' + buildId, { scope: './' })
+            .then(function (reg) {
+              // ── Detect a new SW entering the "waiting" state ──────────────
+              function onNewWorkerReady(newWorker) {
+                newWorker.addEventListener('statechange', function () {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // A new version is ready — notify React
+                    window.dispatchEvent(
+                      new CustomEvent('sw-update-available', { detail: { registration: reg } })
+                    );
+                  }
+                });
+              }
+
+              if (reg.installing) {
+                onNewWorkerReady(reg.installing);
+              }
+              reg.addEventListener('updatefound', function () {
+                if (reg.installing) onNewWorkerReady(reg.installing);
+              });
+
+              // Periodically check for updates (every 60 s while page is open)
+              setInterval(function () { reg.update(); }, 60000);
+            })
+            .catch(function (err) {
+              console.warn('[SW] Registration failed', err);
+            });
+
+          // ── Reload once when the new SW takes control ─────────────────────
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            if (sessionStorage.getItem(RELOAD_FLAG)) return; // loop guard
+            sessionStorage.setItem(RELOAD_FLAG, '1');
+            window.location.reload();
+          });
+        });
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-BSlKisi8.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C9NcjQpl.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

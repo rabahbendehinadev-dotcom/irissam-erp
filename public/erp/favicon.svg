@@ -1,0 +1,10 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="180" height="180" rx="36" fill="#0e3460"/>
+  <!-- Heart shape left (teal) -->
+  <path d="M55 70 Q40 50 55 40 Q70 30 82 55 L90 75 L82 70 Q68 90 55 70Z" fill="#00b4d8"/>
+  <!-- Heart shape right (blue) -->
+  <path d="M125 70 Q140 50 125 40 Q110 30 98 55 L90 75 L98 70 Q112 90 125 70Z" fill="#1a5c8a"/>
+  <!-- Cross -->
+  <rect x="84" y="60" width="12" height="36" rx="3" fill="white"/>
+  <rect x="72" y="72" width="36" height="12" rx="3" fill="white"/>
+</svg>

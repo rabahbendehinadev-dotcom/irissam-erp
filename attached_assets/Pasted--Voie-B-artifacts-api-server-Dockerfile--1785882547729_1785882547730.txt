@@ -1,0 +1,61 @@
+أريد تنفيذ Voie B: تشغيل التطبيق كاملًا داخل حاوية واحدة من خلال artifacts/api-server/Dockerfile.
+
+الوضع الحالي:
+- Dokploy يبني artifacts/api-server/Dockerfile
+- Docker context هو جذر المشروع .
+- الـ API تعمل على VPS وتتصل بقاعدة البيانات
+- GET / يرجع 404 لأن Express يخدم فقط /api/*
+- الواجهتان موجودتان داخل:
+  artifacts/irissam-erp
+  artifacts/patient-portal
+
+المطلوب منك الآن تنفيذ التعديل فعليًا، وليس فقط شرح الحل:
+
+1. عدّل artifacts/api-server/Dockerfile حتى:
+   - يبني api-server
+   - يبني frontend الرئيسي artifacts/irissam-erp
+   - يبني patient portal إذا كان مطلوبًا في الإنتاج
+   - ينسخ ملفات dist الخاصة بالواجهات إلى runtime image
+
+2. عدّل Express حتى:
+   - تبقى جميع مسارات /api تعمل كما هي
+   - يتم تقديم ملفات frontend الرئيسية باستخدام express.static
+   - GET / يعيد index.html
+   - جميع React routes تعمل عند refresh باستخدام SPA fallback
+   - لا يتم اعتراض /api أو مسارات الملفات والـ storage
+   - يتم تقديم patient portal من المسار الصحيح حسب بنية المشروع الحالية
+
+3. افحص vite.config وpackage.json لكل workspace وحدد مسار dist الحقيقي، ولا تفترضه.
+
+4. اجعل PORT الافتراضي في الإنتاج 3001، مع احترام process.env.PORT.
+
+5. لا تغيّر:
+   - قاعدة البيانات
+   - migrations
+   - أسماء الجداول
+   - منطق المصادقة
+   - مسارات API
+   - التخزين المحلي الحالي
+
+6. لا تستخدم أي خدمة خاصة بـ Replit.
+
+7. شغّل الاختبارات التالية داخل Replit بعد التعديل:
+   - pnpm install
+   - build للـ API
+   - build للواجهة الرئيسية
+   - build للـ patient portal إن كان مستخدمًا
+   - تشغيل production محليًا
+   - curl -I http://127.0.0.1:3001/
+   - curl -I http://127.0.0.1:3001/api/health أو مسار health الصحيح
+   - اختبار refresh على route React غير /
+
+8. أصلح أي خطأ يظهر حتى تنجح الاختبارات.
+
+9. بعد النجاح:
+   - اعرض الملفات المعدلة
+   - اشرح باختصار سبب كل تعديل
+   - أعطني Dockerfile path النهائي
+   - Docker context النهائي
+   - Container port النهائي
+   - Environment variables المطلوبة في Dokploy
+   - لا تقم بعمل git push تلقائيًا، فقط حضّر التعديلات وانتظر موافقتي

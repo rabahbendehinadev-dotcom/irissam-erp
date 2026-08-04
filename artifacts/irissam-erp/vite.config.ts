@@ -3,7 +3,11 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, type Plugin } from 'vite';
 
-import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
+// runtimeErrorOverlay is a dev-only tool; skip in production builds
+const runtimeErrorOverlay =
+  process.env.NODE_ENV !== 'production'
+    ? (await import('@replit/vite-plugin-runtime-error-modal')).default
+    : () => ({ name: 'noop-runtime-error-overlay' });
 
 // ── SW build-ID plugin ────────────────────────────────────────────────────────
 // Injects `window.__SW_BUILD_ID__ = "TIMESTAMP"` into the HTML <head> so that
