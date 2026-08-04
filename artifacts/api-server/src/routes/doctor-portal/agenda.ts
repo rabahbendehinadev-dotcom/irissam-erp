@@ -42,7 +42,7 @@ router.get("/", requirePermission("doctor_portal.agenda.view"), async (req, res)
 router.patch("/:id/status", requirePermission("doctor_portal.agenda.view"), async (req, res) => {
   const doctorId = (req as AuthenticatedRequest).auth!.userId;
   const { status } = req.body as { status: string };
-  const allowed = ["confirmed","arrived","in_consultation","completed","absent","cancelled"];
+  const allowed = ["confirmed","arrived","in_consultation","in_progress","completed","absent","no_show","cancelled"];
   if (!allowed.includes(status)) {
     res.status(400).json({ message: "Statut invalide" });
     return;

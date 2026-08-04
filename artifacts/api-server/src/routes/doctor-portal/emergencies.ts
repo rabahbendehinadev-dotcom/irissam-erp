@@ -20,8 +20,8 @@ router.get("/", requirePermission("doctor_portal.emergencies.view"), async (req,
               p.mrn, p.date_of_birth, p.gender,
               p.allergies, p.chronic_diseases,
               (SELECT row_to_json(v) FROM (
-                SELECT heart_rate, blood_pressure_systolic, blood_pressure_diastolic,
-                       temperature, oxygen_saturation, respiratory_rate, recorded_at
+                SELECT heart_rate, blood_pressure, spo2,
+                       temperature, respiratory_rate, gcs, recorded_at
                 FROM emergency_vitals WHERE visit_id=ev.id
                 ORDER BY recorded_at DESC LIMIT 1
               ) v) AS latest_vitals
@@ -32,8 +32,8 @@ router.get("/", requirePermission("doctor_portal.emergencies.view"), async (req,
          AND ev.status NOT IN ('sorti','transfere','hospitalise','decede')
        ORDER BY
          CASE ev.priority
-           WHEN 'p1' THEN 1 WHEN 'p2' THEN 2 WHEN 'p3' THEN 3
-           WHEN 'p4' THEN 4 ELSE 5
+           WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3
+           WHEN 'P4' THEN 4 ELSE 5
          END, enc.opened_at ASC`,
       [doctorId]
     );
@@ -79,9 +79,9 @@ router.post("/:id/decision", requirePermission("doctor_portal.emergencies.decide
     await pool.query(
       `INSERT INTO audit_logs
          (module,action,user_id,user_name,user_role,patient_id,resource_id,resource_type,ip,severity,new_value)
-       VALUES ('emergencies','emergency_decision',$1,$2,$3,$4,$5,'emergency_visit',$6,'info',$7)`,
-      [auth.userId, `${auth.firstName ?? ""} ${auth.lastName ?? ""}`.trim(),
-       auth.role, visit.rows[0].patient_id, req.params.id, req.ip,
+       VALUES ('urgences','emergency_decision',$1,$2,$3,$4,$5,'emergency_visit',$6,'info',$7)`,
+      [auth.userId, auth.userId,   // user_name falls back to userId (name not in JWT payload middleware)
+       auth.role, visit.rows[0].patient_id, req.params.id, req.ip ?? "",
        JSON.stringify({ decision, motif, notes })]
     ).catch(() => {});
     res.json({ id: req.params.id, decision, status: newStatus });

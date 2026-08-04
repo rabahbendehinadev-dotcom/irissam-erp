@@ -18,7 +18,7 @@ const router = Router();
 function doctorCtx(req: AuthenticatedRequest) {
   return {
     id:   req.auth!.userId,
-    name: `${req.auth!.firstName ?? ""} ${req.auth!.lastName ?? ""}`.trim() || req.auth!.userId,
+    name: req.auth!.userId,   // firstName/lastName not in auth middleware payload; use userId as fallback
     role: req.auth!.role,
     ip:   req.ip ?? "",
     ua:   req.headers["user-agent"] ?? "",
@@ -61,11 +61,11 @@ router.post("/", requirePermission("doctor_portal.consultations.create"), async 
       `INSERT INTO consultations
          (number, patient_id, patient_name, patient_mpi, encounter_id,
           doctor_id, doctor_name, specialty, service_name,
-          reason, status, source_module, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'en_attente','doctor_portal',now(),now())
+          reason, status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'en_attente',now(),now())
        RETURNING *`,
       [number, patientId, patName, patMpi, encounterId,
-       doc.id, doc.name, specialty, serviceName ?? ""]
+       doc.id, doc.name, specialty, serviceName ?? "", reason]
     );
     await pool.query(
       `INSERT INTO audit_logs (module,action,user_id,user_name,user_role,patient_id,resource_id,resource_type,ip,severity)
@@ -196,6 +196,43 @@ router.post("/:id/sign", requirePermission("doctor_portal.consultations.sign"), 
     res.json({ id: req.params.id, signed: true, contentHash });
   } catch (err) {
     console.error("[dp/consultations/sign]", err);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+// POST /consultations/:id/addendum — create a separate addendum (original locked)
+router.post("/:id/addendum", requirePermission("doctor_portal.consultations.create"), async (req, res) => {
+  const doc = doctorCtx(req as AuthenticatedRequest);
+  const { content } = req.body as { content?: string };
+  if (!content) { res.status(400).json({ message: "content de l'addendum requis" }); return; }
+  try {
+    const orig = await pool.query(
+      `SELECT * FROM consultations WHERE id=$1 AND doctor_id=$2`,
+      [req.params.id, doc.id]
+    );
+    if (!orig.rowCount) { res.status(404).json({ message: "Consultation introuvable" }); return; }
+    const origRow = orig.rows[0] as Record<string, unknown>;
+    if (!origRow["locked_at"]) {
+      res.status(400).json({ message: "Signez d'abord la consultation avant d'ajouter un addendum" });
+      return;
+    }
+    // Create addendum as a clinical_note of type 'addendum' linked to same encounter/patient
+    const result = await pool.query(
+      `INSERT INTO clinical_notes
+         (patient_id, encounter_id, author_id, type, content, parent_note_id, status, created_at, updated_at)
+       VALUES ($1,$2,$3,'addendum',$4,NULL,'draft',now(),now())
+       RETURNING *`,
+      [origRow["patient_id"], origRow["encounter_id"], doc.id,
+       `[Addendum à ${req.params.id}]\n\n${content}`]
+    );
+    await pool.query(
+      `INSERT INTO audit_logs (module,action,user_id,user_name,user_role,patient_id,resource_id,resource_type,ip,severity)
+       VALUES ('consultations','create_addendum',$1,$2,$3,$4,$5,'clinical_note',$6,'info')`,
+      [doc.id, doc.name, doc.role, origRow["patient_id"], result.rows[0].id, doc.ip]
+    ).catch(() => {});
+    res.status(201).json({ addendum: result.rows[0], parentConsultationId: req.params.id });
+  } catch (err) {
+    console.error("[dp/consultations/addendum]", err);
     res.status(500).json({ message: "Erreur serveur" });
   }
 });

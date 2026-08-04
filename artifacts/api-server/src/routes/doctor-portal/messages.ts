@@ -45,7 +45,7 @@ router.post("/", requirePermission("doctor_portal.messages.use"), async (req, re
     return;
   }
   try {
-    const recipient = await pool.query(`SELECT id FROM users WHERE id=$1 AND is_active=true`, [recipientId]);
+    const recipient = await pool.query(`SELECT id FROM users WHERE id=$1 AND account_status='active' AND deleted_at IS NULL`, [recipientId]);
     if (!recipient.rowCount) { res.status(400).json({ message: "Destinataire introuvable" }); return; }
     const result = await pool.query(
       `INSERT INTO doctor_messages (sender_id, recipient_id, subject, body, patient_id, encounter_id)

@@ -27,7 +27,7 @@ router.post("/", requirePermission("doctor_portal.lab.create"), async (req, res)
       `INSERT INTO lab_orders
          (patient_id, encounter_id, patient_name, requested_by_id, requested_by_name,
           test, category, urgency, clinical_note, status, source_module, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'demandee','doctor_portal',now(),now())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'demandee','laboratoire',now(),now())
        RETURNING *`,
       [patientId, encounterId, patient.rows[0]?.full_name ?? "", auth.userId, doctorName,
        test, category ?? "biologie", urgency ?? "routine", clinicalNote ?? null]

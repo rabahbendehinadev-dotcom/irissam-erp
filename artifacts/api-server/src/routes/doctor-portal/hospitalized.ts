@@ -25,7 +25,7 @@ router.get("/", requirePermission("doctor_portal.hospitalized.view"), async (req
                      WHERE patient_id=p.id AND status IN ('validee','critique')
                      ORDER BY result_at DESC LIMIT 3) lo) AS recent_labs,
               (SELECT json_agg(rx ORDER BY rx.prescribed_at DESC)
-               FROM (SELECT id, drug, dosage, frequency, status
+               FROM (SELECT id, drug, dosage, frequency, status, prescribed_at
                      FROM prescriptions
                      WHERE patient_id=p.id AND status='prescrit' AND deleted_at IS NULL
                      LIMIT 5) rx) AS active_prescriptions

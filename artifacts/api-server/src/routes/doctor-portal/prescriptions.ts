@@ -30,7 +30,7 @@ router.post("/", requirePermission("doctor_portal.prescriptions.create"), async 
           prescribed_by_id, prescribed_by_name,
           drug, dosage, route, frequency, duration, notes,
           status, source_module, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'prescrit','doctor_portal',now(),now())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'prescrit','pharmacie',now(),now())
        RETURNING *`,
       [patientId, encounterId, patient.rows[0]?.full_name ?? "",
        auth.userId, doctorName,

@@ -1,0 +1,354 @@
+نفّذ الآن اختبار End-to-End كامل لـ Portail Médecin مع PostgreSQL والـAPI الحقيقية.
+
+ممنوع إضافة Features جديدة.
+المطلوب فقط اختبار وربط السيناريوهات السريرية، الصلاحيات، الـScope، الـSignature، والـPWA.
+
+==================================================
+1. حسابات الاختبار
+==================================================
+
+حضّر:
+
+- Doctor A
+- Doctor B
+- Medical Director
+- User عادي بدون doctor_portal.access
+- Patient A مرتبط بـDoctor A
+- Patient B مرتبط بـDoctor B
+- Patient C منوم تحت مسؤولية Doctor A
+- Emergency Patient Assigned لـDoctor A
+
+كل العلاقات تكون من الجداول الحقيقية:
+appointments / consultations / admissions / encounters / assignments.
+
+==================================================
+2. Auth وAccess
+==================================================
+
+TEST A:
+Doctor A يسجل الدخول
+→ /doctor-portal يفتح.
+
+TEST B:
+User بدون doctor_portal.access
+→ HTTP 403 + صفحة Access Denied.
+
+TEST C:
+Unauthenticated
+→ redirect إلى Login بدون Loop.
+
+TEST D:
+Logout
+→ Session وRefresh Token يبطلان.
+
+==================================================
+3. Scope وIDOR
+==================================================
+
+TEST E:
+Doctor A يفتح Patient A
+→ 200.
+
+TEST F:
+Doctor A يحاول فتح Patient B غير المرتبط به
+→ 403 أو 404.
+→ لا Data Leak.
+
+TEST G:
+Medical Director حسب صلاحياته
+→ يرى المرضى داخل Scope المسموح فقط.
+
+TEST H:
+تغيير patientId يدويًا في URL أو Request
+→ لا يتجاوز Scope.
+
+==================================================
+4. Agenda وPatients du jour
+==================================================
+
+TEST I:
+Appointment اليوم لـDoctor A
+→ يظهر في Agenda وPatients du jour.
+
+TEST J:
+Appointment لـDoctor B
+→ لا يظهر لـDoctor A.
+
+TEST K:
+Marquer arrivé
+→ status يتحدث في ERP وDoctor Portal.
+
+TEST L:
+Commencer consultation
+→ نفس patientId وappointmentId وencounterId الحقيقي.
+
+==================================================
+5. Consultation كاملة
+==================================================
+
+أنشئ Consultation لـPatient A:
+
+- motif
+- histoire maladie
+- examen clinique
+- constantes
+- diagnostic
+- plan thérapeutique
+- conseils
+
+اختبر:
+
+TEST M:
+Enregistrer brouillon
+→ draft محفوظ.
+
+TEST N:
+Finaliser
+→ status finalized.
+
+TEST O:
+Signer
+→ signedAt + signedBy + contentHash + lockedAt.
+
+TEST P:
+تعديل Consultation موقعة
+→ ممنوع.
+
+TEST Q:
+إنشاء Addendum
+→ سجل منفصل مربوط بالConsultation الأصلية.
+→ الأصل لا يتغير.
+
+==================================================
+6. Lab Order
+==================================================
+
+من نفس Encounter:
+
+- إنشاء Lab Order NFS
+- priority=STAT
+- clinical note
+
+TEST R:
+يظهر داخل Laboratory.
+
+TEST S:
+encounterId يطابق Encounter الحقيقي.
+
+TEST T:
+نتيجة Critical
+→ تظهر في Results Inbox وDashboard.
+
+TEST U:
+Acknowledge Critical
+→ acknowledgedAt + acknowledgedBy.
+→ لا تبقى كتنبيه غير مقروء.
+→ Audit مسجل.
+
+==================================================
+7. Imaging Order
+==================================================
+
+أنشئ Imaging Order:
+
+- modality
+- bodyPart
+- indication
+- priority
+
+TEST V:
+يظهر في Imaging.
+
+TEST W:
+Report interprété
+→ يظهر في Results Inbox.
+
+TEST X:
+الطبيب يفتح التقرير
+→ read/acknowledge مسجل.
+
+==================================================
+8. Prescription
+==================================================
+
+أنشئ Prescription:
+
+- medication
+- dose
+- route
+- frequency
+- duration
+- quantity
+- instructions
+
+TEST Y:
+Allergy conflict
+→ Warning واضح.
+
+TEST Z:
+Prescription unsigned
+→ لا تُعتبر جاهزة للصيدلية.
+
+TEST AA:
+Sign Prescription
+→ locked + visible to Pharmacy.
+
+TEST AB:
+Publier au Portail Patient حسب Permission
+→ تظهر للمريض.
+
+==================================================
+9. Hospitalisés
+==================================================
+
+TEST AC:
+Patient C المنوم تحت Doctor A
+→ يظهر في Hospitalisés.
+
+TEST AD:
+Patient منوم لطبيب آخر
+→ لا يظهر بدون Scope.
+
+TEST AE:
+Note de visite
+→ Clinical Note محفوظة وموقعة حسب workflow.
+
+TEST AF:
+Demande transfert أو sortie
+→ تظهر في Admissions/Hospitalisation مع نفس admissionId.
+
+==================================================
+10. Urgences
+==================================================
+
+TEST AG:
+Emergency Patient Assigned لـDoctor A
+→ يظهر.
+
+TEST AH:
+Prendre en charge
+→ assignment محفوظ.
+
+TEST AI:
+Decision Hospitalisation
+→ نفس Encounter.
+→ Admission created.
+→ Timeline + Audit.
+
+TEST AJ:
+Decision ICU أو Bloc
+→ نفس encounterId.
+→ لا Encounter وهمي.
+
+==================================================
+11. Tasks وMessages
+==================================================
+
+TEST AK:
+إنشاء Clinical Task
+→ يظهر للDoctor.
+
+TEST AL:
+Complete Task
+→ status completed.
+
+TEST AM:
+Task overdue
+→ Dashboard alert.
+
+TEST AN:
+Message داخلي
+→ يصل للجهة الصحيحة.
+→ لا يُكتب محتوى طبي كامل في Logs.
+
+==================================================
+12. Signature Security
+==================================================
+
+اختبر:
+
+- contentHash يتغير إذا تغير المحتوى.
+- Signed record locked.
+- Addendum فقط بعد التوقيع.
+- signature مرتبطة بـdoctorId/session/IP/device.
+- لا يمكن Doctor B توقيع سجل Doctor A بدون Permission.
+- Audit لكل Signature.
+
+==================================================
+13. Permissions
+==================================================
+
+اختبر:
+
+- doctor_portal.consultations.sign
+- doctor_portal.lab.create
+- doctor_portal.lab.acknowledge_critical
+- doctor_portal.imaging.create
+- doctor_portal.prescriptions.sign
+- doctor_portal.emergencies.decide
+- doctor_portal.portal_publish
+
+كل Permission ناقصة
+→ HTTP 403 قبل الوصول للService.
+
+==================================================
+14. Responsive وPWA
+==================================================
+
+اختبر:
+
+- Desktop 1366px
+- iPad
+- iPhone
+- Android
+- PWA standalone
+
+تحقق من:
+
+- Sidebar / Bottom Nav
+- Patient Workspace
+- Consultation Form
+- Results Inbox
+- Prescription Editor
+- Emergency Decision Modal
+- no horizontal overflow
+- no white screen
+- direct refresh
+- update banner
+- no medical API cache
+
+==================================================
+15. Performance
+==================================================
+
+تحقق من:
+
+- Dashboard أقل من 2 ثانية.
+- Patients du jour أقل من 2 ثانية.
+- Patient summary أقل من 2 ثانية.
+- لا N+1 Query واضحة.
+- Pagination تعمل.
+- SSE لا تنشئ connections مكررة.
+
+==================================================
+16. التقرير النهائي
+==================================================
+
+أعطني:
+
+- عدد الاختبارات.
+- عدد الناجحة والفاشلة.
+- الأخطاء المكتشفة.
+- الإصلاحات المطبقة.
+- نتائج Scope وIDOR.
+- نتائج Encounter preservation.
+- نتائج Signature Lock/Addendum.
+- نتائج Critical Result Acknowledgement.
+- نتائج Pharmacy/Lab/Imaging integration.
+- نتائج Mobile/PWA.
+- Response times.
+- TypeScript = 0.
+- Runtime SQL = 0.
+- White Screens = 0.
+- IDOR = 0.
+- Data Leaks = 0.

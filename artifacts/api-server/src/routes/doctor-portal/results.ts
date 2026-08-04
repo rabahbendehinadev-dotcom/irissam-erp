@@ -64,11 +64,11 @@ router.post("/:id/acknowledge", requirePermission("doctor_portal.lab.acknowledge
     await pool.query(
       `INSERT INTO audit_logs (module,action,user_id,user_name,user_role,patient_id,resource_id,resource_type,ip,severity)
        VALUES ($1,'acknowledge_critical_result',$2,$3,$4,$5,$6,$7,$8,'warning')`,
-      [table, auth.userId,
-       `${auth.firstName ?? ""} ${auth.lastName ?? ""}`.trim(),
+      [type === "imaging" ? "imagerie" : "laboratoire",
+       auth.userId, auth.userId,  // user_name falls back to userId if name not in token
        auth.role, result.rows[0].patient_id, req.params.id,
-       type === "imaging" ? "imaging_order" : "lab_order", req.ip]
-    ).catch(() => {});
+       type === "imaging" ? "imaging_order" : "lab_order", req.ip ?? ""]
+    ).catch(e => console.error("[dp/results/audit]", e.message));
     res.json({ id: req.params.id, acknowledged: true });
   } catch (err) {
     console.error("[dp/results/acknowledge]", err);
