@@ -1,7 +1,12 @@
 /**
  * Patient Portal Auth Middleware
- * Verifies the patient Bearer JWT and attaches req.patient to the request.
- * This is completely separate from the staff requireAuth middleware.
+ *
+ * Verifies the patient Bearer JWT and attaches req.patient.
+ * Handles both normal patient sessions and staff preview sessions.
+ *
+ * In preview mode (isPreview: true):
+ *   - GET requests are allowed (read-only view)
+ *   - POST / PATCH / PUT / DELETE → 403 PREVIEW_READ_ONLY
  */
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
@@ -10,12 +15,20 @@ export interface PatientJwtPayload {
   accountId: string;
   patientId: string;
   role: "patient";
+  isPreview?: boolean;
+  staffUserId?: string;
+  staffName?: string;
+  previewExpiresAt?: string;
 }
 
 export interface PatientRequest extends Request {
   patient?: {
     accountId: string;
     patientId: string;
+    isPreview: boolean;
+    staffUserId?: string;
+    staffName?: string;
+    previewExpiresAt?: string;
   };
 }
 
@@ -43,9 +56,23 @@ export function requirePatientAuth(
       res.status(403).json({ message: "Accès refusé.", code: "FORBIDDEN" });
       return;
     }
+
+    // Preview mode: block all write operations
+    if (payload.isPreview && !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+      res.status(403).json({
+        message: "Opération non autorisée en mode aperçu employé.",
+        code: "PREVIEW_READ_ONLY",
+      });
+      return;
+    }
+
     req.patient = {
       accountId: payload.accountId,
       patientId: payload.patientId,
+      isPreview: payload.isPreview ?? false,
+      staffUserId: payload.staffUserId,
+      staffName: payload.staffName,
+      previewExpiresAt: payload.previewExpiresAt,
     };
     next();
   } catch {

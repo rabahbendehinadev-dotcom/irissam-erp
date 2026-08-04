@@ -2,13 +2,22 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { api, setAccessToken, getAccessToken } from "@/lib/api";
 import type { PatientMe } from "@/lib/types";
 
+interface PreviewInfo {
+  staffName: string;
+  expiresAt: string;
+}
+
 interface AuthContextType {
   patient: PatientMe | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isPreview: boolean;
+  previewInfo: PreviewInfo | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
+  startPreview: (token: string, accountId: string) => Promise<void>;
+  exitPreview: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -16,6 +25,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [patient, setPatient] = useState<PatientMe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPreview, setIsPreview] = useState(false);
+  const [previewInfo, setPreviewInfo] = useState<PreviewInfo | null>(null);
 
   const refreshMe = useCallback(async () => {
     try {
@@ -42,6 +53,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // On mount, try to restore session via refresh cookie
   useEffect(() => {
+    // In preview mode, skip the refresh cookie flow — no cookie is available
+    if (window.location.pathname.includes("/preview")) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     refreshMe().finally(() => setIsLoading(false));
   }, [refreshMe]);
@@ -63,15 +79,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPatient(null);
   }, []);
 
+  const startPreview = useCallback(async (token: string, accountId: string) => {
+    const res = await fetch("/api/patient-portal/auth/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, accountId }),
+    });
+    if (!res.ok) {
+      throw new Error("Preview authentication failed");
+    }
+    const data: { previewJwt: string; patientId: string; staffName: string; expiresAt: string } = await res.json();
+    setAccessToken(data.previewJwt);
+    // Fetch patient data using the preview JWT
+    const me = await api.get<{ patient: PatientMe }>("/auth/me");
+    setPatient(me.patient);
+    setIsPreview(true);
+    setPreviewInfo({ staffName: data.staffName, expiresAt: data.expiresAt });
+  }, []);
+
+  const exitPreview = useCallback(() => {
+    setAccessToken(null);
+    setPatient(null);
+    setIsPreview(false);
+    setPreviewInfo(null);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
         patient,
         isLoading,
         isAuthenticated: !!patient,
+        isPreview,
+        previewInfo,
         login,
         logout,
         refreshMe,
+        startPreview,
+        exitPreview,
       }}
     >
       {children}

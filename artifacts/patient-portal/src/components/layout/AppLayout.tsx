@@ -10,17 +10,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { PreviewBanner } from "@/components/layout/PreviewBanner";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { patient, isAuthenticated, isLoading, logout } = useAuth();
+  const { patient, isAuthenticated, isLoading, logout, isPreview } = useAuth();
   const [, setLocation] = useLocation();
   const { data: dashboardData } = useGetDashboard();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!isLoading && !isAuthenticated && !isPreview) {
       setLocation("/login");
     }
-  }, [isLoading, isAuthenticated, setLocation]);
+  }, [isLoading, isAuthenticated, isPreview, setLocation]);
 
   useEffect(() => {
     if (patient?.preferredLanguage === "ar") {
@@ -32,7 +33,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [patient?.preferredLanguage]);
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || (!isAuthenticated && !isPreview)) {
     return <div className="min-h-screen flex items-center justify-center bg-background"><div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" /></div>;
   }
 
@@ -65,7 +66,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background">
+    <div className={`min-h-[100dvh] flex flex-col md:flex-row bg-background${isPreview ? " pt-10" : ""}`}>
+      <PreviewBanner />
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-72 bg-card border-e border-border h-screen sticky top-0 z-20">
         <div className="p-6 pb-2">

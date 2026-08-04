@@ -468,40 +468,117 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
   }
 });
 
-// ── POST /generate-otp  (staff creates OTP for patient activation) ─────────────
-router.post("/generate-otp", async (req: Request, res: Response) => {
-  const { patientId, mrn, dateOfBirth, phone } = req.body ?? {};
+// ── POST /resend-activation  (patient self-service — safe resend) ─────────────
+// Requires: email + dateOfBirth challenge (not just MRN).
+// Never returns OTP in response (no provider configured yet).
+// Never reveals whether account exists (no enumeration).
+// Rate-limited: 3 attempts per 10 minutes per IP.
+const _resendRateMap = new Map<string, { count: number; resetAt: number }>();
+function _resendRateCheck(key: string): boolean {
+  const MAX = 3, WINDOW = 10 * 60 * 1000, now = Date.now();
+  const e = _resendRateMap.get(key);
+  if (!e || now > e.resetAt) { _resendRateMap.set(key, { count: 1, resetAt: now + WINDOW }); return true; }
+  if (e.count >= MAX) return false;
+  e.count++; return true;
+}
+
+router.post("/resend-activation", async (req: Request, res: Response) => {
+  const GENERIC = { message: "Si ce compte existe, un code d'activation a été enregistré." };
+  const { email, dateOfBirth } = req.body ?? {};
+
+  // Rate limit by IP
+  if (!_resendRateCheck(req.ip ?? "unknown")) {
+    res.status(429).json({ message: "Trop de tentatives. Réessayez dans 10 minutes." });
+    return;
+  }
+
+  if (!email || !dateOfBirth) { res.json(GENERIC); return; }
+
   try {
-    let pid = patientId;
-    if (!pid && mrn) {
-      const { rows } = await pool.query(
-        `SELECT id FROM patients WHERE mpi_id=$1 AND date_of_birth=$2::date
-           AND (phone=$3 OR phone_secondary=$3)`,
-        [mrn, dateOfBirth, phone],
-      );
-      pid = rows[0]?.id;
-    }
-    if (!pid) {
-      res.status(404).json({ message: "Patient introuvable." });
-      return;
-    }
-
-    const otp = generateOtp();
-    const exp = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
-
-    // Upsert portal account
-    await pool.query(
-      `INSERT INTO patient_portal_accounts (patient_id, otp_hash, otp_exp, otp_attempts)
-       VALUES ($1,$2,$3,0)
-       ON CONFLICT (patient_id)
-       DO UPDATE SET otp_hash=$2, otp_exp=$3, otp_attempts=0, updated_at=now()`,
-      [pid, hmacOtp(otp), exp],
+    const { rows } = await pool.query(
+      `SELECT ppa.id, ppa.patient_id, ppa.status
+       FROM patient_portal_accounts ppa
+       JOIN patients pt ON pt.id = ppa.patient_id
+       WHERE lower(ppa.email) = lower($1)
+         AND pt.date_of_birth = $2::date
+         AND ppa.deleted_at IS NULL
+         AND ppa.status = 'pending_activation'`,
+      [email, dateOfBirth],
     );
 
-    // In production: send OTP via SMS/Email
-    res.json({ otp, expiresAt: exp, message: "OTP généré." });
+    if (rows[0]) {
+      const otp = generateOtp();
+      const exp = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+      await pool.query(
+        `UPDATE patient_portal_accounts
+         SET otp_hash=$1, otp_exp=$2, otp_attempts=0, updated_at=now()
+         WHERE id=$3`,
+        [hmacOtp(otp), exp, rows[0].id],
+      );
+      // TODO: send via SMS/Email when provider configured
+      // await smsProvider.send(maskedPhone, otp);
+      await auditLog(rows[0].id, rows[0].patient_id, "resend_activation", req.ip, true);
+      // OTP intentionally NOT in response — delivery via provider only
+    }
+    // Always same response whether account found or not
+    res.json(GENERIC);
+  } catch {
+    res.json(GENERIC); // Never expose errors
+  }
+});
+
+// ── POST /preview  (validate staff preview token → read-only JWT) ──────────────
+// Called by the patient portal frontend when opened with a preview link.
+// Returns a short-lived JWT with isPreview:true that allows only GET requests.
+router.post("/preview", async (req: Request, res: Response) => {
+  const { token, accountId } = req.body ?? {};
+  if (!token || !accountId) {
+    res.status(400).json({ message: "token et accountId requis." });
+    return;
+  }
+  try {
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const { rows } = await pool.query(
+      `SELECT pt.id, pt.patient_id, pt.account_id, pt.staff_user_id, pt.expires_at,
+              u.first_name || ' ' || u.last_name AS staff_name
+       FROM portal_preview_tokens pt
+       JOIN users u ON u.id = pt.staff_user_id
+       WHERE pt.token_hash = $1
+         AND pt.account_id = $2
+         AND pt.used_at IS NULL
+         AND pt.expires_at > now()`,
+      [tokenHash, accountId],
+    );
+    if (!rows[0]) {
+      res.status(401).json({ message: "Token invalide, expiré ou déjà utilisé." });
+      return;
+    }
+    const { id: tokenId, patient_id, account_id, staff_user_id, staff_name, expires_at } = rows[0];
+
+    // Mark token as used (one-time)
+    await pool.query(`UPDATE portal_preview_tokens SET used_at=now() WHERE id=$1`, [tokenId]);
+
+    // Issue preview JWT (expires when token expires, max 5 min)
+    const ttlSeconds = Math.max(30, Math.floor((new Date(expires_at).getTime() - Date.now()) / 1000));
+    const previewJwt = jwt.sign(
+      { accountId: account_id, patientId: patient_id, role: "patient",
+        isPreview: true, staffUserId: staff_user_id, staffName: staff_name, previewExpiresAt: expires_at },
+      JWT_SECRET,
+      { expiresIn: `${ttlSeconds}s` },
+    );
+
+    await auditLog(account_id, patient_id, "preview_session_start", req.ip, true,
+      { staffUserId: staff_user_id, preview_mode: true });
+
+    res.json({
+      previewJwt,
+      patientId: patient_id,
+      staffName: staff_name,
+      expiresAt: expires_at,
+      banner: "Mode aperçu employé — lecture seule",
+    });
   } catch (err) {
-    console.error("[portal/generate-otp]", err);
+    console.error("[portal/preview]", err);
     res.status(500).json({ message: "Erreur serveur." });
   }
 });

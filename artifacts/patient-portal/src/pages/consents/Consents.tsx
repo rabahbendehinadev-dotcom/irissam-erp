@@ -1,4 +1,5 @@
 import { useGetConsents, useSignConsent, useRefuseConsent } from "@/hooks/use-portal-api";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ export default function Consents() {
   const { data, isLoading } = useGetConsents();
   const signConsent = useSignConsent();
   const refuseConsent = useRefuseConsent();
+  const { isPreview } = useAuth();
   
   const [selectedConsent, setSelectedConsent] = useState<any>(null);
   const [action, setAction] = useState<"sign"|"refuse"|null>(null);
@@ -56,8 +58,11 @@ export default function Consents() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end gap-2 pt-0">
-                  <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => { setSelectedConsent(c); setAction("refuse"); }}>Refuser</Button>
-                  <Button onClick={() => { setSelectedConsent(c); setAction("sign"); }}>Accepter et Signer</Button>
+                  {isPreview && (
+                    <p className="text-xs text-amber-700 mr-auto">Mode aperçu — lecture seule</p>
+                  )}
+                  <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => { setSelectedConsent(c); setAction("refuse"); }} disabled={isPreview}>Refuser</Button>
+                  <Button onClick={() => { setSelectedConsent(c); setAction("sign"); }} disabled={isPreview}>Accepter et Signer</Button>
                 </CardFooter>
               </Card>
             ))}
@@ -111,7 +116,7 @@ export default function Consents() {
             <Button 
               variant={action === "sign" ? "default" : "destructive"} 
               onClick={handleAction}
-              disabled={signConsent.isPending || refuseConsent.isPending}
+              disabled={signConsent.isPending || refuseConsent.isPending || isPreview}
             >
               {(signConsent.isPending || refuseConsent.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin"/>}
               Confirmer

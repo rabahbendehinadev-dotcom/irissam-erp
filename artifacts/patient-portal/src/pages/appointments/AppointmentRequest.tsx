@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useCreateAppointmentRequest } from "@/hooks/use-portal-api";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import { toast } from "sonner";
 export default function AppointmentRequest() {
   const [, setLocation] = useLocation();
   const createRequest = useCreateAppointmentRequest();
+  const { isPreview } = useAuth();
   
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -21,6 +23,14 @@ export default function AppointmentRequest() {
     preferredTime: "morning",
     reason: ""
   });
+
+  if (isPreview) return (
+    <div className="p-8 text-center">
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+        <p className="text-amber-800 font-medium">Mode aperçu — les demandes de rendez-vous ne sont pas disponibles.</p>
+      </div>
+    </div>
+  );
 
   const handleNext = () => setStep(s => s + 1);
   const handlePrev = () => setStep(s => s - 1);

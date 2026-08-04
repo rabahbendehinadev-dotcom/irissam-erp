@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useGetProfile, useUpdateProfile } from "@/hooks/use-portal-api";
+import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,6 +30,7 @@ const profileSchema = z.object({
 export default function Profile() {
   const { data, isLoading } = useGetProfile();
   const updateProfile = useUpdateProfile();
+  const { isPreview } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
 
   const form = useForm<z.infer<typeof profileSchema>>({
@@ -152,7 +154,7 @@ export default function Profile() {
               <CardDescription>Informations de contact et réglages de l'application</CardDescription>
             </div>
             {!isEditing && (
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>Modifier</Button>
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} disabled={isPreview}>Modifier</Button>
             )}
           </CardHeader>
           <CardContent>

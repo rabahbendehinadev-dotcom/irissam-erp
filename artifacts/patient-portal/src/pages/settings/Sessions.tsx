@@ -1,4 +1,5 @@
 import { useGetSessions, useRevokeSession } from "@/hooks/use-portal-api";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { toast } from "sonner";
 export default function Sessions() {
   const { data, isLoading } = useGetSessions();
   const revoke = useRevokeSession();
+  const { isPreview } = useAuth();
 
   if (isLoading) return <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
@@ -55,7 +57,7 @@ export default function Sessions() {
                   </div>
                 </div>
                 {!s.isCurrent && (
-                  <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleRevoke(s.id)} disabled={revoke.isPending}>
+                  <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleRevoke(s.id)} disabled={revoke.isPending || isPreview}>
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 )}

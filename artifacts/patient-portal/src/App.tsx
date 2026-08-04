@@ -7,6 +7,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 
 import AppLayout from '@/components/layout/AppLayout';
 import Login from '@/pages/auth/Login';
+import PreviewInit from '@/pages/auth/PreviewInit';
 import Activate from '@/pages/auth/Activate';
 import ForgotPassword from '@/pages/auth/ForgotPassword';
 import ResetPassword from '@/pages/auth/ResetPassword';
@@ -72,6 +73,7 @@ function Router() {
       <Route path="/activate" component={Activate} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/preview" component={PreviewInit} />
       
       {/* Fallback to protected layout for everything else */}
       <Route path="/:rest*">

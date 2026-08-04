@@ -7,7 +7,7 @@ import { apiClient } from '@/services/api/client';
 import { toast } from 'sonner';
 import { 
   Users, UserCheck, UserX, Clock, Search, Filter,
-  MoreVertical, ShieldAlert, Key, Ban, Unlock, ShieldCheck, Mail
+  MoreVertical, ShieldAlert, Key, Ban, Unlock, ShieldCheck, Mail, Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +57,7 @@ export default function PatientPortalAdmin() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createEmail, setCreateEmail] = useState('');
   const [createPatientId, setCreatePatientId] = useState('');
+  const [previewAccountId, setPreviewAccountId] = useState<string | null>(null);
 
   // Queries
   const { data: stats } = useQuery<PortalStats>({
@@ -106,6 +107,18 @@ export default function PatientPortalAdmin() {
       toast.success('Compte créé avec succès');
     },
     onError: (err: any) => toast.error(err.message || "Erreur création compte")
+  });
+
+  const previewMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      return apiClient.post<{ token: string }>(`/patient-portal-admin/accounts/${accountId}/preview-token`, {});
+    },
+    onSuccess: (data, accountId) => {
+      window.open('/patient-portal/preview?token=' + data.token + '&account_id=' + accountId, '_blank');
+      toast.success('Aperçu ouvert');
+      setPreviewAccountId(null);
+    },
+    onError: (err: any) => toast.error(err.message || "Erreur lors de l'ouverture de l'aperçu")
   });
 
   const handleAction = (id: string, action: string) => {
@@ -278,6 +291,12 @@ export default function PatientPortalAdmin() {
                             <DropdownMenuContent align="end" className="w-56">
                               <DropdownMenuLabel>Actions du compte</DropdownMenuLabel>
                               <DropdownMenuSeparator />
+                              {(acc.status === 'active' || acc.status === 'pending_activation') && (
+                                <DropdownMenuItem onClick={() => { setPreviewAccountId(acc.id); previewMutation.mutate(acc.id); }}>
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Voir comme patient
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => handleAction(acc.id, 'generate-otp')}>
                                 <Key className="w-4 h-4 mr-2" /> Générer OTP
                               </DropdownMenuItem>

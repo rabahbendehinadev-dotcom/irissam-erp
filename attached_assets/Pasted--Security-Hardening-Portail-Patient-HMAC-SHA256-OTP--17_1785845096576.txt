@@ -1,0 +1,232 @@
+ممتاز، Security Hardening تاع Portail Patient كمل مليح، وقرار HMAC-SHA256 مناسب لـOTP قصير المدة بشرط يبقى `SESSION_SECRET` قوي ومخزن في Environment فقط.
+
+درك الترتيب الصحيح هو:
+
+1. **#142 أولًا** — غلق أي Endpoint يقدر يولد OTP بلا Staff Authentication.
+2. **#143 ثانيًا** — واجهة Preview as Patient مع Banner واضح وRead-only.
+3. **#144 ثالثًا** — إرسال OTP عبر SMS/Email لما تجهز Providers.
+
+ابعثلو هذا البرومبت:
+
+```text
+ابدأ الآن Task #142 ثم #143 فقط.
+
+لا تبدأ SMS/Email Delivery الآن.
+
+==================================================
+TASK #142 — إزالة توليد OTP غير الموثق
+==================================================
+
+الهدف:
+منع أي Endpoint عام أو غير محمي من توليد OTP لحساب المريض.
+
+المطلوب:
+
+1. راجع جميع Endpoints التي تحتوي على:
+- generate-otp
+- activation-code
+- resend-otp
+- create-activation
+- reset-activation
+
+2. أي Endpoint يولد OTP يجب أن يكون واحدًا من حالتين فقط:
+
+A. Staff Admin Endpoint:
+- requireAuth
+- requirePermission('patient_portal.accounts.activate')
+- Data Scope على patient/site
+- Rate Limit
+- Audit
+
+B. Patient Self-Service Resend:
+- لا يولد OTP مباشرة من MRN فقط.
+- يتطلب Flow آمن:
+  - account identifier
+  - date of birth أو challenge مناسب
+  - generic response
+  - rate limit IP + account
+  - لا يكشف هل الحساب موجود أم لا
+  - OTP يرسل فقط إلى contact verified/masked
+- إذا SMS/Email Provider غير مفعّل:
+  - لا تعرض OTP في Response.
+  - أرجع رسالة عامة أن الطلب تم تسجيله.
+  - لا تولد Code قابلًا للعرض للعميل.
+
+3. احذف أو عطّل أي Endpoint عام يعيد OTP في JSON.
+
+4. OTP لا يظهر كاملًا إلا في Staff UI بعد Step-up أو Permission مناسبة، ومرة واحدة فقط، إذا سياسة المستشفى تسمح بالطباعة اليدوية.
+
+5. طبّق:
+- rate limit
+- brute-force controls
+- audit
+- generic errors
+- no account enumeration
+
+6. اختبارات:
+
+TEST A:
+طلب OTP من Endpoint عام غير موثق
+→ لا يعيد Code.
+
+TEST B:
+Staff بدون Permission
+→ 403.
+
+TEST C:
+Staff مع Permission
+→ يولد OTP ويظهر مرة واحدة فقط.
+
+TEST D:
+Self-service resend بدون Provider
+→ لا يعرض OTP.
+
+TEST E:
+محاولات كثيرة
+→ 429.
+
+TEST F:
+Logs وAudit لا تحتوي Code أو Hash.
+
+==================================================
+TASK #143 — Preview as Patient UI
+==================================================
+
+أنشئ واجهة آمنة لميزة:
+
+Voir comme patient
+
+داخل:
+- Patient Detail
+- Patient Portal Admin
+- Account Detail
+
+الزر يحتاج Permission:
+patient_portal.accounts.preview
+
+Workflow:
+
+1. Staff يضغط:
+   "Voir comme patient"
+
+2. تأكيد واضح:
+- المود قراءة فقط.
+- كل الوصول يسجل في Audit.
+- ممنوع تعديل بيانات المريض.
+- ممنوع إرسال رسائل أو طلب مواعيد أو توقيع Consent.
+
+3. POST:
+   /api/patient-portal-admin/accounts/:id/preview-token
+
+4. افتح Portal Preview في:
+- New Tab أو Route معزولة
+- token one-time لمدة 5 دقائق
+
+5. عند استعمال Token:
+- يتحول إلى Preview Session قصيرة.
+- مرتبطة بـ:
+  - staffUserId
+  - patientId
+  - originalStaffSessionId
+  - IP
+  - device
+- لا تتحول إلى Login حقيقي للمريض.
+
+6. أظهر Banner ثابت وواضح في كل صفحات Portal:
+
+"Mode aperçu employé — lecture seule"
+
+مع:
+- اسم الموظف
+- وقت انتهاء Preview
+- زر Quitter l’aperçu
+
+7. في Preview Mode عطّل Backend وFrontend لكل العمليات الكتابية:
+
+- Update profile
+- Appointment request
+- Cancel appointment
+- Send message
+- Sign consent
+- Revoke patient sessions
+- Change password
+- Upload insurance
+- أي POST/PATCH/DELETE خاص بالمريض
+
+Backend يجب أن يرجع:
+HTTP 403
+code: PREVIEW_READ_ONLY
+
+8. View/Download:
+- View مسموح حسب Staff Permission + Patient Scope.
+- Download documents الحساسة يحتاج Permission صريحة أو يبقى ممنوعًا في Preview.
+- كل View يسجل:
+  preview_mode=true
+  staffUserId
+  patientId
+  route
+  timestamp
+
+9. انتهاء Preview:
+- بعد 5 دقائق.
+- بعد استعمال token one-time.
+- عند Logout Staff.
+- عند Revoke Session.
+- زر Quitter يلغي Preview فورًا.
+
+10. ممنوع:
+- استعمال Cookies المريض الحقيقية.
+- تخزين Preview Token في localStorage.
+- مشاركة رابط Preview.
+- فتح Patient آخر بنفس Preview Session.
+
+11. اختبارات:
+
+TEST G:
+Preview Token صالح 5 دقائق وOne-time.
+
+TEST H:
+فتح Patient الصحيح فقط.
+
+TEST I:
+محاولة فتح Patient آخر
+→ 403.
+
+TEST J:
+أي عملية كتابة
+→ 403 PREVIEW_READ_ONLY.
+
+TEST K:
+Banner ظاهر في كل صفحات Portal.
+
+TEST L:
+Quitter l’aperçu يبطل الجلسة.
+
+TEST M:
+Staff Logout يبطل Preview.
+
+TEST N:
+Audit يسجل كل View مع preview_mode=true.
+
+TEST O:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+0 IDOR.
+0 Data Leaks.
+
+==================================================
+التقرير النهائي
+==================================================
+
+أعطني:
+
+- Endpoints العامة التي تم حذفها أو تأمينها.
+- Flow OTP النهائي.
+- صفحة ومكونات Preview الجديدة.
+- العمليات المحظورة في Preview.
+- نتائج TEST A–O.
+- ما بقي مؤجلًا لـSMS/Email.
+```
+
+بعد نجاح #142 و#143، نبدأ **Portail Médecin**.

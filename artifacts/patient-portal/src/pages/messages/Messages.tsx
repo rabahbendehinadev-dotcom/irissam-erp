@@ -1,4 +1,5 @@
 import { useGetMessages, useSendMessage, useCloseMessage } from "@/hooks/use-portal-api";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ export default function Messages() {
   const { data, isLoading } = useGetMessages();
   const sendMsg = useSendMessage();
   const closeMsg = useCloseMessage();
+  const { isPreview } = useAuth();
 
   const [openCompose, setOpenCompose] = useState(false);
   const [formData, setFormData] = useState({ type: "medical", subject: "", body: "" });
@@ -46,9 +48,12 @@ export default function Messages() {
           <h1 className="text-2xl font-bold tracking-tight">Messagerie Sécurisée</h1>
           <p className="text-muted-foreground">Échangez avec l'équipe médicale et administrative.</p>
         </div>
-        <Button onClick={() => setOpenCompose(true)}>
+        <Button onClick={() => setOpenCompose(true)} disabled={isPreview}>
           <Plus className="w-4 h-4 mr-2" /> Nouveau message
         </Button>
+        {isPreview && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-md">Mode aperçu — lecture seule</p>
+        )}
       </div>
 
       {messages.length === 0 ? (
@@ -96,7 +101,7 @@ export default function Messages() {
 
                 {msg.status === "open" && (
                   <div className="mt-4 flex justify-end">
-                    <Button variant="outline" size="sm" onClick={() => closeMsg.mutate(msg.id)}>
+                    <Button variant="outline" size="sm" onClick={() => closeMsg.mutate(msg.id)} disabled={isPreview}>
                       Clôturer la conversation
                     </Button>
                   </div>
@@ -134,7 +139,7 @@ export default function Messages() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenCompose(false)}>Annuler</Button>
-            <Button onClick={handleSend} disabled={sendMsg.isPending}>
+            <Button onClick={handleSend} disabled={sendMsg.isPending || isPreview}>
               {sendMsg.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : <Send className="w-4 h-4 mr-2" />}
               Envoyer
             </Button>

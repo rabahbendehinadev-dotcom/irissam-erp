@@ -3,7 +3,7 @@ import { apiClient } from '@/services/api/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Globe, UserCheck, ShieldAlert, Key, Ban, UserX, Clock, Unlock, Mail } from 'lucide-react';
+import { Globe, UserCheck, ShieldAlert, Key, Ban, UserX, Clock, Unlock, Mail, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ export function PatientPortalTab({ patientId, patientEmail }: { patientId: strin
   const [createEmail, setCreateEmail] = useState(patientEmail || '');
   const [createOpen, setCreateOpen] = useState(false);
   const [otpData, setOtpData] = useState<{ otp: string } | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const { data: account, isLoading } = useQuery({
     queryKey: ['portal-admin', 'by-patient', patientId],
@@ -37,6 +38,19 @@ export function PatientPortalTab({ patientId, patientEmail }: { patientId: strin
       }
     },
     onError: (err: any) => toast.error(err.message || "Erreur lors de l'action")
+  });
+
+  const previewMutation = useMutation({
+    mutationFn: async () => {
+      if (!account?.id) throw new Error('Pas de compte');
+      return apiClient.post<{ token: string }>(`/patient-portal-admin/accounts/${account.id}/preview-token`, {});
+    },
+    onSuccess: (data) => {
+      window.open('/patient-portal/preview?token=' + data.token + '&account_id=' + account.id, '_blank');
+      toast.success('Aperçu ouvert dans un nouvel onglet');
+      setPreviewOpen(false);
+    },
+    onError: () => toast.error("Erreur lors de l'ouverture de l'aperçu")
   });
 
   const createAccountMutation = useMutation({
@@ -182,6 +196,11 @@ export function PatientPortalTab({ patientId, patientEmail }: { patientId: strin
             <UserX className="w-4 h-4 mr-2" />
             Révoquer sessions
           </Button>
+
+          <Button variant="outline" onClick={() => setPreviewOpen(true)} className="gap-2">
+            <Eye className="w-4 h-4" />
+            Voir comme patient
+          </Button>
         </div>
       </div>
 
@@ -215,6 +234,32 @@ export function PatientPortalTab({ patientId, patientEmail }: { patientId: strin
           Ouvrir la gestion avancée du portail
         </Button>
       </div>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Voir comme patient</DialogTitle>
+            <DialogDescription>
+              Vous allez accéder au portail en mode lecture seule. Toutes les actions de modification sont bloquées et l'accès est enregistré dans l'audit.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm font-medium text-gray-700">Actions interdites :</p>
+            <ul className="text-sm text-gray-600 space-y-1 ml-4">
+              <li>❌ Modification des données patient</li>
+              <li>❌ Envoi de messages</li>
+              <li>❌ Signature de consentements</li>
+              <li>❌ Demande de rendez-vous</li>
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Annuler</Button>
+            <Button onClick={() => previewMutation.mutate()} disabled={previewMutation.isPending}>
+              {previewMutation.isPending ? 'Ouverture...' : "Ouvrir l'aperçu"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!otpData} onOpenChange={(o) => !o && setOtpData(null)}>
         <DialogContent className="sm:max-w-md text-center">
