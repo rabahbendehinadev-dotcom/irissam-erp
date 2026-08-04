@@ -20,6 +20,7 @@ import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { formatDate } from '@/utils/format';
+import { printDischargeSummary } from '@/utils/printDischargeSummary';
 import type { Admission, AdmissionTimelineEvent } from '@/types/admission';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -486,7 +487,10 @@ function DischargeSummaryTab({ admission }: { admission: Admission }) {
       <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-gray-800">Compte rendu de sortie</h3>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
+          <button
+            onClick={() => printDischargeSummary(admission)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
+          >
             <Printer size={14} /> Imprimer
           </button>
         </div>
