@@ -40,6 +40,7 @@ import storageRouter from "./storage";
 import systemRouter from "./system/index.js";
 import patientPortalRouter from "./patient-portal/index.js";
 import patientPortalAdminRouter from "./patient-portal-admin/index.js";
+import doctorPortalRouter from "./doctor-portal/index.js";
 import { maintenanceGuard } from "../middleware/maintenanceGuard.js";
 
 const router: IRouter = Router();
@@ -103,5 +104,7 @@ router.use("/system", systemRouter);
 router.use("/patient-portal", patientPortalRouter);
 // Patient Portal Admin (staff auth — publish/unpublish, account management)
 router.use("/patient-portal-admin", requireAuth, patientPortalAdminRouter);
+// Doctor Portal — separate layout/UX; auth + doctor_portal.access guard is inside the router
+router.use("/doctor-portal", doctorPortalRouter);
 
 export default router;

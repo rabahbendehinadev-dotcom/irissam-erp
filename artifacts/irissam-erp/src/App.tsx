@@ -47,6 +47,21 @@ const PayrollPage            = lazy(() => import('@/pages/Payroll'));
 const SuperAdminPage         = lazy(() => import('@/pages/SuperAdmin'));
 const PatientPortalAdminPage = lazy(() => import('@/pages/PatientPortalAdmin'));
 
+// Doctor Portal pages
+const DoctorPortalIndex    = lazy(() => import('@/pages/doctor-portal/DoctorPortalIndex'));
+const DoctorDashboard      = lazy(() => import('@/pages/doctor-portal/DoctorDashboard'));
+const DoctorAgenda         = lazy(() => import('@/pages/doctor-portal/DoctorAgenda'));
+const DoctorPatientsToday  = lazy(() => import('@/pages/doctor-portal/DoctorPatientsToday'));
+const DoctorMyPatients     = lazy(() => import('@/pages/doctor-portal/DoctorMyPatients'));
+const DoctorPatientWorkspace = lazy(() => import('@/pages/doctor-portal/DoctorPatientWorkspace'));
+const DoctorResults        = lazy(() => import('@/pages/doctor-portal/DoctorResults'));
+const DoctorHospitalized   = lazy(() => import('@/pages/doctor-portal/DoctorHospitalized'));
+const DoctorEmergencies    = lazy(() => import('@/pages/doctor-portal/DoctorEmergencies'));
+const DoctorPrescriptions  = lazy(() => import('@/pages/doctor-portal/DoctorPrescriptions'));
+const DoctorTasks          = lazy(() => import('@/pages/doctor-portal/DoctorTasks'));
+const DoctorMessages       = lazy(() => import('@/pages/doctor-portal/DoctorMessages'));
+const DoctorProfile        = lazy(() => import('@/pages/doctor-portal/DoctorProfile'));
+
 // ---------------------------------------------------------------------------
 // Loading skeleton shown while a lazy chunk is fetching
 // ---------------------------------------------------------------------------
@@ -127,6 +142,33 @@ function AuthLoadingScreen() {
   }
 
   return <FullPageSpinner />;
+}
+
+function DoctorLoadingSkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#0a2540] to-[#1a3a5c] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+        <p className="text-white/70 text-sm">Chargement du portail médecin…</p>
+      </div>
+    </div>
+  );
+}
+
+function DoctorProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  if (isLoading) return <AuthLoadingScreen />;
+  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (user?.forcePasswordChange) return <Redirect to="/change-password" />;
+  return (
+    <PageErrorBoundary>
+      <ChunkErrorBoundary>
+        <Suspense fallback={<DoctorLoadingSkeleton />}>
+          <Component />
+        </Suspense>
+      </ChunkErrorBoundary>
+    </PageErrorBoundary>
+  );
 }
 
 /** Wrapper that redirects unauthenticated users to /login.
@@ -222,6 +264,22 @@ function Router() {
       <Route path="/archives" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/reports" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
+
+      {/* Doctor Portal routes */}
+      <Route path="/doctor-portal/dashboard"      component={() => <DoctorProtectedRoute component={DoctorDashboard} />} />
+      <Route path="/doctor-portal/agenda"         component={() => <DoctorProtectedRoute component={DoctorAgenda} />} />
+      <Route path="/doctor-portal/patients-today" component={() => <DoctorProtectedRoute component={DoctorPatientsToday} />} />
+      <Route path="/doctor-portal/my-patients"    component={() => <DoctorProtectedRoute component={DoctorMyPatients} />} />
+      <Route path="/doctor-portal/patient/:id"    component={() => <DoctorProtectedRoute component={DoctorPatientWorkspace} />} />
+      <Route path="/doctor-portal/results"        component={() => <DoctorProtectedRoute component={DoctorResults} />} />
+      <Route path="/doctor-portal/hospitalized"   component={() => <DoctorProtectedRoute component={DoctorHospitalized} />} />
+      <Route path="/doctor-portal/emergencies"    component={() => <DoctorProtectedRoute component={DoctorEmergencies} />} />
+      <Route path="/doctor-portal/prescriptions"  component={() => <DoctorProtectedRoute component={DoctorPrescriptions} />} />
+      <Route path="/doctor-portal/tasks"          component={() => <DoctorProtectedRoute component={DoctorTasks} />} />
+      <Route path="/doctor-portal/messages"       component={() => <DoctorProtectedRoute component={DoctorMessages} />} />
+      <Route path="/doctor-portal/profile"        component={() => <DoctorProtectedRoute component={DoctorProfile} />} />
+      <Route path="/doctor-portal"                component={() => <DoctorProtectedRoute component={DoctorPortalIndex} />} />
+
       <Route component={() => (
         <ChunkErrorBoundary>
           <Suspense fallback={<FullPageSpinner />}>

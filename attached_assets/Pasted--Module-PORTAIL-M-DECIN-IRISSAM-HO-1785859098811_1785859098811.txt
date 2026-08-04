@@ -1,0 +1,961 @@
+ابدأ الآن تطوير Module مستقل وكامل خاص بـ:
+
+PORTAIL MÉDECIN — بوابة الطبيب
+
+داخل نظام IRISSAM HOSPITAL ERP.
+
+مهم جدًا:
+
+- لا تغيّر تصميم الـERP الإداري الحالي.
+- أنشئ واجهة منفصلة ومبسطة للطبيب.
+- استعمل PostgreSQL الحقيقي والـAPI الحقيقي.
+- ممنوع Mock Data.
+- استعمل نفس حسابات الموظفين الحالية، لكن بواجهة Doctor Portal مخصصة.
+- كل طبيب يرى فقط المرضى والبيانات المسموح بها حسب:
+  - Site
+  - Department
+  - Service
+  - Assignment
+  - Encounter
+  - Appointment
+  - Admission
+- دعم كامل:
+  - Français
+  - العربية RTL
+  - English
+- Responsive كامل على:
+  - iPhone
+  - Android
+  - Tablet
+  - Desktop
+  - PWA standalone
+- TypeScript = 0 errors.
+- Runtime SQL = 0 errors.
+- 0 White Screens.
+- جميع العمليات الطبية تسجل في Audit وTimeline.
+- لا تبدأ Nurse Station أو أي Module آخر قبل إكمال Portail Médecin.
+
+==================================================
+1. الهدف
+==================================================
+
+إنشاء بوابة يومية للطبيب تسمح له بـ:
+
+- رؤية جدول اليوم.
+- رؤية المرضى المنتظرين.
+- فتح ملف المريض بسرعة.
+- بدء Consultation.
+- متابعة المرضى المنومين.
+- متابعة مرضى الاستعجالات.
+- طلب تحاليل.
+- طلب أشعة.
+- كتابة وصفة.
+- مراجعة النتائج.
+- اعتماد القرارات الطبية.
+- توقيع الملاحظات والتقارير.
+- متابعة التنبيهات الحرجة.
+- كتابة ملاحظات سريرية.
+- الاطلاع على Timeline.
+- العمل من الهاتف والتابلت بسهولة.
+
+==================================================
+2. Architecture Auth
+==================================================
+
+لا تنشئ Auth منفصلًا جديدًا للطبيب.
+
+استعمل نظام الموظفين الحالي:
+
+- JWT
+- Refresh Token
+- Sessions
+- RBAC
+- Step-up عند الحاجة
+- Data Scope
+
+الدخول إلى Doctor Portal مسموح فقط للأدوار:
+
+- doctor
+- specialist
+- surgeon
+- anesthesiologist
+- radiologist
+- laboratory_doctor
+- medical_director
+- super_admin
+
+أضف Permission عامة:
+
+- doctor_portal.access
+
+إذا المستخدم لا يملك الصلاحية:
+→ HTTP 403
+→ لا يظهر الرابط في Sidebar أو User Menu.
+
+==================================================
+3. Route وLayout منفصل
+==================================================
+
+أنشئ Route:
+
+/doctor-portal
+
+وDoctorPortalLayout خاص بالطبيب.
+
+Desktop Sidebar:
+
+- Tableau de bord
+- Agenda
+- Patients du jour
+- Mes patients
+- Hospitalisés
+- Urgences
+- Consultations
+- Résultats
+- Ordonnances
+- Demandes
+- Messages
+- Notifications
+- Profil
+
+Mobile Bottom Navigation:
+
+- Accueil
+- Agenda
+- Patients
+- Résultats
+- Plus
+
+لا تستعمل Sidebar الإدارة داخل Doctor Portal.
+
+==================================================
+4. Dashboard Médecin
+==================================================
+
+أنشئ Dashboard تعرض:
+
+Cards:
+
+- Rendez-vous اليوم
+- Patients en attente
+- Consultations terminées
+- Résultats à valider
+- Résultats critiques
+- Patients hospitalisés
+- Urgences assignées
+- Ordonnances اليوم
+- Tâches en retard
+- Messages non lus
+
+Widgets:
+
+- Prochain patient
+- Liste d’attente
+- Résultats critiques
+- Patients à revoir
+- Dernières notifications
+- Hospitalisés sous ma responsabilité
+- Tâches cliniques ouvertes
+
+Quick Actions:
+
+- Nouvelle consultation
+- Demander analyse
+- Demander imagerie
+- Nouvelle ordonnance
+- Ajouter note clinique
+- Voir mes patients
+
+==================================================
+5. Agenda
+==================================================
+
+أنشئ صفحة Agenda للطبيب.
+
+Views:
+
+- Jour
+- Semaine
+- Mois
+- Liste
+
+تعرض:
+
+- Rendez-vous
+- Consultations
+- Gardes
+- Interventions bloc
+- Réunions
+- Astreintes
+
+كل موعد يعرض:
+
+- Patient
+- MRN
+- Motif
+- Heure
+- Service
+- Site
+- Statut
+- Priorité
+
+Actions:
+
+- Ouvrir patient
+- Commencer consultation
+- Marquer arrivé
+- Marquer absent
+- Reprogrammer
+- Annuler حسب الصلاحيات
+
+منع Double Booking حسب قواعد الـAppointments الحالية.
+
+==================================================
+6. Patients du jour
+==================================================
+
+أنشئ قائمة يومية تحتوي على:
+
+- Photo / Initiales
+- Patient
+- MRN
+- Heure
+- Motif
+- Priorité
+- Statut
+- Temps d’attente
+- Dernière visite
+- Alertes médicales
+- Actions
+
+Statuses:
+
+- prévu
+- arrivé
+- en attente
+- en consultation
+- terminé
+- absent
+- annulé
+
+Actions:
+
+- Ouvrir dossier
+- Commencer consultation
+- Voir antécédents
+- Voir allergies
+- Voir résultats
+- Prescrire
+
+==================================================
+7. Mes Patients
+==================================================
+
+يعرض فقط المرضى الذين:
+
+- عندهم Appointment مع الطبيب.
+- الطبيب مسؤول عن Encounter.
+- الطبيب مسؤول عن Admission.
+- الطبيب مشارك في الفريق الطبي.
+- الطبيب عنده Assignment رسمي.
+
+الفلاتر:
+
+- Site
+- Service
+- Statut
+- Date
+- Hospitalisé
+- Urgence
+- Suivi
+- Chronique
+
+ممنوع الطبيب يشوف كل المرضى بدون Scope مناسب.
+
+==================================================
+8. Patient Workspace
+==================================================
+
+أنشئ مساحة عمل سريعة داخل Doctor Portal.
+
+Header:
+
+- Nom complet
+- MRN
+- Age
+- Sexe
+- Groupe sanguin
+- Allergies
+- Pathologies chroniques
+- Encounter actif
+- Admission
+- Chambre / Lit
+- Alertes critiques
+
+Tabs:
+
+- Résumé
+- Antécédents
+- Allergies
+- Médicaments
+- Consultations
+- Résultats laboratoire
+- Imagerie
+- Ordonnances
+- Hospitalisations
+- Documents
+- Timeline
+- Notes
+- Audit حسب الصلاحية
+
+استعمل ScrollableTabBar.
+
+==================================================
+9. Consultation
+==================================================
+
+أنشئ Consultation Workspace مناسب للطبيب.
+
+Sections:
+
+- Motif
+- Histoire de la maladie
+- Examen clinique
+- Constantes
+- Diagnostic
+- Diagnostics différentiels
+- Plan thérapeutique
+- Examens demandés
+- Prescription
+- Conseils
+- Prochain rendez-vous
+
+Actions:
+
+- Enregistrer brouillon
+- Finaliser consultation
+- Signer
+- Imprimer résumé
+- Créer certificat
+- Demander hospitalisation
+- Orienter vers urgence
+- Demander avis spécialiste
+
+بعد Finalisation:
+
+- Encounter يتحدث.
+- Timeline تتحدث.
+- Audit يتسجل.
+- لا يمكن تعديل Consultation الموقعة إلا عبر Addendum.
+
+==================================================
+10. Signature médicale
+==================================================
+
+أضف Signature interne للطبيب:
+
+- doctorId
+- role
+- date
+- time
+- IP
+- device
+- contentHash
+- reason
+- signatureType
+
+أنواع:
+
+- validation
+- signature
+- visa
+- addendum
+
+لا تدّع أنها Signature قانونية خارجية معتمدة.
+
+بعد التوقيع:
+
+- المحتوى يصبح Locked.
+- أي تعديل لاحق يكون Addendum منفصل.
+- Audit كامل.
+
+==================================================
+11. Lab Orders
+==================================================
+
+من Doctor Portal يمكن:
+
+- إنشاء Lab Order.
+- اختيار Test أو Panel.
+- Priority:
+  - routine
+  - urgent
+  - STAT
+- إضافة Clinical Note.
+- اختيار Encounter الحالي.
+- متابعة status.
+- فتح النتيجة.
+- Acknowledge نتيجة حرجة.
+
+القواعد:
+
+- نفس patientId وencounterId.
+- ممنوع Order بدون Encounter حقيقي.
+- لا يمكن تعديل Order بعد Collect إلا بصلاحية خاصة.
+- نتيجة حرجة تظهر فورًا في Dashboard وNotifications.
+
+==================================================
+12. Imaging Orders
+==================================================
+
+يمكن للطبيب:
+
+- طلب فحص.
+- اختيار Modality.
+- Zone anatomique.
+- Indication clinique.
+- Priorité.
+- متابعة Scheduling.
+- فتح التقرير.
+- Acknowledge التقرير.
+- طلب Avis إضافي.
+
+لا يظهر PACS raw إلا حسب Permissions.
+
+==================================================
+13. Prescriptions
+==================================================
+
+أنشئ Prescription Editor احترافي.
+
+الحقول:
+
+- Médicament
+- Dose
+- Voie
+- Fréquence
+- Durée
+- Quantité
+- Instructions
+- Start date
+- PRN
+- Indication
+
+أضف Validation:
+
+- Allergies
+- Duplicates
+- Interactions foundation
+- Dose غير صالحة
+- Route غير مناسبة
+- Stock availability info فقط
+
+Actions:
+
+- Enregistrer
+- Signer
+- Imprimer
+- Publier au Portail Patient حسب Permission
+
+بعد التوقيع:
+- Locked.
+- Pharmacy تراها فورًا.
+- Timeline وAudit يتحدثان.
+
+==================================================
+14. Résultats
+==================================================
+
+أنشئ Inbox للنتائج:
+
+Tabs:
+
+- Nouveaux
+- Critiques
+- À valider
+- Lus
+- Laboratoire
+- Imagerie
+
+كل Result:
+
+- Patient
+- MRN
+- Test / Exam
+- Date
+- Priority
+- Status
+- Critical flag
+- Ordering physician
+- Actions
+
+Actions:
+
+- Ouvrir
+- Marquer comme lu
+- Acknowledge
+- Ajouter note
+- Contacter patient
+- Publier au portail حسب الصلاحية
+
+نتائج Critical:
+- لا تختفي حتى Acknowledgement.
+- تسجل doctorId ووقت القراءة.
+- Notification لا تتكرر بعد acknowledgement.
+
+==================================================
+15. Hospitalisés
+==================================================
+
+صفحة مرضى الطبيب المنومين تعرض:
+
+- Patient
+- Admission
+- Service
+- Chambre
+- Lit
+- Diagnostic
+- Jour d’hospitalisation
+- Dernières constantes
+- Dernier résultat
+- Traitement
+- Alertes
+- Plan du jour
+
+Actions:
+
+- Note de visite
+- Prescription
+- Lab
+- Imaging
+- Demande transfert
+- Demande sortie
+- Demande avis
+- Voir Timeline
+
+==================================================
+16. Urgences
+==================================================
+
+يعرض فقط:
+
+- الحالات Assigned للطبيب.
+- الحالات في Service الطبيب.
+- الحالات اللي طلبت Avis منه.
+
+كل بطاقة:
+
+- Patient
+- Priority
+- Temps d’attente
+- Motif
+- Vitals
+- Current step
+- Alerts
+- Encounter
+
+Actions:
+
+- Prendre en charge
+- Commencer consultation
+- Demander Lab
+- Demander Imaging
+- Prescrire
+- Décision:
+  - Sortie
+  - Hospitalisation
+  - ICU
+  - Bloc
+  - Transfert
+
+كل العمليات تستعمل نفس Encounter الحقيقي.
+
+==================================================
+17. Notes cliniques
+==================================================
+
+أنشئ Clinical Notes:
+
+Types:
+
+- Note de consultation
+- Note d’évolution
+- Note de visite
+- Note de garde
+- Avis spécialiste
+- Addendum
+- Résumé médical
+
+Fields:
+
+- patientId
+- encounterId
+- authorId
+- type
+- content
+- status
+- signedAt
+- lockedAt
+- version
+
+الحالات:
+
+- draft
+- signed
+- amended
+- cancelled
+
+ممنوع حذف Note موقعة.
+استعمل Addendum فقط.
+
+==================================================
+18. Tâches cliniques
+==================================================
+
+أنشئ Tasks:
+
+- Revoir résultat
+- Contacter patient
+- Refaire analyse
+- Contrôle postopératoire
+- Préparer sortie
+- Avis spécialiste
+- Renouveler prescription
+
+كل Task:
+
+- patientId
+- encounterId
+- assignedTo
+- dueAt
+- priority
+- status
+- notes
+
+الحالات:
+
+- open
+- in_progress
+- completed
+- overdue
+- cancelled
+
+==================================================
+19. Messages
+==================================================
+
+Messagerie داخلية للطبيب مع:
+
+- Infirmiers
+- Laboratoire
+- Imagerie
+- Pharmacie
+- Administration
+- Direction médicale
+
+لا تستعملها للاستعجالات.
+
+أضف Banner:
+
+“Pour une urgence vitale, utilisez le circuit d’urgence.”
+
+لا تسجل محتوى طبي حساس كامل في logs.
+
+==================================================
+20. Notifications
+==================================================
+
+Notifications عند:
+
+- Patient arrivé.
+- Résultat critique.
+- Rapport Imaging disponible.
+- Avis spécialiste مطلوب.
+- Admission جديدة.
+- Patient transféré.
+- Prescription délivrée.
+- Task overdue.
+- Message جديد.
+- Surgery scheduled.
+
+دعم:
+
+- In-app
+- SSE
+- Push PWA بعد الموافقة
+- Email foundation فقط
+
+==================================================
+21. Profil Médecin
+==================================================
+
+يعرض:
+
+- Nom
+- Spécialité
+- Numéro ordre
+- Site
+- Services
+- Horaires
+- Gardes
+- Signature
+- Devices
+- Sessions
+- Langue
+- Notification preferences
+
+Actions:
+
+- Modifier préférences
+- Changer mot de passe
+- Voir sessions
+- Révoquer session
+- Mettre à jour signature interne
+
+==================================================
+22. Permissions
+==================================================
+
+أضف Permissions:
+
+- doctor_portal.access
+- doctor_portal.dashboard.view
+- doctor_portal.agenda.view
+- doctor_portal.patients.view
+- doctor_portal.patient_detail.view
+- doctor_portal.consultations.create
+- doctor_portal.consultations.update
+- doctor_portal.consultations.finalize
+- doctor_portal.consultations.sign
+- doctor_portal.lab.create
+- doctor_portal.lab.view_results
+- doctor_portal.lab.acknowledge_critical
+- doctor_portal.imaging.create
+- doctor_portal.imaging.view_reports
+- doctor_portal.prescriptions.create
+- doctor_portal.prescriptions.sign
+- doctor_portal.notes.create
+- doctor_portal.notes.sign
+- doctor_portal.hospitalized.view
+- doctor_portal.emergencies.view
+- doctor_portal.emergencies.decide
+- doctor_portal.tasks.manage
+- doctor_portal.messages.use
+- doctor_portal.portal_publish
+- doctor_portal.audit.view
+
+كل Endpoint محمي في Backend.
+
+==================================================
+23. Data Scope
+==================================================
+
+طبق Scope صارم:
+
+الطبيب يرى Patient فقط إذا:
+
+- عنده Appointment معه.
+- هو doctorId للConsultation.
+- هو attending physician للAdmission.
+- هو Assigned في Emergency.
+- عضو في Care Team.
+- عنده Permission واسعة مثل medical_director.
+
+اختبر IDOR:
+
+Doctor A يحاول فتح Patient تابع لـDoctor B بدون علاقة.
+→ 403 أو 404.
+→ لا Data Leak.
+
+==================================================
+24. APIs
+==================================================
+
+أنشئ APIs تحت:
+
+/api/doctor-portal/dashboard
+/api/doctor-portal/agenda
+/api/doctor-portal/patients/today
+/api/doctor-portal/patients
+/api/doctor-portal/patients/:id
+/api/doctor-portal/patients/:id/summary
+/api/doctor-portal/consultations
+/api/doctor-portal/consultations/:id/finalize
+/api/doctor-portal/consultations/:id/sign
+/api/doctor-portal/lab-orders
+/api/doctor-portal/imaging-orders
+/api/doctor-portal/prescriptions
+/api/doctor-portal/prescriptions/:id/sign
+/api/doctor-portal/results
+/api/doctor-portal/results/:id/acknowledge
+/api/doctor-portal/hospitalized
+/api/doctor-portal/emergencies
+/api/doctor-portal/emergencies/:id/decision
+/api/doctor-portal/clinical-notes
+/api/doctor-portal/tasks
+/api/doctor-portal/messages
+/api/doctor-portal/notifications
+/api/doctor-portal/profile
+
+==================================================
+25. Performance
+==================================================
+
+- Dashboard أقل من 2 ثانية.
+- Pagination.
+- React Query Cache.
+- Prefetch patient summary.
+- Lazy-load Tabs الثقيلة.
+- SSE للنتائج الحرجة.
+- Debounce Search.
+- لا تعيد Fetch كامل Patient Record عند كل Tab.
+
+==================================================
+26. Responsive
+==================================================
+
+Desktop:
+
+- Sidebar Doctor.
+- Patient Workspace Split View.
+
+Tablet:
+
+- Sidebar collapsible.
+- Consultation Workspace مناسب للتابلت.
+
+Mobile:
+
+- Bottom Navigation.
+- Cards.
+- Full-screen Patient Workspace.
+- Bottom Sheets.
+- Sticky Action Bar.
+- Safe Area.
+- لا horizontal overflow.
+
+اختبر:
+
+- iPhone SE
+- iPhone Pro Max
+- Android 360px
+- iPad
+- Desktop 1366px
+
+==================================================
+27. PWA
+==================================================
+
+- Installable.
+- Standalone.
+- Update Banner.
+- Offline Shell فقط.
+- لا Cache للبيانات الطبية.
+- Push foundation.
+- Icons المستشفى.
+- اسم:
+  IRISSAM Médecin
+
+يمكن استعمال نفس Service Worker مع Scope مناسب إذا Architecture تسمح، أو Manifest منفصل بدون تعارض مع Portail Patient.
+
+==================================================
+28. Audit
+==================================================
+
+سجل:
+
+- View patient
+- Open result
+- Acknowledge critical result
+- Create consultation
+- Finalize consultation
+- Sign consultation
+- Create order
+- Sign prescription
+- Add note
+- View hospitalized patient
+- Emergency decision
+- Publish to Patient Portal
+- Download document
+- Print
+- Export
+
+لا تسجل المحتوى الطبي كاملًا في Logs العامة.
+
+==================================================
+29. Tests d’acceptation
+==================================================
+
+TEST A:
+Doctor login → Doctor Portal.
+
+TEST B:
+User بدون doctor_portal.access → 403.
+
+TEST C:
+Doctor A لا يرى Patient B غير المرتبط به.
+
+TEST D:
+Patients du jour تظهر من Appointments الحقيقية.
+
+TEST E:
+Commencer consultation يستعمل نفس patientId وencounterId.
+
+TEST F:
+Lab Order تظهر في Laboratory.
+
+TEST G:
+Imaging Order تظهر في Imaging.
+
+TEST H:
+Prescription موقعة تظهر في Pharmacy.
+
+TEST I:
+Critical Result يظهر في Dashboard حتى Acknowledge.
+
+TEST J:
+Signed Consultation تصبح Locked.
+
+TEST K:
+تعديل Signed Consultation ينشئ Addendum.
+
+TEST L:
+Hospitalized list تعرض مرضى الطبيب فقط.
+
+TEST M:
+Emergency Decision تستعمل نفس Encounter.
+
+TEST N:
+Mobile PWA تعمل.
+
+TEST O:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+0 IDOR.
+0 Data Leaks.
+
+==================================================
+30. التقرير النهائي
+==================================================
+
+بعد الانتهاء أعطني:
+
+- Migrations.
+- الجداول.
+- Permissions.
+- Doctor Scope rules.
+- APIs.
+- Portal Layout.
+- Pages.
+- Consultation Workspace.
+- Signature system.
+- Results Inbox.
+- PWA.
+- نتائج TEST A–O.
+- Placeholders المتبقية.
+- TypeScript = 0.
+- Runtime SQL = 0.
+- White Screens = 0.
+
+لا تبدأ Nurse Station أو Native Mobile App قبل الموافقة على Portail Médecin.

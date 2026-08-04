@@ -67,6 +67,8 @@ export interface JwtPayload {
   role: string;
   permissions: string[];
   siteId: string | null;
+  firstName?: string;
+  lastName?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
