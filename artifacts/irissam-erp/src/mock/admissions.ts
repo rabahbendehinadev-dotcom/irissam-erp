@@ -360,6 +360,8 @@ export const MOCK_ADMISSION_TIMELINES: Record<string, AdmissionTimelineEvent[]> 
     { id: 't-a1-2', admissionId: 'adm-1', type: 'bed_change', description: 'Attribution lit A001-A', date: '2026-08-01T08:45:00Z', userId: 'u-2', userName: 'Infirmière Réception' },
     { id: 't-a1-3', admissionId: 'adm-1', type: 'exam_ordered', description: 'ECG + troponines ordonnés', date: '2026-08-01T09:00:00Z', userId: 'u-1', userName: 'Dr. Hamidou Karim' },
     { id: 't-a1-4', admissionId: 'adm-1', type: 'exam_result', description: 'Troponines élevées — NSTEMI confirmé', date: '2026-08-01T10:30:00Z', userId: 'u-1', userName: 'Dr. Hamidou Karim' },
+    { id: 't-a1-5', admissionId: 'adm-1', type: 'vitals', description: 'Signes vitaux enregistrés', date: '2026-08-01T11:00:00Z', userId: 'u-2', userName: 'Inf. Réception', meta: { fc: '112', taSys: '155', taDia: '95', temp: '37.8', spo2: '94', glycemie: '1.4' } },
+    { id: 't-a1-6', admissionId: 'adm-1', type: 'vitals', description: 'Signes vitaux enregistrés', date: '2026-08-01T14:00:00Z', userId: 'u-2', userName: 'Inf. Réception', meta: { fc: '88', taSys: '138', taDia: '88', temp: '37.2', spo2: '97', glycemie: '1.2' } },
   ],
   'adm-5': [
     { id: 't-a5-1', admissionId: 'adm-5', type: 'admission', description: 'Admission médecine interne — décompensation diabétique', date: '2026-07-31T16:20:00Z', userId: 'u-2', userName: 'Dr. Meziane Farid' },

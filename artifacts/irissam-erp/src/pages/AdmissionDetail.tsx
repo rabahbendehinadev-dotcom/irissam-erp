@@ -3,9 +3,9 @@ import { useRoute, useLocation } from 'wouter';
 import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import {
   ArrowLeft, Edit, LogOut, ArrowRight, AlertTriangle,
-  Stethoscope, Bed, MapPin, Calendar, Clock, User,
+  Stethoscope, Bed, MapPin, Clock, User,
   FileText, StickyNote, ClipboardList, CheckCircle2,
-  PlusCircle, Printer,
+  PlusCircle, Printer, Activity,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
@@ -20,7 +20,7 @@ import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { formatDate } from '@/utils/format';
-import type { Admission } from '@/types/admission';
+import type { Admission, AdmissionTimelineEvent } from '@/types/admission';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +42,125 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
         <h3 className="font-semibold text-gray-800 text-sm">{title}</h3>
       </div>
       <div className="space-y-3">{children}</div>
+    </div>
+  );
+}
+
+// ─── Vitals reference ranges ────────────────────────────────────────────────────
+
+type VitalStatus = 'normal' | 'warning' | 'critical';
+
+function getVitalStatus(key: string, value: number): VitalStatus {
+  switch (key) {
+    case 'fc':
+      if (value < 40 || value > 150) return 'critical';
+      if (value < 60 || value > 100) return 'warning';
+      return 'normal';
+    case 'taSys':
+      if (value > 180 || value < 80) return 'critical';
+      if (value < 90 || value > 140) return 'warning';
+      return 'normal';
+    case 'taDia':
+      if (value < 50 || value > 120) return 'critical';
+      if (value < 60 || value > 90) return 'warning';
+      return 'normal';
+    case 'temp':
+      if (value < 35 || value > 39) return 'critical';
+      if (value < 36 || value > 37.5) return 'warning';
+      return 'normal';
+    case 'spo2':
+      if (value < 90) return 'critical';
+      if (value < 95) return 'warning';
+      return 'normal';
+    case 'glycemie':
+      if (value < 0.5 || value > 3) return 'critical';
+      if (value < 0.7 || value > 1.8) return 'warning';
+      return 'normal';
+    default:
+      return 'normal';
+  }
+}
+
+const STATUS_CLS: Record<VitalStatus, string> = {
+  normal:   'border-gray-200 focus:border-blue-400',
+  warning:  'border-amber-400 focus:border-amber-500 bg-amber-50',
+  critical: 'border-red-400 focus:border-red-500 bg-red-50',
+};
+
+interface VitalField { key: string; label: string; unit: string; placeholder: string; step?: string; min?: number; max?: number }
+
+const VITAL_FIELDS: VitalField[] = [
+  { key: 'fc',       label: 'Fréquence cardiaque',   unit: 'bpm',  placeholder: '60–100',   min: 20,  max: 300 },
+  { key: 'taSys',    label: 'TA systolique',          unit: 'mmHg', placeholder: '90–140',   min: 40,  max: 300 },
+  { key: 'taDia',    label: 'TA diastolique',         unit: 'mmHg', placeholder: '60–90',    min: 20,  max: 200 },
+  { key: 'temp',     label: 'Température',            unit: '°C',   placeholder: '36–37.5',  min: 30,  max: 45,  step: '0.1' },
+  { key: 'spo2',     label: 'SpO₂',                  unit: '%',    placeholder: '95–100',   min: 50,  max: 100 },
+  { key: 'glycemie', label: 'Glycémie',               unit: 'g/L',  placeholder: '0.7–1.8',  min: 0.1, max: 10,  step: '0.1' },
+];
+
+function VitalsModal({ onSave, onCancel }: {
+  onSave: (values: Record<string, string>) => void;
+  onCancel: () => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const cls = 'w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors';
+
+  const set = (key: string, val: string) => setValues(prev => ({ ...prev, [key]: val }));
+  const hasAny = Object.values(values).some(v => v.trim() !== '');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-6 max-h-[95dvh] overflow-y-auto">
+        <div className="flex items-center gap-2 mb-5">
+          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-rose-100 text-rose-600">
+            <Activity size={16} />
+          </span>
+          <h3 className="font-bold text-gray-900 text-lg">Saisie des signes vitaux</h3>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {VITAL_FIELDS.map(f => {
+            const raw = values[f.key] ? Number(values[f.key]) : NaN;
+            const status: VitalStatus = isNaN(raw) ? 'normal' : getVitalStatus(f.key, raw);
+            return (
+              <div key={f.key}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  {f.label} <span className="text-gray-400 font-normal">({f.unit})</span>
+                  {status === 'warning'  && <span className="ml-1 text-amber-600 font-semibold">⚠ Anormal</span>}
+                  {status === 'critical' && <span className="ml-1 text-red-600 font-bold">⚠ Critique</span>}
+                </label>
+                <input
+                  type="number"
+                  step={f.step ?? '1'}
+                  min={f.min}
+                  max={f.max}
+                  value={values[f.key] ?? ''}
+                  onChange={e => set(f.key, e.target.value)}
+                  placeholder={f.placeholder}
+                  className={`${cls} ${STATUS_CLS[status]}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="text-xs text-gray-400 mt-4">Les champs non remplis seront ignorés. Les valeurs hors normes sont mises en évidence.</p>
+
+        <div className="flex gap-3 mt-5">
+          <button onClick={onCancel}
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+            Annuler
+          </button>
+          <button
+            onClick={() => onSave(values)}
+            disabled={!hasAny}
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-rose-600 text-white rounded-lg hover:bg-rose-700 font-medium disabled:opacity-40 transition-colors"
+          >
+            <Activity size={14} /> Enregistrer
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -419,6 +538,8 @@ export default function AdmissionDetailPage() {
   const [showForm,     setShowForm]     = useState(false);
   const [discharging,  setDischarging]  = useState(false);
   const [transferring, setTransferring] = useState(false);
+  const [showVitals,   setShowVitals]   = useState(false);
+  const [localEvents,  setLocalEvents]  = useState<AdmissionTimelineEvent[]>([]);
 
   // Not found
   if (!admission) {
@@ -436,7 +557,8 @@ export default function AdmissionDetailPage() {
     );
   }
 
-  const timeline = MOCK_ADMISSION_TIMELINES[admission.id] ?? [];
+  const seedTimeline = MOCK_ADMISSION_TIMELINES[admission.id] ?? [];
+  const timeline = [...seedTimeline, ...localEvents];
   const isActive = ['active', 'preadmission', 'ambulatoire'].includes(admission.status);
 
   return (
@@ -495,6 +617,14 @@ export default function AdmissionDetailPage() {
 
             {/* Action buttons */}
             <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+              {can('admissions.edit') && isActive && (
+                <button
+                  onClick={() => setShowVitals(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
+                >
+                  <Activity size={13} /> Signes vitaux
+                </button>
+              )}
               {can('admissions.edit') && isActive && (
                 <button
                   onClick={() => { log('view', 'admission', admission.id); setShowForm(true); }}
@@ -579,6 +709,42 @@ export default function AdmissionDetailPage() {
             setTransferring(false);
           }}
           onCancel={() => setTransferring(false)}
+        />
+      )}
+
+      {showVitals && (
+        <VitalsModal
+          onSave={(values) => {
+            const filled = Object.fromEntries(
+              Object.entries(values).filter(([, v]) => v.trim() !== ''),
+            );
+            if (Object.keys(filled).length === 0) { setShowVitals(false); return; }
+
+            // Build human-readable description
+            const parts: string[] = [];
+            if (filled.fc)       parts.push(`FC: ${filled.fc} bpm`);
+            if (filled.taSys && filled.taDia) parts.push(`TA: ${filled.taSys}/${filled.taDia} mmHg`);
+            if (filled.temp)     parts.push(`T°: ${filled.temp}°C`);
+            if (filled.spo2)     parts.push(`SpO₂: ${filled.spo2}%`);
+            if (filled.glycemie) parts.push(`Glyc: ${filled.glycemie} g/L`);
+
+            const event: AdmissionTimelineEvent = {
+              id: `vitals-${Date.now()}`,
+              admissionId: admission.id,
+              type: 'vitals',
+              description: 'Signes vitaux enregistrés',
+              date: new Date().toISOString(),
+              userId: 'current-user',
+              userName: 'Utilisateur courant',
+              meta: filled,
+            };
+
+            setLocalEvents(prev => [...prev, event]);
+            log('create', 'admission', admission.id, `Signes vitaux — ${parts.join(', ')}`);
+            setShowVitals(false);
+            setActiveTab('timeline');
+          }}
+          onCancel={() => setShowVitals(false)}
         />
       )}
     </DashboardLayout>

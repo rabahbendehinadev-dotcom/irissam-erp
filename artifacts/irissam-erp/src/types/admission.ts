@@ -50,7 +50,20 @@ export type AdmissionTimelineEventType =
   | 'note'
   | 'exam_ordered'
   | 'exam_result'
-  | 'preadmission_converted';
+  | 'preadmission_converted'
+  | 'vitals';
+
+// ─── Vitals ──────────────────────────────────────────────────────────────────
+
+/** Mesure ponctuelle de signes vitaux enregistrée dans la timeline */
+export interface VitalsReading {
+  fc?:        number;  // Fréquence cardiaque (bpm)
+  taSys?:     number;  // Tension systolique (mmHg)
+  taDia?:     number;  // Tension diastolique (mmHg)
+  temp?:      number;  // Température (°C)
+  spo2?:      number;  // Saturation O₂ (%)
+  glycemie?:  number;  // Glycémie (g/L)
+}
 
 // ─── Structures physiques ────────────────────────────────────────────────────
 // Note: Building and Floor are re-exported from @/types/hospital
