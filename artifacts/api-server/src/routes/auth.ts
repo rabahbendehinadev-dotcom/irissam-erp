@@ -39,7 +39,7 @@ if (!JWT_SECRET) {
 const ACCESS_TOKEN_TTL  = "15m";                     // short-lived
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60 * 1000;  // 7 days in ms
 const REFRESH_COOKIE    = "irissam_rt";
-const MAX_ATTEMPTS      = 5;
+const MAX_ATTEMPTS      = 20;
 const LOCK_MINUTES      = 15;
 const DUMMY_HASH        = "$2b$12$invalidhashpadding0000000000000000000000000000000000";
 
