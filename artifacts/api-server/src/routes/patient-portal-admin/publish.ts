@@ -68,7 +68,10 @@ router.post(
 
     try {
       const { rows } = await pool.query(
-        `SELECT id, patient_id, status, test, published_to_patient FROM lab_orders WHERE id=$1 AND deleted_at IS NULL`,
+        `SELECT lo.id, lo.patient_id, lo.status, lo.test, lo.published_to_patient
+         FROM lab_orders lo
+         JOIN patients pt ON pt.id = lo.patient_id AND pt.deleted_at IS NULL
+         WHERE lo.id=$1 AND lo.deleted_at IS NULL`,
         [id],
       );
       const order = rows[0];
@@ -318,15 +321,21 @@ router.post(
 
     try {
       const { rows } = await pool.query(
-        `SELECT id, patient_id, title, confidentiality FROM document_records WHERE id=$1 AND deleted_at IS NULL`,
+        `SELECT dr.id, dr.patient_id, dr.title, dr.confidentiality, dr.internal_only
+         FROM document_records dr
+         JOIN patients pt ON pt.id = dr.patient_id AND pt.deleted_at IS NULL
+         WHERE dr.id=$1 AND dr.deleted_at IS NULL`,
         [id],
       );
       const doc = rows[0];
       if (!doc) { res.status(404).json({ message: "Document introuvable." }); return; }
 
-      if (BLOCKED_CONFIDENTIALITY.includes(doc.confidentiality)) {
+      // Block confidential and internal documents
+      if (BLOCKED_CONFIDENTIALITY.includes(doc.confidentiality) || doc.internal_only) {
         res.status(422).json({
-          message: `Ce document est classifié "${doc.confidentiality}" et ne peut pas être publié sur le portail patient.`,
+          message: doc.internal_only
+            ? "Ce document est marqué usage interne uniquement et ne peut pas être publié sur le portail patient."
+            : `Ce document est classifié "${doc.confidentiality}" et ne peut pas être publié sur le portail patient.`,
         });
         return;
       }

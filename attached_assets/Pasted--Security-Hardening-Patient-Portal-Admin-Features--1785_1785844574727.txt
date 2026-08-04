@@ -1,0 +1,145 @@
+نفّذ الآن Security Hardening قصير لـ Patient Portal Admin.
+
+مهم جدًا:
+- لا تضف Features جديدة.
+- لا تغيّر التصميم.
+- ركّز فقط على OTP وPreview وPublishing Safety.
+
+1. OTP Security
+
+الوضع الحالي:
+activation OTP مخزن plain داخل قاعدة البيانات.
+
+المطلوب:
+- تخزين OTP باستعمال Hash آمن:
+  - Argon2id أو bcrypt
+  - أو HMAC-SHA256 بمفتاح سري من Environment
+- لا تخزن OTP plain نهائيًا.
+- عند التحقق:
+  - قارن الـOTP المدخل بالـHash.
+- OTP:
+  - صالح 30 دقيقة.
+  - single-use.
+  - max attempts.
+  - revoked عند توليد OTP جديد.
+- لا يظهر كاملًا إلا مرة واحدة عند الإنشاء.
+- لا يظهر في:
+  - GET endpoints
+  - logs
+  - audit
+  - errors
+- بعد نجاح التفعيل:
+  - otpHash = NULL
+  - otpExpiresAt = NULL
+  - otpAttempts = 0
+
+2. منع Timing Attacks
+
+- استعمل مقارنة ثابتة الوقت عند التحقق.
+- لا ترجع رسالة مختلفة بين:
+  - OTP غير صحيح
+  - OTP منتهي
+  - الحساب غير موجود
+- استعمل رسالة عامة للمستخدم.
+
+3. OTP Brute Force
+
+- حد أقصى للمحاولات.
+- Lock مؤقت بعد تجاوز الحد.
+- Rate limit حسب:
+  - IP
+  - account
+  - patient
+- سجل المحاولات المشبوهة بدون تسجيل الكود.
+
+4. Preview as Patient
+
+حضّر فقط Preview Token آمن:
+
+POST /api/patient-portal-admin/accounts/:id/preview-token
+
+القواعد:
+- Permission:
+  patient_portal.accounts.preview
+- Token:
+  - قصير الصلاحية 5 دقائق.
+  - one-time use.
+  - مربوط بـstaffUserId وpatientId.
+  - read-only.
+  - لا يسمح بتعديل أي شيء.
+  - لا يسمح بتحميل Documents إلا حسب Rules.
+- كل Preview يسجل في Audit.
+- اعرض Banner واضح:
+  “Mode aperçu employé — lecture seule”
+- لا تستعمل Login حقيقي للمريض.
+
+5. Publishing Safety
+
+- قبل Publish:
+  - تحقق أن السجل يعود لنفس patientId.
+  - تحقق أن document access يسمح patient_portal.
+  - تحقق أنه لا يحتوي internal_only metadata.
+- Unpublish لا يحذف Notification history.
+- نشر نتيجة حرجة يحتاج Confirmation إضافية أو Rule حسب سياسة المستشفى.
+
+6. Discharge Documents Foundation
+
+لا تضف Feature كاملة الآن.
+
+فقط:
+- أضف publication fields اللازمة لوثائق الخروج.
+- لا تنشر تلقائيًا.
+- حضّر Contract موحد مع:
+  publishedToPatient
+  publishedAt
+  publishedBy
+  unpublishedAt
+  unpublishedBy
+
+7. اختبارات القبول
+
+TEST A:
+OTP غير مخزن plain في DB.
+
+TEST B:
+GET account لا يعرض OTP أو Hash.
+
+TEST C:
+OTP صحيح يفعّل الحساب مرة واحدة.
+
+TEST D:
+إعادة استعمال نفس OTP مرفوض.
+
+TEST E:
+OTP منتهي مرفوض.
+
+TEST F:
+محاولات كثيرة → lock مؤقت.
+
+TEST G:
+توليد OTP جديد يبطل القديم.
+
+TEST H:
+Preview token:
+- 5 دقائق
+- read-only
+- one-time
+- مرتبط بالمريض الصحيح
+
+TEST I:
+Staff خارج Scope المريض → 403.
+
+TEST J:
+Logs/Audit لا تحتوي OTP.
+
+TEST K:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+
+في التقرير:
+- طريقة Hash.
+- Migration الجديدة.
+- Endpoints المعدلة.
+- نتائج TEST A–K.
+- تأكيد حذف OTP plain.

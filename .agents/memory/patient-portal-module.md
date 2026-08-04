@@ -34,7 +34,7 @@ auth, dashboard, profile, appointments, appointment-requests, lab-results, imagi
 ## Patient Portal Admin (Task #139 + #140)
 - Migration 030: adds `unpublished_at/by/publication_note` to lab_orders, imaging_orders, prescriptions, document_records; `published_by + patient_visible_note` to prescriptions; 13 new `patient_portal.*` permissions.
 - Backend: `artifacts/api-server/src/routes/patient-portal-admin/` — `publish.ts` (8 endpoints) + `accounts.ts` (11 endpoints) + `index.ts`. Registered as `router.use("/patient-portal-admin", requireAuth, patientPortalAdminRouter)`.
-- OTP stored as PLAIN TEXT (not hashed) — the patient portal activate endpoint compares OTP plain. Do not hash OTP in staff-side generate-otp either.
+- OTP hashed with HMAC-SHA256 (SESSION_SECRET) — lib/otpUtils.ts: hmacOtp(), timingSafeEqualHex(), GENERIC_OTP_ERROR, DUMMY_OTP_HASH. DB column is `otp_hash` (not otp_code). All comparison uses timingSafeEqualHex. Generic error always. otp_hash=NULL after successful activation.
 - `req.params.*` in Express 5 is `string | string[]` — always cast with `String(req.params.id)`.
 - ERP frontend: `PublishToPortalButton` component, `PatientPortalAdmin` page at `/patient-portal-admin`, "Portail Patient" tab in PatientDetail. i18n key `"pat.tab.portal"` added to fr/ar/en.
 - Publish rules: Lab → `validee|critique`, Imaging → `interpretee`, Prescription → not `annule`, Document → not `hr_confidential|finance_confidential|direction_only|medical_confidential`.

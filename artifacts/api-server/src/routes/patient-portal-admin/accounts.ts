@@ -17,7 +17,8 @@
  * GET  /patient-portal-admin/by-patient/:patientId
  */
 import { Router, type Response } from "express";
-import crypto from "crypto";
+import crypto from "node:crypto";
+import { hmacOtp } from "../../lib/otpUtils.js";
 import { pool } from "@workspace/db";
 import { requirePermission } from "../../middleware/requirePermission.js";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth.js";
@@ -171,7 +172,8 @@ router.get(
       );
       if (!rows[0]) { res.status(404).json({ message: "Compte introuvable." }); return; }
       // Never expose sensitive hash fields
-      const { password_hash, activation_token, reset_token, otp_code, mfa_secret, ...safe } = rows[0];
+      // Strip all sensitive fields — OTP hash MUST never leave the server
+      const { password_hash, activation_token, reset_token, otp_code, otp_hash, mfa_secret, ...safe } = rows[0];
       res.json({ account: safe });
     } catch (err) {
       console.error("[portal-admin/accounts/:id]", err);
@@ -222,10 +224,10 @@ router.post(
       // 4. Create account
       const { rows: created } = await pool.query(
         `INSERT INTO patient_portal_accounts
-           (patient_id, email, phone, status, otp_code, otp_exp, otp_attempts, force_password_change)
+           (patient_id, email, phone, status, otp_hash, otp_exp, otp_attempts, force_password_change)
          VALUES ($1, $2, $3, 'pending_activation', $4, $5, 0, TRUE)
          RETURNING id`,
-        [patientId, accountEmail, accountPhone, otp, otpExp],
+        [patientId, accountEmail, accountPhone, hmacOtp(otp), otpExp],
       );
 
       await auditAction(req, "create_portal_account", "patient_portal_account", created[0].id, {
@@ -271,9 +273,9 @@ router.post(
 
       await pool.query(
         `UPDATE patient_portal_accounts
-         SET otp_code=$1, otp_exp=$2, otp_attempts=0, updated_at=now()
+         SET otp_hash=$1, otp_exp=$2, otp_attempts=0, updated_at=now()
          WHERE id=$3`,
-        [otp, otpExp, String(req.params.id)],
+        [hmacOtp(otp), otpExp, String(req.params.id)],
       );
 
       await auditAction(req, "generate_portal_otp", "patient_portal_account", String(req.params.id));

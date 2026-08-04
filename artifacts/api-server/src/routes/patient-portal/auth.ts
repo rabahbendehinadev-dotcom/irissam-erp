@@ -18,6 +18,7 @@ import jwt from "jsonwebtoken";
 import type { Request, Response } from "express";
 import { pool } from "@workspace/db";
 import { requirePatientAuth, type PatientRequest } from "../../middleware/requirePatientAuth.js";
+import { hmacOtp, timingSafeEqualHex, GENERIC_OTP_ERROR, DUMMY_OTP_HASH } from "../../lib/otpUtils.js";
 
 const router = Router();
 
@@ -76,27 +77,45 @@ router.post("/activate", async (req: Request, res: Response) => {
       );
       account = rows[0];
     } else if (otp && mrn) {
-      const { rows } = await pool.query(
-        `SELECT a.id, a.patient_id, a.status
+      // ── Timing-attack-safe OTP check ─────────────────────────────────────
+      // 1. Look up account by MRN only — never filter by OTP value in SQL
+      const { rows: byMrn } = await pool.query(
+        `SELECT a.id, a.patient_id, a.status, a.otp_hash, a.otp_exp, a.otp_attempts
          FROM patient_portal_accounts a
          JOIN patients p ON p.id = a.patient_id
-         WHERE a.otp_code = $1
-           AND a.otp_exp > now()
-           AND a.otp_attempts < 5
+         WHERE p.mpi_id = $1
            AND a.status = 'pending_activation'
-           AND p.mpi_id = $2
            AND a.deleted_at IS NULL`,
-        [otp, mrn],
+        [mrn],
       );
-      account = rows[0];
-      if (!account) {
-        // Increment OTP attempts
-        await pool.query(
-          `UPDATE patient_portal_accounts SET otp_attempts = otp_attempts + 1
-           WHERE otp_code = $1`,
-          [otp],
+      const candidate = byMrn[0];
+
+      // 2. Always compute HMAC even when no account exists (constant-time)
+      const providedHash     = hmacOtp(otp);
+      const storedHash       = candidate?.otp_hash ?? DUMMY_OTP_HASH;
+      const hashMatch        = timingSafeEqualHex(providedHash, storedHash);
+      const notExpired       = !!candidate && new Date(candidate.otp_exp) > new Date();
+      const underMaxAttempts = !!candidate && candidate.otp_attempts < MAX_ATTEMPTS;
+
+      if (!hashMatch || !notExpired || !underMaxAttempts) {
+        if (candidate) {
+          await pool.query(
+            `UPDATE patient_portal_accounts SET otp_attempts = otp_attempts + 1 WHERE id = $1`,
+            [candidate.id],
+          );
+        }
+        await auditLog(
+          candidate?.id ?? null,
+          candidate?.patient_id ?? null,
+          "activate_otp_failed",
+          req.ip,
+          false,
         );
+        // Generic error — never distinguish wrong/expired/not-found
+        res.status(401).json({ message: GENERIC_OTP_ERROR });
+        return;
       }
+      account = { id: candidate.id, patient_id: candidate.patient_id, status: candidate.status };
     } else if (mrn && dateOfBirth && phone) {
       const { rows } = await pool.query(
         `SELECT a.id, a.patient_id, a.status
@@ -122,7 +141,7 @@ router.post("/activate", async (req: Request, res: Response) => {
     await pool.query(
       `UPDATE patient_portal_accounts
        SET status='active', password_hash=$1, activation_token=NULL,
-           activation_token_exp=NULL, otp_code=NULL, otp_exp=NULL,
+           activation_token_exp=NULL, otp_hash=NULL, otp_exp=NULL,
            otp_attempts=0, force_password_change=FALSE, updated_at=now()
        WHERE id=$2`,
       [hash, account.id],
@@ -408,28 +427,36 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
     return;
   }
   try {
+    // Fetch by email only — do not filter by OTP in SQL
     const { rows } = await pool.query(
-      `SELECT id, patient_id, otp_code, otp_exp, otp_attempts
+      `SELECT id, patient_id, otp_hash, otp_exp, otp_attempts
        FROM patient_portal_accounts
        WHERE lower(email)=lower($1) AND deleted_at IS NULL`,
       [email],
     );
     const acc = rows[0];
-    if (!acc || acc.otp_attempts >= 5 || !acc.otp_exp || new Date(acc.otp_exp) < new Date()) {
-      res.status(400).json({ message: "OTP invalide ou expiré." });
-      return;
-    }
-    if (acc.otp_code !== otp) {
-      await pool.query(
-        `UPDATE patient_portal_accounts SET otp_attempts=otp_attempts+1 WHERE id=$1`,
-        [acc.id],
-      );
-      res.status(400).json({ message: "OTP incorrect." });
+
+    // Always compute hash to prevent timing oracle
+    const providedHash     = hmacOtp(otp ?? "");
+    const storedHash       = acc?.otp_hash ?? DUMMY_OTP_HASH;
+    const hashMatch        = timingSafeEqualHex(providedHash, storedHash);
+    const notExpired       = !!acc && acc.otp_exp && new Date(acc.otp_exp) > new Date();
+    const underMaxAttempts = !!acc && acc.otp_attempts < MAX_ATTEMPTS;
+
+    if (!hashMatch || !notExpired || !underMaxAttempts) {
+      if (acc) {
+        await pool.query(
+          `UPDATE patient_portal_accounts SET otp_attempts=otp_attempts+1 WHERE id=$1`,
+          [acc.id],
+        );
+      }
+      // Generic — no distinction between wrong code / expired / account not found
+      res.status(400).json({ message: GENERIC_OTP_ERROR });
       return;
     }
     await pool.query(
       `UPDATE patient_portal_accounts
-       SET otp_code=NULL, otp_exp=NULL, otp_attempts=0, phone_verified=TRUE, updated_at=now()
+       SET otp_hash=NULL, otp_exp=NULL, otp_attempts=0, phone_verified=TRUE, updated_at=now()
        WHERE id=$1`,
       [acc.id],
     );
@@ -464,11 +491,11 @@ router.post("/generate-otp", async (req: Request, res: Response) => {
 
     // Upsert portal account
     await pool.query(
-      `INSERT INTO patient_portal_accounts (patient_id, otp_code, otp_exp, otp_attempts)
+      `INSERT INTO patient_portal_accounts (patient_id, otp_hash, otp_exp, otp_attempts)
        VALUES ($1,$2,$3,0)
        ON CONFLICT (patient_id)
-       DO UPDATE SET otp_code=$2, otp_exp=$3, otp_attempts=0, updated_at=now()`,
-      [pid, otp, exp],
+       DO UPDATE SET otp_hash=$2, otp_exp=$3, otp_attempts=0, updated_at=now()`,
+      [pid, hmacOtp(otp), exp],
     );
 
     // In production: send OTP via SMS/Email
