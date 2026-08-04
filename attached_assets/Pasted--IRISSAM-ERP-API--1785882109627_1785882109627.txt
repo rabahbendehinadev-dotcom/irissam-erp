@@ -1,0 +1,70 @@
+أريدك أن تحلل بنية مشروع IRISSAM ERP وتحدد لي بدقة كيف يتم تشغيل الواجهة الأمامية والـ API في الإنتاج.
+
+المشكلة الحالية:
+- المشروع تم نقله إلى VPS عبر Dokploy.
+- PostgreSQL تعمل والـ API تتصل بقاعدة البيانات بنجاح.
+- Traefik يوجّه الدومين إلى الحاوية على المنفذ 8080.
+- عند طلب:
+  GET /
+  التطبيق يرجع:
+  HTTP 404
+  x-powered-by: Express
+
+أريد منك أن تفحص المشروع وتجيبني بدقة على الأسئلة التالية:
+
+1. هل Dockerfile الموجود في:
+   artifacts/api-server/Dockerfile
+   يبني ويشغّل الـ Backend فقط، أم يبني Backend + Frontend معًا؟
+
+2. هل Express مفروض أن يقدّم ملفات React/Vite المبنية في الإنتاج؟
+   إذا نعم:
+   - أين يتم بناء frontend؟
+   - ما هو مسار dist النهائي؟
+   - أين يوجد express.static؟
+   - أين يوجد fallback route الخاص بـ SPA مثل:
+     app.get("/{*path}", ...)
+     أو أي route يعيد index.html؟
+
+3. ما هو المسار الصحيح للـ Dockerfile الذي يشغّل التطبيق الكامل؟
+   افحص خصوصًا:
+   - artifacts/api-server/Dockerfile
+   - artifacts/irissam-erp/Dockerfile
+   - nginx/Dockerfile
+   - docker-compose.production.yml
+
+4. هل المشروع يجب نشره كتطبيق واحد أم كتطبيقين منفصلين:
+   - Frontend React
+   - Backend API
+   وضح الإعداد الصحيح في Dokploy لكل واحد:
+   - Dockerfile path
+   - Docker context
+   - container port
+   - environment variables
+
+5. افحص package.json وملفات التشغيل وحدد:
+   - أمر build للـ API
+   - أمر build للـ frontend
+   - أمر start في production
+   - أي متغير مثل VITE_API_URL أو API_BASE_URL يحتاج الدومين الجديد
+
+6. لماذا GET / يرجع 404 من Express؟
+   أعطني السبب الحقيقي من الكود، وليس تخمينًا.
+
+7. إذا التطبيق الكامل مفروض يشتغل من حاوية واحدة، قم بتعديل الملفات اللازمة حتى:
+   - يتم بناء frontend
+   - يتم نسخه إلى runtime image
+   - Express يقدّم frontend dist
+   - GET / يعيد index.html
+   - مسارات /api تبقى للـ API
+   - React routes تعمل عند refresh
+
+8. لا تغيّر قاعدة البيانات ولا migrations.
+9. لا تستخدم أي خدمة خاصة بـ Replit.
+10. أعطني في النهاية:
+   - الملفات المعدلة
+   - سبب كل تعديل
+   - Dockerfile path النهائي
+   - Docker context النهائي
+   - container port النهائي
+   - متغيرات البيئة المطلوبة في Dokploy
+   - أمر اختبار محلي مثل curl للتأكد أن GET / يرجع 200 بدل 404
