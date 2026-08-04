@@ -1,0 +1,779 @@
+ابدأ الآن تطوير Module مستقل خاص بـ:
+
+PORTAIL PATIENT — بوابة المريض
+
+داخل نظام IRISSAM HOSPITAL ERP.
+
+مهم جدًا:
+
+- لا تغيّر تصميم النظام الإداري الحالي.
+- أنشئ تجربة منفصلة ومبسطة للمريض.
+- استعمل PostgreSQL الحقيقي والـAPI الحقيقي.
+- ممنوع Mock Data.
+- دعم كامل:
+  - Français
+  - العربية RTL
+  - English
+- Responsive كامل على:
+  - iPhone
+  - Android
+  - Tablet
+  - Desktop
+  - PWA standalone
+- TypeScript = 0 errors.
+- Runtime SQL = 0 errors.
+- 0 White Screens.
+- جميع البيانات الطبية المعروضة يجب أن تمر عبر صلاحيات واضحة وموافقة المستشفى.
+
+==================================================
+1. الهدف
+==================================================
+
+إنشاء بوابة آمنة تسمح للمريض بـ:
+
+- تسجيل الدخول.
+- الاطلاع على بياناته الشخصية.
+- مشاهدة المواعيد.
+- طلب موعد جديد.
+- متابعة طلبات المواعيد.
+- رؤية نتائج التحاليل المنشورة له.
+- رؤية تقارير الأشعة المنشورة له.
+- رؤية الوصفات الطبية.
+- تحميل الوثائق المسموح بها.
+- رؤية الفواتير.
+- رؤية المدفوعات والوصولات.
+- رؤية حالة التأمين.
+- استقبال الإشعارات.
+- إرسال طلب أو رسالة للمستشفى.
+- تحديث بعض بيانات الاتصال.
+- تحميل التطبيق كـPWA.
+
+==================================================
+2. حساب المريض
+==================================================
+
+أنشئ جداول أو أكمل الموجود:
+
+patient_portal_accounts
+patient_portal_sessions
+patient_portal_devices
+patient_portal_notifications
+patient_portal_messages
+patient_portal_appointment_requests
+patient_portal_consents
+patient_portal_access_logs
+
+كل حساب مرتبط بـpatientId حقيقي.
+
+Fields:
+
+- id UUID
+- patientId
+- email
+- phone
+- passwordHash
+- status
+- emailVerified
+- phoneVerified
+- lastLoginAt
+- failedLoginAttempts
+- lockedUntil
+- mfaEnabled
+- forcePasswordChange
+- createdAt
+- updatedAt
+- deletedAt
+
+الحالات:
+
+- pending_activation
+- active
+- suspended
+- locked
+- archived
+
+==================================================
+3. تفعيل الحساب
+==================================================
+
+طرق التفعيل:
+
+- من طرف الاستقبال.
+- رابط Activation.
+- OTP عبر SMS أو Email.
+- كود مؤقت يطبعه المستشفى.
+- إعادة تعيين كلمة المرور.
+
+القواعد:
+
+- لا يستطيع المريض إنشاء حساب لشخص آخر.
+- التحقق من:
+  - MRN
+  - تاريخ الميلاد
+  - رقم الهاتف أو البريد
+- OTP تنتهي صلاحيته.
+- منع Brute Force.
+- تسجيل كل المحاولات.
+
+==================================================
+4. Authentication
+==================================================
+
+Endpoints:
+
+POST /api/patient-portal/auth/activate
+POST /api/patient-portal/auth/login
+POST /api/patient-portal/auth/refresh
+POST /api/patient-portal/auth/logout
+GET /api/patient-portal/auth/me
+POST /api/patient-portal/auth/forgot-password
+POST /api/patient-portal/auth/reset-password
+POST /api/patient-portal/auth/verify-otp
+
+المطلوب:
+
+- Access Token قصير.
+- Refresh Token HttpOnly Secure.
+- Rotation.
+- Session revocation.
+- Device list.
+- Brute-force lockout.
+- MFA foundation.
+
+المريض لا يستعمل نفس Auth الخاص بالموظفين.
+
+==================================================
+5. Dashboard Patient
+==================================================
+
+أنشئ صفحة:
+
+/patient-portal
+
+تحتوي على:
+
+- رسالة ترحيب.
+- الموعد القادم.
+- آخر نتيجة تحليل منشورة.
+- آخر تقرير أشعة منشور.
+- آخر وصفة.
+- الرصيد المالي.
+- حالة التأمين.
+- إشعارات جديدة.
+- أزرار سريعة:
+  - Prendre rendez-vous
+  - Mes résultats
+  - Mes ordonnances
+  - Mes factures
+  - Mes documents
+  - Contacter l’hôpital
+
+==================================================
+6. Profil
+==================================================
+
+يعرض:
+
+- Nom
+- Prénom
+- MRN
+- Date de naissance
+- Sexe
+- Téléphone
+- Email
+- Adresse
+- Contact d’urgence
+- Assurance principale
+
+المريض يستطيع تعديل فقط:
+
+- Téléphone
+- Email
+- Adresse
+- Contact d’urgence
+
+أي تعديل حساس يحتاج مراجعة من الإدارة.
+
+==================================================
+7. Rendez-vous
+==================================================
+
+صفحة مواعيد تعرض:
+
+- À venir
+- Passés
+- Annulés
+- En attente
+
+كل موعد:
+
+- Service
+- Médecin
+- Date
+- Heure
+- Site
+- Statut
+- Instructions
+- QR Code للموعد
+
+Actions:
+
+- Demander un rendez-vous
+- Annuler حسب القواعد
+- Reprogrammer كطلب
+- Ajouter au calendrier
+- Télécharger confirmation PDF
+
+المريض لا يختار طبيبًا أو وقتًا غير متاح مباشرة دون Validation.
+
+==================================================
+8. طلب موعد
+==================================================
+
+Wizard:
+
+Step 1:
+- Service
+- Motif
+
+Step 2:
+- Site
+- Date préférée
+- Période:
+  - Matin
+  - Après-midi
+
+Step 3:
+- Médecin préféré اختياري
+
+Step 4:
+- ملاحظات
+- Document optional
+
+Step 5:
+- Confirmation
+
+الحالات:
+
+- draft
+- submitted
+- under_review
+- approved
+- proposed_new_date
+- rejected
+- cancelled
+
+==================================================
+9. Résultats Laboratoire
+==================================================
+
+اعرض فقط النتائج:
+
+- Validated
+- Published to patient
+
+كل نتيجة:
+
+- Date
+- Analyse
+- Laboratoire
+- Médecin prescripteur
+- Statut
+- Résumé
+- PDF
+
+ممنوع عرض:
+
+- ملاحظات داخلية.
+- نتائج غير مصادق عليها.
+- تنبيه حرج قبل مراجعة الطبيب إذا سياسة المستشفى تمنع ذلك.
+
+أضف:
+- publishedToPatient
+- publishedAt
+- publishedBy
+
+==================================================
+10. Imagerie
+==================================================
+
+اعرض فقط:
+
+- Examens interprétés
+- Rapports publiés للمريض
+
+كل فحص:
+
+- Type
+- Date
+- Service
+- Radiologue
+- Rapport
+- PDF
+- Images link فقط إذا المستشفى تسمح
+
+لا تعرض PACS raw access مباشرة دون صلاحية.
+
+==================================================
+11. Ordonnances
+==================================================
+
+اعرض:
+
+- Médicament
+- Dose
+- Voie
+- Fréquence
+- Durée
+- Médecin
+- Date
+- Instructions
+
+Actions:
+
+- Télécharger PDF
+- Ajouter rappel محلي
+- Voir historique
+
+المريض لا يستطيع تعديل الوصفة.
+
+==================================================
+12. Documents
+==================================================
+
+اربط مع GED.
+
+يعرض فقط الوثائق التي:
+
+- مرتبطة بالمريض.
+- لها access rule تسمح patient_portal.
+- منشورة.
+
+الفئات:
+
+- Analyses
+- Imagerie
+- Ordonnances
+- Hospitalisation
+- Consentements
+- Factures
+- Assurance
+- Autres
+
+كل View/Download يسجل Audit.
+
+==================================================
+13. Factures وPaiements
+==================================================
+
+اعرض:
+
+- Facture number
+- Date
+- Total
+- Part assurance
+- Part patient
+- Payé
+- Reste
+- Statut
+
+Actions:
+
+- Télécharger facture PDF
+- Télécharger reçu
+- Voir détail
+- Demander clarification
+
+لا تضف Paiement en ligne حقيقي الآن إلا إذا Gateway موجود.
+
+حضّر فقط Payment Gateway Foundation.
+
+==================================================
+14. Assurance
+==================================================
+
+اعرض:
+
+- Organisme
+- Numéro adhérent masked
+- Validité
+- Taux couverture
+- Plafond
+- Plafond restant
+- Claims
+- Claims en attente
+- Claims approuvées
+- Claims rejetées
+
+Actions:
+
+- Upload nouvelle carte
+- Signaler changement assurance
+- Voir documents requis
+
+==================================================
+15. Hospitalisation
+==================================================
+
+اعرض للمريض:
+
+- Admission en cours
+- Service
+- Chambre
+- Médecin
+- Date d’entrée
+- Instructions
+- Documents de sortie عند النشر
+
+لا تعرض معلومات تشغيلية داخلية أو Notes تمريضية غير مخصصة للمريض.
+
+==================================================
+16. Notifications
+==================================================
+
+أنشئ إشعارات عند:
+
+- موعد تم قبوله.
+- موعد تم تغييره.
+- تذكير قبل الموعد.
+- نتيجة تحليل منشورة.
+- تقرير أشعة منشور.
+- وصفة جديدة.
+- فاتورة جديدة.
+- دفعة مسجلة.
+- تأمين قرب الانتهاء.
+- وثيقة جديدة.
+- رسالة من المستشفى.
+
+دعم:
+
+- In-app
+- Email
+- SMS foundation
+- Push PWA بعد موافقة المستخدم
+
+==================================================
+17. Messages
+==================================================
+
+أنشئ Messagerie بسيطة:
+
+المريض يقدر يرسل:
+
+- سؤال إداري.
+- سؤال حول موعد.
+- طلب وثيقة.
+- اعتراض على فاتورة.
+- تحديث Assurance.
+
+ممنوع استعمالها للاستعجالات.
+
+اعرض Banner واضح:
+
+"هذه الخدمة لا تستعمل للحالات المستعجلة. اتصل بقسم الاستعجالات."
+
+Statuses:
+
+- open
+- assigned
+- answered
+- closed
+
+==================================================
+18. Consentements
+==================================================
+
+اعرض:
+
+- Consentements demandés
+- Signés
+- Refusés
+- Expirés
+
+دعم:
+
+- قراءة الوثيقة.
+- الموافقة.
+- الرفض مع سبب اختياري.
+- Signature interne بسيطة:
+  - patientId
+  - timestamp
+  - IP
+  - device
+  - document hash
+
+لا تدّع توقيعًا قانونيًا خارجيًا.
+
+==================================================
+19. Privacy
+==================================================
+
+أنشئ صفحة:
+
+Confidentialité & Sécurité
+
+تحتوي على:
+
+- الأجهزة المتصلة.
+- الجلسات.
+- تغيير كلمة السر.
+- MFA.
+- سجل آخر عمليات الدخول.
+- تحميل نسخة من البيانات الشخصية كطلب.
+- طلب تصحيح بيانات.
+- طلب إغلاق الحساب.
+
+لا تحذف Medical Record عند إغلاق الحساب؛ فقط توقف Portal Access.
+
+==================================================
+20. Permissions وPublishing
+==================================================
+
+أضف صلاحيات للموظفين:
+
+- patient_portal.accounts.view
+- patient_portal.accounts.create
+- patient_portal.accounts.activate
+- patient_portal.accounts.suspend
+- patient_portal.results.publish
+- patient_portal.documents.publish
+- patient_portal.appointments.manage
+- patient_portal.messages.manage
+- patient_portal.consent.manage
+- patient_portal.audit.view
+
+المريض لا يستعمل RBAC الموظفين.
+استعمل Portal Scope خاص به:
+- own patientId فقط.
+
+==================================================
+21. Backend Data Scope
+==================================================
+
+كل Endpoint في Patient Portal يجب أن يتحقق أن:
+
+token.patientId === requestedPatientId
+
+ممنوع الاعتماد على ID من الـFrontend فقط.
+
+اختبر IDOR:
+
+- Patient A يحاول فتح Patient B.
+- النتيجة 403 أو 404.
+- لا Data Leak.
+
+==================================================
+22. APIs
+==================================================
+
+أنشئ:
+
+/api/patient-portal/auth/*
+/api/patient-portal/dashboard
+/api/patient-portal/profile
+/api/patient-portal/appointments
+/api/patient-portal/appointment-requests
+/api/patient-portal/lab-results
+/api/patient-portal/imaging
+/api/patient-portal/prescriptions
+/api/patient-portal/documents
+/api/patient-portal/invoices
+/api/patient-portal/payments
+/api/patient-portal/insurance
+/api/patient-portal/hospitalizations
+/api/patient-portal/notifications
+/api/patient-portal/messages
+/api/patient-portal/consents
+/api/patient-portal/sessions
+/api/patient-portal/privacy
+
+==================================================
+23. Frontend منفصل
+==================================================
+
+أنشئ Layout خاص بالمريض، بسيط وواضح.
+
+Bottom Navigation Mobile:
+
+- Accueil
+- Rendez-vous
+- Résultats
+- Documents
+- Profil
+
+Desktop Sidebar:
+
+- Dashboard
+- Rendez-vous
+- Résultats
+- Imagerie
+- Ordonnances
+- Documents
+- Factures
+- Assurance
+- Messages
+- Profil
+
+لا تستعمل Sidebar الإدارة.
+
+==================================================
+24. Design
+==================================================
+
+التصميم يكون:
+
+- بسيط.
+- مريح.
+- نصوص كبيرة.
+- أزرار واضحة.
+- بدون مصطلحات طبية معقدة قدر الإمكان.
+- ألوان هادئة.
+- Accessibility جيدة.
+
+أضف:
+- Contrast مناسب.
+- Keyboard navigation.
+- Screen-reader labels.
+- Touch targets 44px.
+
+==================================================
+25. PWA
+==================================================
+
+أنشئ Manifest أو Scope مناسب للبوابة.
+
+- Installable.
+- Standalone.
+- Push foundation.
+- Offline shell فقط.
+- لا Cache للبيانات الطبية.
+- Update banner.
+- Icons المستشفى.
+
+==================================================
+26. Responsive
+==================================================
+
+اختبر:
+
+- iPhone SE
+- iPhone Pro Max
+- Android 360px
+- Tablet
+- Desktop
+
+Mobile:
+
+- Cards.
+- Bottom sheets.
+- Bottom navigation.
+- Full-screen document viewer.
+- لا horizontal overflow.
+
+==================================================
+27. Audit
+==================================================
+
+سجل:
+
+- Login.
+- View result.
+- Download document.
+- View invoice.
+- Submit appointment request.
+- Cancel appointment.
+- View prescription.
+- Update profile.
+- Sign consent.
+- Send message.
+- Revoke session.
+
+لا تسجل Passwords أو محتوى الرسائل الطبي كاملًا.
+
+==================================================
+28. اختبارات القبول
+==================================================
+
+TEST A:
+تفعيل حساب مريض.
+→ يعمل.
+
+TEST B:
+Login + Refresh + Logout.
+→ يعمل.
+
+TEST C:
+Patient A يحاول فتح بيانات Patient B.
+→ ممنوع.
+
+TEST D:
+نتيجة غير منشورة.
+→ لا تظهر.
+
+TEST E:
+نتيجة منشورة.
+→ تظهر مع PDF.
+
+TEST F:
+طلب موعد.
+→ يظهر للإدارة.
+
+TEST G:
+موعد تمت الموافقة عليه.
+→ يظهر للمريض.
+
+TEST H:
+فاتورة تظهر بالقيم الصحيحة.
+
+TEST I:
+Document غير مسموح للمريض.
+→ لا يظهر.
+
+TEST J:
+Consent signature تسجل hash والوقت.
+
+TEST K:
+Revoke session.
+→ تبطل فورًا.
+
+TEST L:
+Patient account suspended.
+→ لا يدخل.
+
+TEST M:
+iPhone PWA.
+→ تعمل Standalone.
+
+TEST N:
+Android PWA.
+→ Install prompt يعمل.
+
+TEST O:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+0 IDOR.
+0 Data Leaks.
+
+==================================================
+29. التقرير النهائي
+==================================================
+
+أعطني:
+
+- Migrations.
+- الجداول.
+- Auth architecture.
+- APIs.
+- Portal layout.
+- Pages.
+- Publishing rules.
+- Security controls.
+- PWA.
+- نتائج TEST A–O.
+- Placeholders.
+- TypeScript = 0.
+- Runtime SQL = 0.
+- White Screens = 0.
+
+لا تبدأ Portail Médecin أو Application Mobile Native قبل الموافقة على Portail Patient.
