@@ -31,7 +31,9 @@ WORKDIR /workspace
 FROM base AS erp-builder
 
 # Copy workspace manifests first (better layer caching)
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# tsconfig.base.json must be here — both frontend tsconfigs extend it, and
+# esbuild resolves the full extends chain at build time.  Missing it → transform error.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 # All artifact package.jsons so pnpm workspace resolution succeeds
 COPY artifacts/api-server/package.json         ./artifacts/api-server/
 COPY artifacts/irissam-erp/package.json        ./artifacts/irissam-erp/
@@ -57,7 +59,7 @@ RUN cd artifacts/irissam-erp && node_modules/.bin/vite build --config vite.confi
 # ── Stage 2: Patient Portal Frontend ─────────────────────────────────────────
 FROM base AS portal-builder
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 COPY artifacts/api-server/package.json         ./artifacts/api-server/
 COPY artifacts/irissam-erp/package.json        ./artifacts/irissam-erp/
 COPY artifacts/patient-portal/package.json     ./artifacts/patient-portal/
@@ -77,7 +79,7 @@ RUN cd artifacts/patient-portal && node_modules/.bin/vite build --config vite.co
 # ── Stage 3: API Server ───────────────────────────────────────────────────────
 FROM base AS api-builder
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 COPY artifacts/api-server/package.json         ./artifacts/api-server/
 COPY artifacts/irissam-erp/package.json        ./artifacts/irissam-erp/
 COPY artifacts/patient-portal/package.json     ./artifacts/patient-portal/
