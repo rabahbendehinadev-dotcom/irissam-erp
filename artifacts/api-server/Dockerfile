@@ -11,11 +11,19 @@
 #   Dockerfile path  : artifacts/api-server/Dockerfile
 #   Docker context   : . (workspace root)
 #   Container port   : 3001
+#
+# NOTE: Builder stages use node:22 (Debian/glibc) — NOT Alpine — because
+# pnpm-workspace.yaml excludes the musl native binaries for @tailwindcss/oxide
+# and rollup.  On Alpine (musl libc) those packages would have no working binary
+# and Tailwind CSS v4 has no pure-JS fallback, causing vite build to exit 1.
+# The runtime stage stays on Alpine for a minimal image footprint.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── Shared base for all build stages ─────────────────────────────────────────
-FROM node:22-alpine AS base
-RUN apk add --no-cache python3 make g++
+# ── Shared base for all build stages (Debian/glibc for native package compat) ─
+FROM node:22 AS base
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 make g++ \
+ && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.26.1 --activate
 WORKDIR /workspace
 
