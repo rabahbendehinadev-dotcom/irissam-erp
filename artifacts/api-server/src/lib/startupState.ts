@@ -1,14 +1,15 @@
 /**
- * Shared startup state — lets the health check reflect whether
- * DB migrations have completed without blocking app.listen().
+ * Shared startup state — lets the health check and the startupGuard middleware
+ * reflect whether DB migrations have completed without blocking app.listen().
  *
- * Pattern:
+ * Lifecycle:
  *   1. app.listen() is called immediately so the port opens fast.
- *   2. runMigrations() runs in parallel.
- *   3. /api/healthz returns 503 while migrating, 200 when ready.
- *      The Replit startup probe keeps retrying until it gets 200.
- *   4. On migration failure the process exits(1); the deployer
- *      reports the build as failed.
+ *   2. runMigrations() runs in the background.
+ *   3. While pending: /api and /api/healthz respond (503 migrating);
+ *      every other route is blocked with 503 SYSTEM_STARTING.
+ *   4. On success: status → "done", all routes open normally.
+ *   5. On failure: status → "failed", service stays alive so the health
+ *      check surfaces the error — NO process.exit(1).
  */
 
 export type MigrationStatus = "pending" | "done" | "failed";

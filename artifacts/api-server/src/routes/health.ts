@@ -8,14 +8,21 @@ function healthHandler(_req: Request, res: Response): void {
   const status = getMigrationStatus();
 
   if (status === "pending") {
-    // Migrations still running — tell the startup probe to keep retrying.
-    res.status(503).json({ status: "migrating", message: "DB migrations in progress" });
+    res.status(503).json({
+      status: "migrating",
+      code: "SYSTEM_STARTING",
+      message: "Initialisation de la base de données en cours.",
+    });
     return;
   }
 
   if (status === "failed") {
-    // Migrations failed — process will exit(1) shortly; surface it clearly.
-    res.status(503).json({ status: "error", message: "DB migration failed" });
+    res.status(503).json({
+      status: "migration_failed",
+      code: "MIGRATION_FAILED",
+      message:
+        "Échec de l'initialisation de la base de données. Le service est dégradé.",
+    });
     return;
   }
 

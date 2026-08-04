@@ -17,9 +17,10 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-// Start listening immediately so the port opens and the startup probe
-// can reach /api/healthz.  While migrations are running the health
-// endpoint returns 503 (Replit retries until it gets 200).
+// Start listening immediately so the port opens and the startup probe can
+// reach /api and /api/healthz.  While migrations are running the startupGuard
+// middleware blocks every other route with 503 SYSTEM_STARTING, and the health
+// endpoints return 503 migrating.  The Replit probe retries until it gets 200.
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
@@ -29,15 +30,17 @@ app.listen(port, (err) => {
 });
 
 // Run migrations after the server is already accepting connections.
-// /api/healthz returns 503 until setMigrationDone() is called.
 runMigrations()
   .then(() => {
     setMigrationDone();
-    logger.info("Migrations complete — server is fully ready");
+    logger.info("Migrations complete — all routes open");
   })
   .catch((err) => {
     setMigrationFailed();
-    logger.error({ err }, "Migration failed — server degraded, exiting");
-    // Give the health check one cycle to surface the error before dying.
-    setTimeout(() => process.exit(1), 2000);
+    // Do NOT exit — keep the process alive so /api/healthz surfaces the error
+    // and operators can read logs without a crash loop.
+    logger.error(
+      { err },
+      "Migration failed — service is degraded; all routes blocked except health",
+    );
   });
