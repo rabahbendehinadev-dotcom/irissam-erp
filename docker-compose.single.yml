@@ -1,0 +1,85 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# IRISSAM Hospital ERP — Single-Container Compose (Voie B / Dokploy)
+#
+# Un seul conteneur "app" sert :
+#   GET /                → ERP React SPA (irissam-erp)
+#   GET /patient-portal/ → Patient Portal React SPA
+#   GET /api/*           → Express JSON API
+#
+# Pour Dokploy : pointez Traefik directement vers le service "app" sur le
+# port 3001. Pas besoin de nginx séparé.
+#
+# Prérequis — créer les répertoires sur l'hôte AVANT le premier démarrage :
+#   sudo mkdir -p /data/irissam/{uploads,documents,pdfs,backups,postgres}
+#   sudo chown -R 1000:1000 /data/irissam/{uploads,documents,pdfs,backups}
+#   sudo chown -R 999:999   /data/irissam/postgres   # uid postgres
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-irissam}
+      POSTGRES_USER:     ${POSTGRES_USER:-irissam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - /data/irissam/postgres:/var/lib/postgresql/data
+    networks:
+      - irissam
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-irissam}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Application (API + ERP frontend + Patient Portal) ────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV:           production
+      PORT:               3001
+      DATABASE_URL:       postgresql://${POSTGRES_USER:-irissam}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-irissam}
+      SESSION_SECRET:     ${SESSION_SECRET:?SESSION_SECRET is required}
+      JWT_SECRET:         ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      # ── Stockage local VPS ─────────────────────────────────────────────────
+      STORAGE_PROVIDER:   local
+      LOCAL_STORAGE_ROOT: /app/storage
+      DOCUMENTS_DIR:      /app/storage/documents
+      UPLOADS_DIR:        /app/storage/uploads
+      PDF_DIR:            /app/storage/pdfs
+      BACKUP_DIR:         /app/storage/backups
+      MAX_DOC_FILE_SIZE:  52428800      # 50 MB
+      # ── Optionnel ──────────────────────────────────────────────────────────
+      LOG_LEVEL:          ${LOG_LEVEL:-info}
+      CORS_ORIGIN:        ${CORS_ORIGIN:-*}
+    volumes:
+      - /data/irissam/uploads:/app/storage/uploads
+      - /data/irissam/documents:/app/storage/documents
+      - /data/irissam/pdfs:/app/storage/pdfs
+      - /data/irissam/backups:/app/storage/backups
+    ports:
+      - "3001:3001"
+    networks:
+      - irissam
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  irissam:
+    driver: bridge
