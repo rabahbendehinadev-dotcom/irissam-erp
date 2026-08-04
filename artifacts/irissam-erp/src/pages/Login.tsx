@@ -9,7 +9,7 @@ const IS_DEV = import.meta.env.DEV;
 
 const DEMO_USERS = IS_DEV
   ? [
-      { label: 'Administrateur', email: 'admin@irissam.dz', password: 'Admin@2026!', color: 'bg-blue-600' },
+      { label: 'Administrateur', email: 'admin@irissam.dz', password: 'Admin@2026', color: 'bg-blue-600' },
     ]
   : [];
 
