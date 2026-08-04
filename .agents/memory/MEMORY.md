@@ -28,3 +28,4 @@
 - [Super Admin Module](super-admin-module.md) — migrations 026+027, 20 backend routes, 17 frontend tabs; user_activity_logs uses `timestamp` not `created_at`; step-up tokens single-use
 - [Patient Portal Module](patient-portal-module.md) — migrations 028+029; separate auth (irissam_pt cookie, role "patient"); 17 sub-routers; custom api client (no codegen); teal/blue mobile-first React app
 - [Doctor Portal](doctor-portal.md) — migrations 033+034; same JWT auth; doctor_portal.access permission gate; 15 backend routes; 13 frontend pages + DoctorPortalLayout; column name gotchas; JwtPayload firstName/lastName fix
+- [VPS Storage Architecture](vps-storage.md) — local filesystem replaces GCS; UUID keys; FormData upload; JWT-gated download; 4 Docker volumes; backup.sh; 14-test E2E suite

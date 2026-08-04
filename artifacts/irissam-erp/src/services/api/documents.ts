@@ -173,8 +173,6 @@ export const docsApi = {
     apiClient.post(`${BASE}/records/${id}/comments`, { content, isInternal }).then(r => r.data),
   getDownloadUrl: (id: string) => `${BASE}/records/${id}/download-url`,
   getPreviewUrl: (id: string) => `${BASE}/records/${id}/preview-url`,
-  requestUploadUrl: (fileName: string, mimeType: string, fileSize: number) =>
-    apiClient.post(`${BASE}/records/upload-url`, { fileName, mimeType, fileSize }).then(r => r.data as { uploadURL: string; objectPath: string }),
 
   // Versions
   getVersions: (docId: string): Promise<{ versions: DocVersion[] }> =>
@@ -231,24 +229,63 @@ export const docsApi = {
   },
 };
 
-// Helper: upload file to GCS using presigned URL
+/**
+ * Upload a file to local VPS storage via the backend API.
+ *
+ * Uses multipart/form-data POST to /api/storage/upload — the backend validates
+ * MIME type, size, writes to the Docker volume, and returns a UUID storage key.
+ * The real filesystem path is never exposed to the client.
+ *
+ * @param file       Browser File object to upload
+ * @param onProgress Optional progress callback (0-100)
+ * @returns { storageKey, checksum } — storageKey is the UUID to persist in the document record
+ */
 export async function uploadDocumentFile(
   file: File,
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number) => void,
 ): Promise<{ storageKey: string; checksum?: string }> {
-  const { uploadURL, objectPath } = await docsApi.requestUploadUrl(file.name, file.type, file.size);
   return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
     const xhr = new XMLHttpRequest();
+
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
     };
+
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve({ storageKey: objectPath });
-      else reject(new Error(`Upload échoué: ${xhr.status}`));
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const { storageKey, checksum } = JSON.parse(xhr.responseText);
+          resolve({ storageKey, checksum });
+        } catch {
+          reject(new Error("Réponse du serveur invalide"));
+        }
+      } else {
+        let msg = `Upload échoué (${xhr.status})`;
+        try {
+          const body = JSON.parse(xhr.responseText);
+          if (body?.error) msg = body.error;
+        } catch {}
+        reject(new Error(msg));
+      }
     };
+
     xhr.onerror = () => reject(new Error("Erreur réseau lors du téléversement"));
-    xhr.open("PUT", uploadURL);
-    xhr.setRequestHeader("Content-Type", file.type);
-    xhr.send(file);
+    xhr.ontimeout = () => reject(new Error("Délai d'attente dépassé lors du téléversement"));
+
+    xhr.open("POST", "/api/storage/upload");
+    xhr.timeout = 5 * 60 * 1000; // 5 min timeout for large files
+
+    // Attach JWT from localStorage (same key used by the ERP api-client interceptor)
+    const token =
+      localStorage.getItem("accessToken") ??
+      sessionStorage.getItem("accessToken");
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.send(formData);
   });
 }

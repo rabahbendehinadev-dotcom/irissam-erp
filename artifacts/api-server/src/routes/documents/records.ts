@@ -3,27 +3,22 @@ import crypto from "crypto";
 import { pool } from "@workspace/db";
 import { requirePermission } from "../../middleware/requirePermission";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
-import { ObjectStorageService } from "../../lib/objectStorage";
+import {
+  localStorageService,
+  ALLOWED_MIMES,
+  FileNotFoundError,
+  StorageSecurityError,
+} from "../../lib/localStorageService";
 
 const router = Router();
-const storage = new ObjectStorageService();
 
-// Allowed MIME types
-const ALLOWED_MIMES = new Set([
-  "application/pdf",
-  "image/jpeg", "image/png", "image/gif", "image/webp", "image/tiff",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/msword", "application/vnd.ms-excel",
-  "text/plain", "text/csv",
-  "application/dicom", "application/zip",
-]);
-
-const MAX_FILE_SIZE = parseInt(process.env.MAX_DOC_FILE_SIZE ?? "52428800"); // 50 MB default
+const MAX_FILE_SIZE = parseInt(process.env.MAX_DOC_FILE_SIZE ?? "52428800", 10); // 50 MB default
 
 // ─── Upload URL ───────────────────────────────────────────────
 
-// POST /api/documents/records/upload-url — request presigned URL
+// POST /api/documents/records/upload-url — returns local upload config
+// On VPS: clients should POST multipart to POST /api/storage/upload instead.
+// This endpoint now validates the file metadata and returns the upload endpoint info.
 router.post("/upload-url", requirePermission("documents.upload"), async (req: AuthenticatedRequest, res) => {
   const { fileName, mimeType, fileSize } = req.body;
   if (!fileName || !mimeType || !fileSize) {
@@ -35,16 +30,17 @@ router.post("/upload-url", requirePermission("documents.upload"), async (req: Au
   if (fileSize > MAX_FILE_SIZE) {
     return res.status(400).json({ error: `Fichier trop volumineux (max ${MAX_FILE_SIZE / 1048576} MB)` });
   }
-  // Path traversal guard
+  // Sanitize display name (never used as a storage path)
   const safeName = fileName.replace(/[^a-zA-Z0-9._\-\s]/g, "_").slice(0, 255);
-  try {
-    const uploadURL = await storage.getObjectEntityUploadURL();
-    const objectPath = storage.normalizeObjectEntityPath(uploadURL);
-    res.json({ uploadURL, objectPath, fileName: safeName });
-  } catch (err: any) {
-    req.log?.error(err);
-    res.status(500).json({ error: "Erreur lors de la génération de l'URL de téléversement" });
-  }
+  // Return local upload config — client should POST multipart/form-data to uploadURL
+  res.json({
+    uploadURL:       "/api/storage/upload",
+    objectPath:      null,               // will be returned in the upload response as storageKey
+    method:          "POST",
+    fieldName:       "file",
+    storageProvider: "local",
+    fileName:        safeName,
+  });
 });
 
 // ─── LIST ─────────────────────────────────────────────────────
@@ -453,26 +449,29 @@ router.get("/:id/download-url", requirePermission("documents.download"), async (
       return res.status(403).json({ error: "Accès refusé" });
     }
 
-    // Serve the file directly (proxy through backend so storage_key stays hidden)
+    // Serve the file directly — all access proxied through backend (storage_key never exposed)
     try {
-      const file = await storage.getObjectEntityFile(doc.storage_key);
-      const fileRes = await storage.downloadObject(file, 0); // no cache for medical files
+      const { stream, size } = await localStorageService.streamFile(doc.storage_key);
 
       // Audit
-      await pool.query("INSERT INTO document_download_logs (document_id,user_id,action,ip_address,site_id,created_by) VALUES ($1,$2,'download',$3,$4,$2)",
-        [req.params.id, req.auth?.userId, req.ip, req.auth?.siteId]);
+      await pool.query(
+        "INSERT INTO document_download_logs (document_id,user_id,action,ip_address,site_id,created_by) VALUES ($1,$2,'download',$3,$4,$2)",
+        [req.params.id, req.auth?.userId, req.ip, req.auth?.siteId],
+      );
 
       res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(doc.file_name)}"`);
       res.setHeader("Content-Type", doc.mime_type);
-      res.setHeader("Cache-Control", "no-store, no-cache"); // never cache medical files
-      fileRes.body?.pipeTo(new WritableStream({
-        write(chunk) { res.write(chunk); },
-        close() { res.end(); }
-      }));
-    } catch {
-      // Fallback: return a short-lived signed URL if direct proxy fails
-      const signedUrl = await storage.getObjectEntityUploadURL();
-      res.json({ url: signedUrl, expiresIn: 300 });
+      res.setHeader("Content-Length", size);
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate"); // never cache medical files
+      res.setHeader("X-Content-Type-Options", "nosniff");
+
+      stream.on("error", () => { if (!res.headersSent) res.status(500).end(); });
+      stream.pipe(res);
+    } catch (err) {
+      if (err instanceof FileNotFoundError) {
+        return res.status(404).json({ error: "Fichier introuvable sur le serveur" });
+      }
+      throw err; // bubble up to outer catch
     }
   } catch (err: any) {
     req.log?.error(err);
@@ -492,20 +491,25 @@ router.get("/:id/preview-url", requirePermission("documents.view"), async (req: 
     const doc = data.rows[0];
 
     try {
-      const file = await storage.getObjectEntityFile(doc.storage_key);
-      const fileRes = await storage.downloadObject(file, 60);
+      const { stream, size } = await localStorageService.streamFile(doc.storage_key);
 
-      await pool.query("INSERT INTO document_download_logs (document_id,user_id,action,ip_address,site_id,created_by) VALUES ($1,$2,'view',$3,$4,$2)",
-        [req.params.id, req.auth?.userId, req.ip, req.auth?.siteId]);
+      await pool.query(
+        "INSERT INTO document_download_logs (document_id,user_id,action,ip_address,site_id,created_by) VALUES ($1,$2,'view',$3,$4,$2)",
+        [req.params.id, req.auth?.userId, req.ip, req.auth?.siteId],
+      );
 
       res.setHeader("Content-Type", doc.mime_type);
+      res.setHeader("Content-Length", size);
       res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(doc.file_name)}"`);
-      res.setHeader("Cache-Control", "no-store");
-      fileRes.body?.pipeTo(new WritableStream({
-        write(chunk) { res.write(chunk); },
-        close() { res.end(); }
-      }));
-    } catch {
+      res.setHeader("Cache-Control", "no-store, must-revalidate");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+
+      stream.on("error", () => { if (!res.headersSent) res.status(500).end(); });
+      stream.pipe(res);
+    } catch (err) {
+      if (err instanceof FileNotFoundError) {
+        return res.status(404).json({ error: "Fichier introuvable sur le serveur" });
+      }
       res.status(500).json({ error: "Fichier temporairement indisponible" });
     }
   } catch (err: any) {

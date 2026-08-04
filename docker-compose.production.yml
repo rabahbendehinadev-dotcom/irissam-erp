@@ -1,0 +1,139 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# IRISSAM Hospital ERP — Production Docker Compose
+#
+# VPS deployment with local filesystem storage (no GCS / S3).
+# All medical files are persisted on bind-mounted host directories:
+#
+#   /data/irissam/uploads    ← /app/storage/uploads   (temp uploads)
+#   /data/irissam/documents  ← /app/storage/documents (GED documents)
+#   /data/irissam/pdfs       ← /app/storage/pdfs      (generated PDFs)
+#   /data/irissam/backups    ← /app/storage/backups   (backup archives)
+#   /data/irissam/postgres   ← PostgreSQL data dir
+#
+# FIRST RUN — create host dirs and set ownership before `docker compose up`:
+#   sudo mkdir -p /data/irissam/{uploads,documents,pdfs,backups,postgres}
+#   sudo chown -R 1000:1000 /data/irissam/uploads /data/irissam/documents \
+#                            /data/irissam/pdfs /data/irissam/backups
+#   sudo chown -R 999:999 /data/irissam/postgres   # postgres uid
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-irissam}
+      POSTGRES_USER:     ${POSTGRES_USER:-irissam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - /data/irissam/postgres:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-irissam}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── API Server ─────────────────────────────────────────────────────────────
+  api-server:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV:             production
+      PORT:                 3001
+      DATABASE_URL:         postgresql://${POSTGRES_USER:-irissam}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-irissam}
+      SESSION_SECRET:       ${SESSION_SECRET:?SESSION_SECRET is required}
+      JWT_SECRET:           ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET:   ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      # ── Local storage (VPS volumes) ──────────────────────────────────────────
+      STORAGE_PROVIDER:     local
+      LOCAL_STORAGE_ROOT:   /app/storage
+      DOCUMENTS_DIR:        /app/storage/documents
+      UPLOADS_DIR:          /app/storage/uploads
+      PDF_DIR:              /app/storage/pdfs
+      BACKUP_DIR:           /app/storage/backups
+      MAX_DOC_FILE_SIZE:    52428800
+      # ── Optional ────────────────────────────────────────────────────────────
+      LOG_LEVEL:            ${LOG_LEVEL:-info}
+      CORS_ORIGIN:          ${CORS_ORIGIN:-*}
+    volumes:
+      # Persistent medical file storage — bind-mounted from VPS host
+      - /data/irissam/uploads:/app/storage/uploads
+      - /data/irissam/documents:/app/storage/documents
+      - /data/irissam/pdfs:/app/storage/pdfs
+      - /data/irissam/backups:/app/storage/backups
+    networks:
+      - backend
+    # Do NOT expose port 3001 externally — only nginx accesses it
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Main ERP Frontend ──────────────────────────────────────────────────────
+  irissam-erp:
+    build:
+      context: .
+      dockerfile: artifacts/irissam-erp/Dockerfile
+    restart: unless-stopped
+    networks:
+      - frontend
+    expose:
+      - "80"
+
+  # ── Patient Portal Frontend ────────────────────────────────────────────────
+  patient-portal:
+    build:
+      context: .
+      dockerfile: artifacts/patient-portal/Dockerfile
+    restart: unless-stopped
+    networks:
+      - frontend
+    expose:
+      - "80"
+
+  # ── Nginx Reverse Proxy ────────────────────────────────────────────────────
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api-server
+      - irissam-erp
+      - patient-portal
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Uncomment to use SSL certificates:
+      # - /etc/letsencrypt:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - frontend
+      - backend
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  backend:
+    driver: bridge
+  frontend:
+    driver: bridge
+
+# ── Named volumes (only for nginx logs — storage uses bind mounts) ────────────
+volumes:
+  nginx_logs:

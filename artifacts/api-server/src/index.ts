@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { runMigrations } from "./lib/migrations";
 import { setMigrationDone, setMigrationFailed } from "./lib/startupState.js";
+import { initStorageDirs } from "./lib/localStorageService.js";
 
 const rawPort = process.env["PORT"];
 
@@ -15,6 +16,13 @@ const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+// Ensure local storage directories exist before accepting requests
+try {
+  initStorageDirs();
+} catch (err) {
+  logger.warn({ err }, "Storage dirs init warning (non-fatal on Replit dev)");
 }
 
 // Start listening immediately so the port opens and the startup probe can

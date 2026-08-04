@@ -1,0 +1,102 @@
+عدّل تحضير المشروع للنشر على VPS بحيث يكون التخزين كاملًا محليًا داخل الـVPS، بدون GCS أو S3 أو أي خدمة خارجية.
+
+المطلوب:
+
+1. استبدال Object Storage الحالي بـ Local VPS Storage.
+
+2. إنشاء مجلد دائم على الـVPS مثل:
+
+/data/irissam/uploads
+/data/irissam/documents
+/data/irissam/pdfs
+/data/irissam/backups
+
+3. داخل Docker استعمل مسارات مثل:
+
+/app/storage/uploads
+/app/storage/documents
+/app/storage/pdfs
+/app/storage/backups
+
+4. اربطها بـDocker Volumes أو Bind Mounts داخل docker-compose.production.yml.
+
+مثال:
+
+volumes:
+  - /data/irissam/uploads:/app/storage/uploads
+  - /data/irissam/documents:/app/storage/documents
+  - /data/irissam/pdfs:/app/storage/pdfs
+  - /data/irissam/backups:/app/storage/backups
+
+5. ممنوع تخزين الملفات الطبية داخل:
+- /tmp
+- dist
+- public
+- container filesystem غير دائم
+
+6. أضف Environment Variables:
+
+STORAGE_PROVIDER=local
+LOCAL_STORAGE_ROOT=/app/storage
+UPLOADS_DIR=/app/storage/uploads
+DOCUMENTS_DIR=/app/storage/documents
+PDF_DIR=/app/storage/pdfs
+BACKUP_DIR=/app/storage/backups
+
+7. كل Upload:
+- يولد اسم ملف آمن UUID
+- يمنع path traversal
+- يتحقق من MIME type
+- يتحقق من الحجم
+- لا يستعمل اسم الملف الأصلي كمسار
+- يحفظ metadata في PostgreSQL
+- يحفظ الملف داخل Volume
+
+8. كل Download:
+- يمر عبر Backend Permission Check
+- لا يسمح بفتح المسار مباشرة
+- لا يعرض المسار الحقيقي
+- يستعمل Stream response
+- Content-Disposition صحيح
+- Cache-Control: no-store للملفات الطبية
+
+9. Direct URLs:
+- لا تجعل /uploads public
+- لا تجعل Nginx يخدم الملفات الطبية مباشرة
+- كل الوصول يمر عبر API محمي
+
+10. Docker:
+- تأكد أن app user عنده صلاحية القراءة والكتابة على Volumes
+- أنشئ المجلدات عند startup إذا غير موجودة
+- لا تشغل التطبيق كـroot
+- اختبر restart وredeploy وتأكد الملفات تبقى
+
+11. Backup:
+- أضف Backup يومي للملفات مع PostgreSQL
+- Backup الملفات يكون:
+  tar أو rsync
+- مع checksum
+- لا تعتمد على نفس القرص فقط كنسخة احتياطية نهائية
+- حضّر مجلد:
+  /data/irissam/backups
+
+12. اختبارات:
+
+- Upload ملف
+- Restart container
+- الملف يبقى موجود
+- Redeploy
+- الملف يبقى موجود
+- User بدون Permission → 403
+- محاولة path traversal → مرفوضة
+- Download يعمل
+- Preview PDF/Image يعمل
+- 0 Data Loss
+
+في التقرير أعطني:
+- المسارات النهائية على الـVPS
+- Volumes المطلوبة
+- صلاحيات المجلدات
+- Env Variables
+- الملفات المعدلة
+- نتيجة اختبارات persistence

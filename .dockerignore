@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .dockerignore — exclure les fichiers inutiles du contexte de build Docker
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Git
+.git
+.gitignore
+
+# Environment files (ne jamais inclure dans l'image)
+.env
+.env.*
+!.env.production.example
+
+# Node modules (réinstallés dans le Dockerfile)
+**/node_modules
+
+# Build outputs (reconstruits dans le Dockerfile)
+**/dist
+
+# Logs
+*.log
+logs/
+/tmp/
+
+# Test & dev
+**/*.test.ts
+**/*.spec.ts
+**/vitest.config.*
+coverage/
+.nyc_output/
+
+# IDE & OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# Replit-specific
+.replit
+replit.nix
+.local/
+.upm/
+attached_assets/
+
+# Medical file storage volumes (NEVER bake into image)
+/data/
+/app/storage/
+artifacts/api-server/storage/
+
+# Security audit reports
+*SECURITY*REPORT*
+*AUDIT*REPORT*
+
+# Backup archives
+*.tar.gz
+*.sql.gz

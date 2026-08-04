@@ -1,175 +1,155 @@
-import { Readable } from 'stream';
-import { Router, type IRouter, type Request, type Response } from 'express';
+/**
+ * Local Storage Routes
+ *
+ * POST /api/storage/upload        — authenticated multipart file upload
+ * GET  /api/storage/objects/:uuid — permission-gated file download (stream)
+ *
+ * Security rules:
+ *   - Every request requires a valid JWT (requireAuth middleware)
+ *   - Storage keys are UUIDs — no user-supplied paths reach the filesystem
+ *   - All downloads are streamed through the backend; real paths are never sent to clients
+ *   - Medical files: Cache-Control: no-store
+ */
 
-// Inline validation helpers (avoids @workspace/api-zod dependency)
-const RequestUploadUrlBody = {
-  safeParse(body: any) {
-    if (body && typeof body.name === 'string' && body.name.length > 0
-        && typeof body.size === 'number' && body.size > 0
-        && typeof body.contentType === 'string' && body.contentType.length > 0) {
-      return { success: true as const, data: body as { name: string; size: number; contentType: string } };
-    }
-    return { success: false as const };
-  }
-};
-
-import { ObjectPermission } from '../lib/objectAcl';
+import { Router, type Response, type NextFunction, type Request } from 'express';
+import multer, { MulterError } from 'multer';
+import type { AuthenticatedRequest } from '../middleware/requireAuth.js';
+import { requireAuth } from '../middleware/requireAuth.js';
 import {
-  ObjectNotFoundError,
-  ObjectStorageService,
-} from '../lib/objectStorage';
+  localStorageService,
+  StorageSecurityError,
+  FileNotFoundError,
+  ALLOWED_MIMES,
+} from '../lib/localStorageService.js';
 
-const router: IRouter = Router();
-const objectStorageService = new ObjectStorageService();
+const router = Router();
 
-function hasAuthenticatedSession(
-  req: Request,
-): req is Request & { isAuthenticated: () => boolean } {
-  if (
-    !('isAuthenticated' in req) ||
-    typeof req.isAuthenticated !== 'function'
-  ) {
-    return false;
+// ── Multer: memory storage, 50 MB limit, single field named "file" ────────────
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 52_428_800 /* 50 MB */, files: 1 },
+  fileFilter(_req, file, cb) {
+    if (ALLOWED_MIMES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Type MIME non autorisé: ${file.mimetype}`));
+    }
+  },
+});
+
+// ── POST /api/storage/upload ──────────────────────────────────────────────────
+/**
+ * Authenticated multipart upload.
+ * Field name: "file"
+ * Returns: { storageKey, checksum, size, objectPath }
+ *
+ * objectPath is the path to use for the GET /api/storage/objects/:uuid endpoint.
+ */
+// Error handler for multer validation failures (MIME type, file size, etc.)
+function handleUploadError(
+  err: unknown,
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (err instanceof MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      res.status(400).json({ error: 'Fichier trop volumineux (max 50 Mo)' });
+    } else {
+      res.status(400).json({ error: `Erreur upload: ${err.message}` });
+    }
+    return;
   }
-
-  return req.isAuthenticated();
+  if (err instanceof Error && err.message.startsWith('Type MIME')) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+  next(err);
 }
 
-/**
- * POST /storage/uploads/request-url
- *
- * Request a presigned URL for file upload.
- * The client sends JSON metadata (name, size, contentType) — NOT the file.
- * Then uploads the file directly to the returned presigned URL.
- * Requires auth middleware so public callers cannot mint write-capable URLs.
- */
 router.post(
-  '/storage/uploads/request-url',
-  async (req: Request, res: Response) => {
-    if (!hasAuthenticatedSession(req)) {
-      res.status(401).json({ error: 'Unauthorized' });
-
+  '/storage/upload',
+  requireAuth,
+  (req: Request, res: Response, next: NextFunction) => {
+    upload.single('file')(req, res, (err) => {
+      if (err) return handleUploadError(err, req, res, next);
+      next();
+    });
+  },
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.file) {
+      res.status(400).json({ error: 'Aucun fichier reçu (champ attendu: file)' });
       return;
     }
-
-    const parsed = RequestUploadUrlBody.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: 'Missing or invalid required fields' });
-      return;
-    }
-
     try {
-      const { name, size, contentType } = parsed.data;
-
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      const objectPath =
-        objectStorageService.normalizeObjectEntityPath(uploadURL);
-
-      res.json(
-        RequestUploadUrlResponse.parse({
-          uploadURL,
-          objectPath,
-          metadata: { name, size, contentType },
-        }),
+      const { storageKey, checksum, size } = await localStorageService.saveFile(
+        req.file.buffer,
+        req.file.mimetype,
       );
-    } catch (error) {
-      req.log.error({ err: error }, 'Error generating upload URL');
-      res.status(500).json({ error: 'Failed to generate upload URL' });
+      res.status(201).json({
+        storageKey,
+        checksum,
+        size,
+        objectPath: `/api/storage/objects/${storageKey}`,
+      });
+    } catch (err) {
+      if (err instanceof StorageSecurityError) {
+        res.status(err.status).json({ error: err.message });
+      } else {
+        console.error('[storage/upload]', err);
+        res.status(500).json({ error: "Erreur lors de l'enregistrement du fichier" });
+      }
     }
   },
 );
 
+// ── GET /api/storage/objects/:uuid ────────────────────────────────────────────
 /**
- * GET /storage/public-objects/*
- *
- * Serve public assets from PUBLIC_OBJECT_SEARCH_PATHS.
- * These are unconditionally public — no authentication or ACL checks.
- * IMPORTANT: Always provide this endpoint when object storage is set up.
+ * Stream a stored file to the authenticated client.
+ * The real filesystem path is never sent to the client.
+ * Content-Type is set from the optional ?mime= query param or falls back to
+ * application/octet-stream (callers like records.ts set it from the DB row).
  */
 router.get(
-  '/storage/public-objects/*filePath',
-  async (req: Request, res: Response) => {
+  '/storage/objects/:uuid',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    const { uuid } = req.params;
+    // Optional caller-supplied content type (set by download/preview endpoints)
+    const contentType = (req.query['mime'] as string) || 'application/octet-stream';
+    const disposition = (req.query['disposition'] as string) || 'attachment';
+    const filename    = (req.query['filename'] as string) || uuid;
+
     try {
-      const raw = req.params.filePath;
-      const filePath = Array.isArray(raw) ? raw.join('/') : raw;
-      const file = await objectStorageService.searchPublicObject(filePath);
-      if (!file) {
-        res.status(404).json({ error: 'File not found' });
-        return;
-      }
+      const { stream, size } = await localStorageService.streamFile(uuid);
 
-      const response = await objectStorageService.downloadObject(file);
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Length', size);
+      res.setHeader(
+        'Content-Disposition',
+        `${disposition}; filename="${encodeURIComponent(filename)}"`,
+      );
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
 
-      res.status(response.status);
-      response.headers.forEach((value, key) => res.setHeader(key, value));
+      stream.on('error', (err) => {
+        console.error('[storage/objects] stream error', err);
+        if (!res.headersSent) res.status(500).json({ error: 'Erreur de lecture' });
+        res.destroy();
+      });
 
-      if (response.body) {
-        const nodeStream = Readable.fromWeb(
-          response.body as ReadableStream<Uint8Array>,
-        );
-        nodeStream.pipe(res);
+      stream.pipe(res);
+    } catch (err) {
+      if (err instanceof FileNotFoundError) {
+        res.status(404).json({ error: 'Fichier introuvable' });
+      } else if (err instanceof StorageSecurityError) {
+        res.status(400).json({ error: err.message });
       } else {
-        res.end();
+        console.error('[storage/objects]', err);
+        res.status(500).json({ error: 'Erreur de téléchargement' });
       }
-    } catch (error) {
-      req.log.error({ err: error }, 'Error serving public object');
-      res.status(500).json({ error: 'Failed to serve public object' });
     }
   },
 );
-
-/**
- * GET /storage/objects/*
- *
- * Serve object entities from PRIVATE_OBJECT_DIR.
- * These are served from a separate path from /public-objects and can optionally
- * be protected with authentication or ACL checks based on the use case.
- */
-router.get('/storage/objects/*path', async (req: Request, res: Response) => {
-  try {
-    const raw = req.params.path;
-    const wildcardPath = Array.isArray(raw) ? raw.join('/') : raw;
-    const objectPath = `/objects/${wildcardPath}`;
-    const objectFile =
-      await objectStorageService.getObjectEntityFile(objectPath);
-
-    // --- Protected route example (uncomment when using replit-auth) ---
-    // if (!req.isAuthenticated()) {
-    //   res.status(401).json({ error: "Unauthorized" });
-    //   return;
-    // }
-    // const canAccess = await objectStorageService.canAccessObjectEntity({
-    //   userId: req.user.id,
-    //   objectFile,
-    //   requestedPermission: ObjectPermission.READ,
-    // });
-    // if (!canAccess) {
-    //   res.status(403).json({ error: "Forbidden" });
-    //   return;
-    // }
-
-    const response = await objectStorageService.downloadObject(objectFile);
-
-    res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
-
-    if (response.body) {
-      const nodeStream = Readable.fromWeb(
-        response.body as ReadableStream<Uint8Array>,
-      );
-      nodeStream.pipe(res);
-    } else {
-      res.end();
-    }
-  } catch (error) {
-    if (error instanceof ObjectNotFoundError) {
-      req.log.warn({ err: error }, 'Object not found');
-      res.status(404).json({ error: 'Object not found' });
-      return;
-    }
-    req.log.error({ err: error }, 'Error serving object');
-    res.status(500).json({ error: 'Failed to serve object' });
-  }
-});
 
 export default router;
