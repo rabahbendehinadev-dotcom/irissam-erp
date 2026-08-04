@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { PageErrorBoundary } from '@/components/shared/PageErrorBoundary';
+import { ChunkErrorBoundary } from '@/components/shared/ChunkErrorBoundary';
 import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
 import { AppProvider } from '@/store/AppProvider';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -137,9 +138,11 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   if (user?.forcePasswordChange) return <Redirect to="/change-password" />;
   return (
     <PageErrorBoundary>
-      <Suspense fallback={<LoadingSkeleton />}>
-        <Component />
-      </Suspense>
+      <ChunkErrorBoundary>
+        <Suspense fallback={<LoadingSkeleton />}>
+          <Component />
+        </Suspense>
+      </ChunkErrorBoundary>
     </PageErrorBoundary>
   );
 }
@@ -157,9 +160,11 @@ function Router() {
           // Authenticated but must change password first
           user?.forcePasswordChange ? <Redirect to="/change-password" /> : <Redirect to="/" />
         ) : (
-          <Suspense fallback={<FullPageSpinner />}>
-            <LoginPage />
-          </Suspense>
+          <ChunkErrorBoundary>
+            <Suspense fallback={<FullPageSpinner />}>
+              <LoginPage />
+            </Suspense>
+          </ChunkErrorBoundary>
         )}
       </Route>
 
@@ -170,9 +175,11 @@ function Router() {
         ) : !isAuthenticated ? (
           <Redirect to="/login" />
         ) : (
-          <Suspense fallback={<FullPageSpinner />}>
-            <ChangePasswordPage />
-          </Suspense>
+          <ChunkErrorBoundary>
+            <Suspense fallback={<FullPageSpinner />}>
+              <ChangePasswordPage />
+            </Suspense>
+          </ChunkErrorBoundary>
         )}
       </Route>
 
@@ -216,9 +223,11 @@ function Router() {
       <Route path="/reports" component={() => <ProtectedRoute component={PlaceholderPage} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
       <Route component={() => (
-        <Suspense fallback={<FullPageSpinner />}>
-          <NotFound />
-        </Suspense>
+        <ChunkErrorBoundary>
+          <Suspense fallback={<FullPageSpinner />}>
+            <NotFound />
+          </Suspense>
+        </ChunkErrorBoundary>
       )} />
     </Switch>
   );
