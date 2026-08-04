@@ -48,7 +48,10 @@ COPY artifacts/irissam-erp/ ./artifacts/irissam-erp/
 # BASE_PATH=/ so asset URLs are absolute from root: /assets/main.js
 # PORT is required by vite.config.ts (used only for dev server, not build output)
 ENV BASE_PATH=/ PORT=3000 NODE_ENV=production
-RUN pnpm --filter @workspace/irissam-erp run build
+# Run vite directly — do NOT use pnpm --filter, which in pnpm v10 triggers builds
+# for all workspace packages with a "build" script (including irissam-erp in the
+# portal stage where its vite.config.ts is absent → exit 1).
+RUN cd artifacts/irissam-erp && node_modules/.bin/vite build --config vite.config.ts
 # Output: artifacts/irissam-erp/dist/public/
 
 # ── Stage 2: Patient Portal Frontend ─────────────────────────────────────────
@@ -68,7 +71,7 @@ COPY artifacts/patient-portal/ ./artifacts/patient-portal/
 
 # BASE_PATH=/patient-portal/ so asset URLs: /patient-portal/assets/main.js
 ENV BASE_PATH=/patient-portal/ PORT=3000 NODE_ENV=production
-RUN pnpm --filter @workspace/patient-portal run build
+RUN cd artifacts/patient-portal && node_modules/.bin/vite build --config vite.config.ts
 # Output: artifacts/patient-portal/dist/public/
 
 # ── Stage 3: API Server ───────────────────────────────────────────────────────
@@ -87,7 +90,7 @@ RUN pnpm install --frozen-lockfile
 COPY artifacts/api-server/ ./artifacts/api-server/
 
 # esbuild bundles everything into dist/index.mjs
-RUN pnpm --filter @workspace/api-server run build
+RUN cd artifacts/api-server && node ./build.mjs
 
 # ── Stage 4: Runtime ──────────────────────────────────────────────────────────
 FROM node:22-alpine AS runtime
