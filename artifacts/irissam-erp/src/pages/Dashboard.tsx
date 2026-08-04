@@ -1,16 +1,28 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
 import React, { Component, type ReactNode } from "react";
 import { useLanguage } from "@/i18n";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import { ChartConsultations } from "@/components/dashboard/ChartConsultations";
-import { ChartAdmissions } from "@/components/dashboard/ChartAdmissions";
-import { ChartServices } from "@/components/dashboard/ChartServices";
 import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
 import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { UpcomingAppointments } from "@/components/dashboard/UpcomingAppointments";
-import { MiniWidgets } from "@/components/dashboard/MiniWidgets";
 import { PatientDrawer } from "@/components/shared/PatientDrawer";
+import { ChartSkeleton, MiniWidgetsSkeleton } from "@/components/dashboard/ChartSkeleton";
+import { WhenVisible } from "@/components/dashboard/WhenVisible";
+
+// ── Lazy chart chunks — Recharts + D3 load only when these components render ──
+const ChartConsultations = lazy(() =>
+  import("@/components/dashboard/ChartConsultations").then(m => ({ default: m.ChartConsultations }))
+);
+const ChartAdmissions = lazy(() =>
+  import("@/components/dashboard/ChartAdmissions").then(m => ({ default: m.ChartAdmissions }))
+);
+const ChartServices = lazy(() =>
+  import("@/components/dashboard/ChartServices").then(m => ({ default: m.ChartServices }))
+);
+const MiniWidgets = lazy(() =>
+  import("@/components/dashboard/MiniWidgets").then(m => ({ default: m.MiniWidgets }))
+);
 import { MOCK_DASHBOARD_STATS } from "@/mock";
 import { formatNumber } from "@/utils/format";
 import { useGetDashboardStats } from "@workspace/api-client-react";
@@ -154,17 +166,29 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[300px]">
           <div className="lg:col-span-5 h-[260px] lg:h-full">
             <WidgetErrorBoundary label="ChartConsultations">
-              <ChartConsultations />
+              <WhenVisible fallback={<ChartSkeleton />} className="h-full">
+                <Suspense fallback={<ChartSkeleton />}>
+                  <ChartConsultations />
+                </Suspense>
+              </WhenVisible>
             </WidgetErrorBoundary>
           </div>
           <div className="lg:col-span-4 h-[260px] lg:h-full">
             <WidgetErrorBoundary label="ChartAdmissions">
-              <ChartAdmissions />
+              <WhenVisible fallback={<ChartSkeleton />} className="h-full">
+                <Suspense fallback={<ChartSkeleton />}>
+                  <ChartAdmissions />
+                </Suspense>
+              </WhenVisible>
             </WidgetErrorBoundary>
           </div>
           <div className="lg:col-span-3 h-[260px] lg:h-full">
             <WidgetErrorBoundary label="ChartServices">
-              <ChartServices />
+              <WhenVisible fallback={<ChartSkeleton />} className="h-full">
+                <Suspense fallback={<ChartSkeleton />}>
+                  <ChartServices />
+                </Suspense>
+              </WhenVisible>
             </WidgetErrorBoundary>
           </div>
         </div>
@@ -191,7 +215,11 @@ export default function Dashboard() {
         {/* Mini Widgets */}
         <div>
           <WidgetErrorBoundary label="MiniWidgets">
-            <MiniWidgets />
+            <WhenVisible fallback={<MiniWidgetsSkeleton />}>
+              <Suspense fallback={<MiniWidgetsSkeleton />}>
+                <MiniWidgets />
+              </Suspense>
+            </WhenVisible>
           </WidgetErrorBoundary>
         </div>
 
