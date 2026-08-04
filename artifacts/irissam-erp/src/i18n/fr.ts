@@ -340,6 +340,7 @@ export default {
   "pat.tab.appointments": "Rendez-vous",
   "pat.tab.admissions": "Admissions",
   "pat.tab.consultations": "Consultations",
+  "pat.tab.portal": "Portail Patient",
   "pat.tab.emergencies": "Urgences",
   "pat.tab.hospitalizations": "Hospitalisations",
   "pat.tab.laboratory": "Laboratoire",

@@ -9,7 +9,7 @@ import {
   Stethoscope, Bed, Scissors, HeartPulse, Baby, FlaskConical, Scan,
   Pill, Droplets, Package, Microscope, UserCheck, Users2, DollarSign,
   Truck, FolderOpen, BarChart3, Settings, ChevronLeft, Bell, Shield,
-  ShieldCheck, BarChart2, FolderArchive, Wallet
+  ShieldCheck, BarChart2, FolderArchive, Wallet, Globe
 } from "lucide-react";
 
 /** sessionStorage key — kept separate from page scroll keys */
@@ -150,6 +150,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
       items: [
         { path: "/doctors",   icon: UserCheck, label: "nav.doctors" },
         { path: "/hr",        icon: Users2,    label: "nav.hr" },
+        { path: "/patient-portal-admin", icon: Globe, label: "Portail Patient" },
         { path: "/finance",   icon: DollarSign,label: "nav.finance" },
         { path: "/ambulances",icon: Truck,     label: "nav.ambulances" },
         { path: "/archives",  icon: FolderOpen,label: "nav.archives" },

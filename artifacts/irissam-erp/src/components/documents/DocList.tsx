@@ -3,6 +3,7 @@ import { LayoutGrid, LayoutList, Table2, FileText, Eye, Download, Star, MoreVert
 import { cn } from "@/lib/utils";
 import { DocStatusBadge, DocConfidentialityBadge, DocMimeIcon, formatFileSize } from "./DocStatusBadge";
 import type { DocRecord } from "@/services/api/documents";
+import { PublishToPortalButton } from "@/components/portal/PublishToPortalButton";
 
 type ViewMode = "grid" | "list" | "table";
 
@@ -74,6 +75,14 @@ function DocRow({ doc, onView }: { doc: DocRecord; onView: (id: string) => void 
       <td className="px-3 py-3 text-gray-500 text-xs hidden sm:table-cell truncate max-w-[120px]">
         {doc.createdByName}
       </td>
+      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+        <PublishToPortalButton
+          entityType="documents"
+          entityId={doc.id}
+          isPublished={false}
+          status={doc.status}
+        />
+      </td>
     </tr>
   );
 }
@@ -125,6 +134,7 @@ export function DocList({ documents, total, loading, page, pageSize, onPageChang
                   <th className="px-3 py-2 text-left font-medium hidden xl:table-cell">Taille</th>
                   <th className="px-3 py-2 text-left font-medium">Date</th>
                   <th className="px-3 py-2 text-left font-medium hidden sm:table-cell">Créé par</th>
+                  <th className="px-3 py-2 text-left font-medium">Portail</th>
                 </tr>
               </thead>
               <tbody>

@@ -1,0 +1,244 @@
+ابدأ الآن تنفيذ Task #139 وTask #140 فقط.
+
+لا تبدأ Native Mobile App الآن.
+
+الهدف:
+إكمال الربط التشغيلي بين نظام الموظفين وPortail Patient حتى يستطيع المستشفى إنشاء حسابات المرضى ونشر النتائج والوثائق بشكل آمن.
+
+==================================================
+TASK #139 — Publish to Patient Portal
+==================================================
+
+أضف داخل نظام الموظفين أزرار نشر واضحة في:
+
+- Laboratory
+- Imaging
+- Prescriptions
+- Documents GED
+- Discharge documents
+- Invoices عند الحاجة
+
+كل سجل يحتوي على:
+
+- publishedToPatient
+- publishedAt
+- publishedBy
+- unpublishedAt
+- unpublishedBy
+- publicationNote اختياري
+
+الأزرار:
+
+- Publier au portail patient
+- Retirer du portail
+- Voir comme patient
+
+القواعد:
+
+1. لا يمكن نشر نتيجة Lab قبل status=validated.
+2. لا يمكن نشر Imaging قبل status=interpreted.
+3. لا يمكن نشر Prescription قبل اعتمادها.
+4. لا يمكن نشر Document بدون access rule تسمح patient_portal.
+5. النشر يحتاج Permission خاصة.
+6. إزالة النشر لا تحذف السجل.
+7. كل Publish/Unpublish يسجل Audit وTimeline.
+8. إرسال Notification للمريض عند النشر.
+9. منع نشر ملاحظات داخلية أو بيانات غير مخصصة للمريض.
+10. Bulk Publish مسموح فقط بصلاحية خاصة مع Confirmation.
+
+Permissions:
+
+- patient_portal.results.publish
+- patient_portal.results.unpublish
+- patient_portal.documents.publish
+- patient_portal.documents.unpublish
+- patient_portal.prescriptions.publish
+- patient_portal.bulk_publish
+
+APIs:
+
+POST /api/patient-portal-admin/lab-orders/:id/publish
+POST /api/patient-portal-admin/lab-orders/:id/unpublish
+POST /api/patient-portal-admin/imaging/:id/publish
+POST /api/patient-portal-admin/imaging/:id/unpublish
+POST /api/patient-portal-admin/prescriptions/:id/publish
+POST /api/patient-portal-admin/prescriptions/:id/unpublish
+POST /api/patient-portal-admin/documents/:id/publish
+POST /api/patient-portal-admin/documents/:id/unpublish
+
+==================================================
+TASK #140 — Staff Patient Portal Account Management
+==================================================
+
+أنشئ صفحة داخل نظام الموظفين:
+
+/patient-portal-admin
+
+تحتوي على:
+
+- Dashboard comptes portail
+- Comptes actifs
+- En attente activation
+- Suspendus
+- Verrouillés
+- Dernières connexions
+- Échecs d’activation
+- OTP expirés
+
+جدول الحسابات:
+
+- Patient
+- MRN
+- Téléphone
+- Email
+- Statut
+- Date activation
+- Dernière connexion
+- Appareils actifs
+- Résultats publiés
+- Actions
+
+Actions:
+
+- Créer compte
+- Générer code activation
+- Envoyer OTP
+- Réinitialiser activation
+- Suspendre
+- Réactiver
+- Déverrouiller
+- Révoquer sessions
+- Forcer changement mot de passe
+- Voir journal d’accès
+
+عند إنشاء الحساب:
+
+1. اختيار Patient حقيقي.
+2. التحقق أنه لا يملك حسابًا آخر.
+3. استعمال الهاتف والبريد من ملف المريض.
+4. إنشاء activation token أو OTP قصير الصلاحية.
+5. عرض الكود مرة واحدة فقط.
+6. تخزين token/OTP بشكل Hashed.
+7. إرسال عبر SMS/Email إذا Provider موجود.
+8. إمكانية طباعة ورقة Activation.
+9. Audit كامل.
+
+القواعد الأمنية:
+
+- لا تعرض كلمة السر.
+- لا تعرض Refresh Token.
+- OTP ينتهي.
+- OTP single-use.
+- Brute-force protection.
+- Revoke sessions فوري.
+- Patient A لا يرتبط بحساب Patient B.
+- الموظف يرى فقط المرضى داخل Scope المسموح له.
+
+Permissions:
+
+- patient_portal.accounts.view
+- patient_portal.accounts.create
+- patient_portal.accounts.activate
+- patient_portal.accounts.suspend
+- patient_portal.accounts.unlock
+- patient_portal.accounts.revoke_sessions
+- patient_portal.accounts.view_audit
+
+==================================================
+واجهة Patient Detail
+==================================================
+
+أضف داخل Patient Detail قسم:
+
+Portail Patient
+
+يعرض:
+
+- Account status
+- Email
+- Phone
+- Activated at
+- Last login
+- Active devices
+- Published results count
+- Published documents count
+- Unread notifications
+
+Actions حسب الصلاحية:
+
+- Créer le compte
+- Générer activation
+- Suspendre
+- Révoquer sessions
+- Ouvrir gestion portail
+
+==================================================
+اختبارات القبول
+==================================================
+
+TEST A:
+Lab غير Validated
+→ Publish مرفوض.
+
+TEST B:
+Lab Validated
+→ Publish ينجح ويظهر للمريض.
+
+TEST C:
+Unpublish
+→ يختفي من البوابة بدون حذف السجل.
+
+TEST D:
+Document بدون patient_portal access
+→ Publish مرفوض.
+
+TEST E:
+إنشاء حساب لمريض بدون حساب
+→ ينجح.
+
+TEST F:
+إنشاء حساب ثانٍ لنفس المريض
+→ HTTP 409.
+
+TEST G:
+Activation OTP
+→ Hashed + expiry + single-use.
+
+TEST H:
+Suspend account
+→ Login مرفوض.
+
+TEST I:
+Revoke sessions
+→ Refresh tokens تبطل فورًا.
+
+TEST J:
+موظف خارج Scope المريض
+→ 403 أو 404.
+
+TEST K:
+Patient Detail يعرض حالة الحساب الحقيقية.
+
+TEST L:
+Notification تصل للمريض عند Publish.
+
+TEST M:
+Responsive على iPhone / Android / Tablet / Desktop.
+
+TEST N:
+0 TypeScript Errors.
+0 Runtime SQL Errors.
+0 White Screens.
+0 IDOR.
+0 Data Leaks.
+
+في التقرير النهائي أعطني:
+
+- Migrations الجديدة.
+- Endpoints.
+- Permissions.
+- صفحات ومكونات الموظفين.
+- Workflow النشر.
+- Workflow التفعيل.
+- نتائج TEST A–N.
+- ما تم تأجيله.

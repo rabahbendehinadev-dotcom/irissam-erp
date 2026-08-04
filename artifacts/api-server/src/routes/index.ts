@@ -39,6 +39,7 @@ import payrollRouter    from "./payroll/index";
 import storageRouter from "./storage";
 import systemRouter from "./system/index.js";
 import patientPortalRouter from "./patient-portal/index.js";
+import patientPortalAdminRouter from "./patient-portal-admin/index.js";
 import { maintenanceGuard } from "../middleware/maintenanceGuard.js";
 
 const router: IRouter = Router();
@@ -100,5 +101,7 @@ router.use(storageRouter);
 router.use("/system", systemRouter);
 // Patient Portal (separate auth — uses requirePatientAuth, not requireAuth)
 router.use("/patient-portal", patientPortalRouter);
+// Patient Portal Admin (staff auth — publish/unpublish, account management)
+router.use("/patient-portal-admin", requireAuth, patientPortalAdminRouter);
 
 export default router;

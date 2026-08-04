@@ -20,6 +20,7 @@ import { PatientMedicalHistoryTab } from '@/components/patients/PatientMedicalHi
 import { PatientInvoicesTab } from '@/components/billing/PatientInvoicesTab';
 import { PatientPaymentsTab } from '@/components/billing/PatientPaymentsTab';
 import { PatientBillingTab } from '@/components/billing/PatientBillingTab';
+import { PatientPortalTab } from '@/components/patients/PatientPortalTab';
 import { ConsultationTable } from '@/components/consultations/ConsultationTable';
 import { ConsultationForm } from '@/components/consultations/ConsultationForm';
 import { ConsultationStatusBadge } from '@/components/consultations/ConsultationStatusBadge';
@@ -481,6 +482,9 @@ export default function PatientDetailPage() {
 
         {/* ─── AUDIT (Feature 8: search + filter + export) ─── */}
         {activeTab === 'audit' && <PatientAuditLog />}
+
+        {/* ─── PORTAL ─── */}
+        {activeTab === 'portal' && <PatientPortalTab patientId={patient.id} patientEmail={patient.email} />}
 
         {/* ─── BILLING TABS ─── */}
         {activeTab === 'invoices' && <PatientInvoicesTab patientId={patient.id} />}

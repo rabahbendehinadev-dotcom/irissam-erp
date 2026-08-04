@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import type { RepoLabOrder } from '@/types/repository';
 import type { AuditCtx } from '@/types/repository';
+import { PublishToPortalButton } from '@/components/portal/PublishToPortalButton';
 
 // ─── Status / urgency config ──────────────────────────────────────────────────
 
@@ -282,7 +283,7 @@ export default function LaboratoryPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {['Patient / Encounter', 'Analyse', 'Priorité', 'Médecin / Source', 'Statut', 'Heure', 'Action'].map(h => (
+                    {['Patient / Encounter', 'Analyse', 'Priorité', 'Médecin / Source', 'Statut', 'Heure', 'Portail', 'Action'].map(h => (
                       <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -340,6 +341,14 @@ export default function LaboratoryPage() {
                           {order.validatedBy && (
                             <p className="text-[10px] text-green-600 mt-0.5">par {order.validatedBy}</p>
                           )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <PublishToPortalButton
+                            entityType="lab-orders"
+                            entityId={order.id}
+                            isPublished={false} /* TODO: hook up to order.isPublished when added to store */
+                            status={order.status}
+                          />
                         </td>
                         <td className="px-4 py-3 text-right">
                           {canAdvance && st.next && (

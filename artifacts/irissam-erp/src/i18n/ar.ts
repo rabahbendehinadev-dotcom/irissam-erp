@@ -340,6 +340,7 @@ export default {
   "pat.tab.appointments": "المواعيد",
   "pat.tab.admissions": "الاستقبال",
   "pat.tab.consultations": "الاستشارات",
+  "pat.tab.portal": "بوابة المريض",
   "pat.tab.emergencies": "الطوارئ",
   "pat.tab.hospitalizations": "الاستشفاء",
   "pat.tab.laboratory": "المختبر",

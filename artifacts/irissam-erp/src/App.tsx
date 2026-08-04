@@ -44,6 +44,7 @@ const ExecutiveDashboardPage = lazy(() => import('@/pages/ExecutiveDashboard'));
 const DocumentsPage          = lazy(() => import('@/pages/Documents'));
 const PayrollPage            = lazy(() => import('@/pages/Payroll'));
 const SuperAdminPage         = lazy(() => import('@/pages/SuperAdmin'));
+const PatientPortalAdminPage = lazy(() => import('@/pages/PatientPortalAdmin'));
 
 // ---------------------------------------------------------------------------
 // Loading skeleton shown while a lazy chunk is fetching
@@ -202,6 +203,7 @@ function Router() {
       <Route path="/documents" component={() => <ProtectedRoute component={DocumentsPage} />} />
       <Route path="/payroll"   component={() => <ProtectedRoute component={PayrollPage}   />} />
       <Route path="/super-admin" component={() => <ProtectedRoute component={SuperAdminPage} />} />
+      <Route path="/patient-portal-admin" component={() => <ProtectedRoute component={PatientPortalAdminPage} />} />
       <Route path="/doctors" component={() => <ProtectedRoute component={PersonnelPage} />} />
       <Route path="/hr/employees/:id" component={() => <ProtectedRoute component={HRPage} />} />
       <Route path="/hr/:tab" component={() => <ProtectedRoute component={HRPage} />} />

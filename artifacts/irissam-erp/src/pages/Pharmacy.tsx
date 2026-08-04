@@ -28,6 +28,7 @@ import {
   Download,
 } from 'lucide-react';
 import type { RepoPrescription, AuditCtx } from '@/types/repository';
+import { PublishToPortalButton } from '@/components/portal/PublishToPortalButton';
 import {
   useGetMedications,
   useCreateMedication,
@@ -843,7 +844,7 @@ function PrescriptionsTab() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {['Patient / Encounter', 'Médicament', 'Posologie', 'Médecin / Source', 'Statut', 'Heure', 'Action'].map(h => (
+                  {['Patient / Encounter', 'Médicament', 'Posologie', 'Médecin / Source', 'Statut', 'Heure', 'Portail', 'Action'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -898,6 +899,14 @@ function PrescriptionsTab() {
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
                         {new Date(rx.prescribedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <PublishToPortalButton
+                          entityType="prescriptions"
+                          entityId={rx.id}
+                          isPublished={false}
+                          status={rx.status}
+                        />
                       </td>
                       <td className="px-4 py-3 text-right">
                         {canAct && st.next && (

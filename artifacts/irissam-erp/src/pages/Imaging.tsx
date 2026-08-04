@@ -19,6 +19,7 @@ import {
   ScanLine, Search, ChevronRight, X, FileText, Eye,
 } from 'lucide-react';
 import type { RepoImagingOrder, AuditCtx } from '@/types/repository';
+import { PublishToPortalButton } from '@/components/portal/PublishToPortalButton';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -310,7 +311,7 @@ export default function ImagingPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {['Patient / Encounter', 'Examen', 'Priorité', 'Médecin / Source', 'Statut', 'Heure', 'Action'].map(h => (
+                    {['Patient / Encounter', 'Examen', 'Priorité', 'Médecin / Source', 'Statut', 'Heure', 'Portail', 'Action'].map(h => (
                       <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -359,6 +360,14 @@ export default function ImagingPage() {
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
                           {new Date(order.requestedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <PublishToPortalButton
+                            entityType="imaging"
+                            entityId={order.id}
+                            isPublished={false}
+                            status={order.status}
+                          />
                         </td>
                         <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
                           {canAdvance && st.next && (

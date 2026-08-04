@@ -33,6 +33,7 @@ const TABS = [
   { key: 'payments',           labelKey: 'pat.tab.payments',         soon: true },
   { key: 'consents',           labelKey: 'pat.tab.consents' },
   { key: 'timeline',           labelKey: 'pat.tab.timeline' },
+  { key: 'portal',             labelKey: 'pat.tab.portal' },
   { key: 'audit',              labelKey: 'pat.tab.audit' },
 ] as const;
 
