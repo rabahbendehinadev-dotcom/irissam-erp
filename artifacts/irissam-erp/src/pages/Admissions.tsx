@@ -325,6 +325,7 @@ export default function AdmissionsPage() {
           onTransfer={a => setTransferring(a)}
           onCancel={a => setCancelling(a)}
           onPatientClick={patientId => setDrawerPatientId(patientId)}
+          onViewPatient={patientId => navigate(`/patients/${patientId}`)}
           canEdit={can('admissions.edit')}
           canDischarge={can('admissions.discharge')}
           canTransfer={can('admissions.transfer')}

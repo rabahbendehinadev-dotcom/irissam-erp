@@ -500,6 +500,7 @@ export default {
   "adm.bed.maintenance": "Maintenance",
   "adm.bed.occupied_by": "Occupé par",
   "adm.action.view": "Voir détail",
+  "adm.action.viewPatient": "Voir dossier patient",
   "adm.action.edit": "Modifier",
   "adm.action.discharge": "Sortie patient",
   "adm.action.transfer": "Transférer",

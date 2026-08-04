@@ -1,4 +1,4 @@
-import { ArrowUpDown, ArrowUp, ArrowDown, BedDouble } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, BedDouble, FolderOpen } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import type { Admission } from '@/types/admission';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
@@ -32,6 +32,7 @@ interface Props {
   onTransfer: (a: Admission) => void;
   onCancel: (a: Admission) => void;
   onPatientClick?: (patientId: string) => void;
+  onViewPatient?: (patientId: string) => void;
   canEdit: boolean;
   canDischarge: boolean;
   canTransfer: boolean;
@@ -44,7 +45,7 @@ interface Props {
 export function AdmissionTable({
   admissions, page, perPage,
   onView, onEdit, onDischarge, onTransfer, onCancel,
-  onPatientClick,
+  onPatientClick, onViewPatient,
   canEdit, canDischarge, canTransfer, canCancel,
   sortField, sortDir, onSort,
 }: Props) {
@@ -108,15 +109,26 @@ export function AdmissionTable({
 
                 {/* Patient */}
                 <td className="px-3 py-3">
-                  <button
-                    onClick={() => onPatientClick ? onPatientClick(admission.patientId) : onView(admission)}
-                    className="flex items-center gap-2.5"
-                  >
-                    <PatientAvatar name={admission.patientName} size="sm" />
-                    <span className="text-sm font-medium text-gray-900 group-hover:text-blue-700 transition-colors">
-                      {admission.patientName}
-                    </span>
-                  </button>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={() => onPatientClick ? onPatientClick(admission.patientId) : onView(admission)}
+                      className="flex items-center gap-2.5 min-w-0"
+                    >
+                      <PatientAvatar name={admission.patientName} size="sm" />
+                      <span className="text-sm font-medium text-gray-900 group-hover:text-blue-700 transition-colors truncate">
+                        {admission.patientName}
+                      </span>
+                    </button>
+                    {onViewPatient && (
+                      <button
+                        title="Ouvrir le dossier patient"
+                        onClick={e => { e.stopPropagation(); onViewPatient(admission.patientId); }}
+                        className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-1 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-all"
+                      >
+                        <FolderOpen size={14} />
+                      </button>
+                    )}
+                  </div>
                 </td>
 
                 {/* Service */}
@@ -174,6 +186,7 @@ export function AdmissionTable({
                     onTransfer={() => onTransfer(admission)}
                     onCancel={() => onCancel(admission)}
                     onPrint={() => window.print()}
+                    onViewPatient={onViewPatient ? () => onViewPatient(admission.patientId) : undefined}
                     canEdit={canEdit}
                     canDischarge={canDischarge}
                     canTransfer={canTransfer}

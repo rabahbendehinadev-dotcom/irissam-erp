@@ -500,6 +500,7 @@ export default {
   "adm.bed.maintenance": "صيانة",
   "adm.bed.occupied_by": "مشغول بـ",
   "adm.action.view": "عرض التفاصيل",
+  "adm.action.viewPatient": "فتح ملف المريض",
   "adm.action.edit": "تعديل",
   "adm.action.discharge": "خروج المريض",
   "adm.action.transfer": "نقل",

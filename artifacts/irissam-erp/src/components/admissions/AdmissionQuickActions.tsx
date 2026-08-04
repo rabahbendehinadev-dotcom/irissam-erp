@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MoreVertical, Eye, Pencil, LogOut, ArrowRight, Ban, Printer } from 'lucide-react';
+import { MoreVertical, Eye, Pencil, LogOut, ArrowRight, Ban, Printer, FolderOpen } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import type { Admission } from '@/types/admission';
 
@@ -11,6 +11,7 @@ interface Props {
   onTransfer: () => void;
   onCancel: () => void;
   onPrint: () => void;
+  onViewPatient?: () => void;
   canEdit: boolean;
   canDischarge: boolean;
   canTransfer: boolean;
@@ -18,7 +19,7 @@ interface Props {
 }
 
 export function AdmissionQuickActions({
-  admission, onView, onEdit, onDischarge, onTransfer, onCancel, onPrint,
+  admission, onView, onEdit, onDischarge, onTransfer, onCancel, onPrint, onViewPatient,
   canEdit, canDischarge, canTransfer, canCancel,
 }: Props) {
   const { t } = useLanguage();
@@ -60,6 +61,7 @@ export function AdmissionQuickActions({
       {open && (
         <div className="absolute right-0 top-8 z-20 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 w-44 min-w-max">
           {item(<Eye size={14} />,         t('adm.action.view'),      onView)}
+          {onViewPatient && item(<FolderOpen size={14} />, t('adm.action.viewPatient'), onViewPatient)}
           {canEdit && item(<Pencil size={14} />, t('adm.action.edit'), onEdit)}
           {canDischarge && canActOnActive && item(<LogOut size={14} />, t('adm.action.discharge'), onDischarge)}
           {canTransfer  && canActOnActive && item(<ArrowRight size={14} />, t('adm.action.transfer'), onTransfer)}
