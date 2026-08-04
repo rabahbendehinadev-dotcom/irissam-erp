@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useLanguage } from "@/i18n";
 import { cn } from "@/lib/utils";
-import logoPath from "@assets/9e2f711d-0744-437b-a151-78a356a73edf_1785616056682.png";
+import logoPath from "@/assets/logo.png";
 import { useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/store/AuthContext";
 import {

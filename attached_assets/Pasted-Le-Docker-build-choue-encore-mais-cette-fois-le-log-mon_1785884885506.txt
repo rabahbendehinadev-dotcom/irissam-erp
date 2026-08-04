@@ -1,0 +1,64 @@
+Le Docker build échoue encore, mais cette fois le log montre que l’erreur réelle vient de :
+
+@workspace/irissam-erp build
+vite build --config vite.config.ts
+ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL
+Exit status 1
+
+Ne te fie pas seulement à la ligne Dockerfile du patient portal affichée en bas.
+
+Je veux que tu fasses exactement ceci :
+
+1. Lance depuis la racine :
+   docker build --no-cache --progress=plain \
+   -f artifacts/api-server/Dockerfile \
+   -t irissam-test .
+
+2. Récupère la PREMIÈRE erreur complète située avant :
+   ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL
+   Exit status 1
+
+3. Reproduis séparément dans le même environnement :
+   NODE_ENV=production BASE_PATH=/ PORT=3000 \
+   pnpm --filter @workspace/irissam-erp run build
+
+4. Corrige la cause réelle dans le code ou les dépendances.
+   Vérifie particulièrement :
+   - artifacts/irissam-erp/vite.config.ts
+   - artifacts/irissam-erp/package.json
+   - imports runtimeErrorOverlay
+   - aliases
+   - modules partagés
+   - dépendances Rollup, Tailwind et esbuild
+   - fichiers copiés dans le stage Docker builder
+   - différences Linux de majuscules/minuscules dans les noms de fichiers
+
+5. Ne masque pas l’erreur avec :
+   - || true
+   - suppression du frontend
+   - désactivation du build
+   - fallback vide
+
+6. Après correction, valide obligatoirement :
+   pnpm --filter @workspace/irissam-erp run build
+   pnpm --filter @workspace/patient-portal run build
+   docker build --no-cache --progress=plain \
+   -f artifacts/api-server/Dockerfile \
+   -t irissam-test .
+
+7. Lance ensuite l’image et vérifie :
+   GET / = 200
+   GET /api/healthz = 200
+   GET /patient-portal/ = 200
+   GET /admissions = 200
+   GET /patient-portal/appointments = 200
+
+8. Fais un commit local après réussite, mais ne fais pas git push.
+
+9. Donne-moi :
+   - la première erreur exacte
+   - la cause réelle
+   - les fichiers modifiés
+   - les résultats des builds
+   - les résultats curl
+   - le hash du commit local
