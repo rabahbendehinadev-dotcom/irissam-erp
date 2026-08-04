@@ -1,0 +1,162 @@
+أوقف Task #144 الخاصة بإرسال OTP عبر SMS أو Email.
+
+أريد اعتماد سياسة Manual OTP من لوحة الموظفين فقط.
+
+المطلوب:
+
+1. توليد OTP يكون فقط من:
+POST /api/patient-portal-admin/accounts/:id/generate-otp
+
+2. الـEndpoint يجب أن يكون محميًا بـ:
+- requireAuth
+- requirePermission('patient_portal.accounts.activate')
+- Data Scope حسب Site / Patient
+- Rate Limit
+- Audit
+
+3. لا يوجد أي Endpoint عام يسمح للمريض بتوليد OTP بنفسه.
+
+4. احذف أو عطّل:
+- resend-activation
+- generate-otp public
+- أي self-service OTP flow
+
+5. عند الضغط من Panel على:
+"Générer un code d’activation"
+
+يتم:
+- توليد OTP من 6 أرقام
+- تخزين HMAC-SHA256 فقط
+- صلاحية 30 دقيقة
+- single-use
+- otpAttempts = 0
+- إلغاء أي OTP سابق
+
+6. الكود يظهر مرة واحدة فقط في Dialog داخل Panel.
+
+الـDialog يحتوي على:
+- OTP
+- Date d’expiration
+- Copier
+- Imprimer
+- Fermer
+
+بعد غلق الـDialog:
+- لا يمكن استرجاع نفس OTP
+- يجب توليد OTP جديد
+
+7. إذا نسي المريض OTP أو انتهت صلاحيته:
+- الموظف يضغط "Générer un nouveau code"
+- الكود القديم يبطل فورًا
+- يظهر الكود الجديد مرة واحدة
+
+8. أضف Confirmation قبل توليد كود جديد:
+
+"سيتم إبطال رمز التفعيل السابق. هل تريد المتابعة؟"
+
+9. Patient Portal:
+صفحة Activation تقبل:
+- MRN
+- Date de naissance
+- Téléphone
+- OTP
+
+ولا توفر زر:
+- Renvoyer OTP
+- Envoyer par SMS
+- Envoyer par Email
+
+بدل ذلك تعرض رسالة:
+
+"للحصول على رمز تفعيل جديد، يرجى الاتصال بالاستقبال."
+
+10. الأمان:
+- OTP لا يظهر في Logs
+- OTP لا يظهر في Audit
+- OTP لا يظهر في GET Accounts
+- OTP Hash لا يرجع للFrontend
+- أقصى 5 محاولات
+- Lock مؤقت عند تجاوز المحاولات
+- رسالة خطأ عامة
+
+11. واجهة Staff:
+داخل Patient Portal Admin وPatient Detail أضف:
+
+- Générer code d’activation
+- Régénérer code
+- Imprimer code
+- Voir date d’expiration
+- Statut:
+  - Code actif
+  - Code expiré
+  - Compte activé
+  - Compte suspendu
+
+12. ورقة الطباعة تحتوي على:
+
+IRISSAM HOSPITAL
+Activation Portail Patient
+
+Nom patient
+MRN
+Code d’activation
+Date d’expiration
+Adresse du portail:
+https://irissamhospital.com/patient-portal
+
+Instructions:
+1. Ouvrir le portail
+2. Choisir Activer mon compte
+3. Saisir MRN, date de naissance, téléphone et code
+4. Créer un mot de passe
+
+لا تطبع أي بيانات طبية أخرى.
+
+13. اختبارات:
+
+TEST A:
+Staff بدون Permission
+→ 403
+
+TEST B:
+Staff يولد OTP
+→ يظهر مرة واحدة فقط
+
+TEST C:
+GET account
+→ لا يعرض OTP أو Hash
+
+TEST D:
+توليد OTP جديد
+→ القديم يصبح invalid
+
+TEST E:
+OTP صحيح
+→ الحساب يتفعل
+
+TEST F:
+OTP مستعمل مرة ثانية
+→ مرفوض
+
+TEST G:
+OTP منتهي
+→ مرفوض
+
+TEST H:
+5 محاولات خاطئة
+→ Lock مؤقت
+
+TEST I:
+لا توجد أي Route SMS/Email/Resend فعالة
+
+TEST J:
+0 TypeScript Errors
+0 Runtime SQL Errors
+0 White Screens
+
+في التقرير النهائي أعطني:
+- Endpoints التي تم حذفها أو تعطيلها
+- Flow Manual OTP النهائي
+- ملفات الواجهة المعدلة
+- نموذج ورقة الطباعة
+- نتائج TEST A–J

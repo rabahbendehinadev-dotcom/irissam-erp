@@ -109,7 +109,9 @@ router.get(
            (SELECT COUNT(*) FROM lab_orders lo WHERE lo.patient_id=ppa.patient_id AND lo.published_to_patient=TRUE AND lo.deleted_at IS NULL) +
            (SELECT COUNT(*) FROM imaging_orders io WHERE io.patient_id=ppa.patient_id AND io.published_to_patient=TRUE AND io.deleted_at IS NULL) +
            (SELECT COUNT(*) FROM prescriptions rx WHERE rx.patient_id=ppa.patient_id AND rx.published_to_patient=TRUE AND rx.deleted_at IS NULL) AS published_results,
-           (SELECT COUNT(*) FROM document_records dr WHERE dr.patient_id=ppa.patient_id AND dr.published_to_patient=TRUE AND dr.deleted_at IS NULL) AS published_documents
+           (SELECT COUNT(*) FROM document_records dr WHERE dr.patient_id=ppa.patient_id AND dr.published_to_patient=TRUE AND dr.deleted_at IS NULL) AS published_documents,
+           (ppa.otp_hash IS NOT NULL AND ppa.otp_exp > now()) AS has_active_otp,
+           CASE WHEN ppa.otp_hash IS NOT NULL AND ppa.otp_exp > now() THEN ppa.otp_exp ELSE NULL END AS otp_expires_at
          FROM patient_portal_accounts ppa
          JOIN patients p ON p.id = ppa.patient_id
          WHERE ${where.join(" AND ")}
@@ -138,6 +140,8 @@ router.get(
            ppa.id, ppa.patient_id, ppa.email, ppa.phone, ppa.status,
            ppa.last_login_at, ppa.created_at, ppa.force_password_change,
            (ppa.locked_until > now()) AS is_locked,
+           (ppa.otp_hash IS NOT NULL AND ppa.otp_exp > now()) AS has_active_otp,
+           CASE WHEN ppa.otp_hash IS NOT NULL AND ppa.otp_exp > now() THEN ppa.otp_exp ELSE NULL END AS otp_expires_at,
            (SELECT COUNT(*) FROM patient_portal_sessions ps WHERE ps.account_id=ppa.id AND ps.expires_at>now() AND ps.revoked_at IS NULL) AS active_sessions,
            (SELECT COUNT(*) FROM lab_orders lo WHERE lo.patient_id=ppa.patient_id AND lo.published_to_patient=TRUE AND lo.deleted_at IS NULL) +
            (SELECT COUNT(*) FROM imaging_orders io WHERE io.patient_id=ppa.patient_id AND io.published_to_patient=TRUE AND io.deleted_at IS NULL) +
@@ -164,16 +168,18 @@ router.get(
     try {
       const { rows } = await pool.query(
         `SELECT ppa.*, p.first_name, p.last_name, p.mpi_id, p.phone AS patient_phone, p.email AS patient_email,
-                (ppa.locked_until > now()) AS is_locked
+                (ppa.locked_until > now()) AS is_locked,
+                (ppa.otp_hash IS NOT NULL AND ppa.otp_exp > now()) AS has_active_otp,
+                CASE WHEN ppa.otp_hash IS NOT NULL AND ppa.otp_exp > now() THEN ppa.otp_exp ELSE NULL END AS otp_expires_at
          FROM patient_portal_accounts ppa
          JOIN patients p ON p.id = ppa.patient_id
          WHERE ppa.id=$1 AND ppa.deleted_at IS NULL`,
         [String(req.params.id)],
       );
       if (!rows[0]) { res.status(404).json({ message: "Compte introuvable." }); return; }
-      // Never expose sensitive hash fields
-      // Strip all sensitive fields — OTP hash MUST never leave the server
-      const { password_hash, activation_token, reset_token, otp_code, otp_hash, mfa_secret, ...safe } = rows[0];
+      // Strip all sensitive hash fields — NEVER expose to frontend
+      const { password_hash, activation_token, reset_token, otp_code, otp_hash, otp_exp, mfa_secret, ...safe } = rows[0];
+      // has_active_otp and otp_expires_at are computed, remain in safe
       res.json({ account: safe });
     } catch (err) {
       console.error("[portal-admin/accounts/:id]", err);
@@ -269,7 +275,6 @@ router.post(
 
       const otp = generateOtp();
       const otpExp = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
-      const otpHash = hashToken(otp);
 
       await pool.query(
         `UPDATE patient_portal_accounts

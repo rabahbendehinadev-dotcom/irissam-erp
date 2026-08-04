@@ -468,64 +468,12 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
   }
 });
 
-// ── POST /resend-activation  (patient self-service — safe resend) ─────────────
-// Requires: email + dateOfBirth challenge (not just MRN).
-// Never returns OTP in response (no provider configured yet).
-// Never reveals whether account exists (no enumeration).
-// Rate-limited: 3 attempts per 10 minutes per IP.
-const _resendRateMap = new Map<string, { count: number; resetAt: number }>();
-function _resendRateCheck(key: string): boolean {
-  const MAX = 3, WINDOW = 10 * 60 * 1000, now = Date.now();
-  const e = _resendRateMap.get(key);
-  if (!e || now > e.resetAt) { _resendRateMap.set(key, { count: 1, resetAt: now + WINDOW }); return true; }
-  if (e.count >= MAX) return false;
-  e.count++; return true;
-}
-
-router.post("/resend-activation", async (req: Request, res: Response) => {
-  const GENERIC = { message: "Si ce compte existe, un code d'activation a été enregistré." };
-  const { email, dateOfBirth } = req.body ?? {};
-
-  // Rate limit by IP
-  if (!_resendRateCheck(req.ip ?? "unknown")) {
-    res.status(429).json({ message: "Trop de tentatives. Réessayez dans 10 minutes." });
-    return;
-  }
-
-  if (!email || !dateOfBirth) { res.json(GENERIC); return; }
-
-  try {
-    const { rows } = await pool.query(
-      `SELECT ppa.id, ppa.patient_id, ppa.status
-       FROM patient_portal_accounts ppa
-       JOIN patients pt ON pt.id = ppa.patient_id
-       WHERE lower(ppa.email) = lower($1)
-         AND pt.date_of_birth = $2::date
-         AND ppa.deleted_at IS NULL
-         AND ppa.status = 'pending_activation'`,
-      [email, dateOfBirth],
-    );
-
-    if (rows[0]) {
-      const otp = generateOtp();
-      const exp = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
-      await pool.query(
-        `UPDATE patient_portal_accounts
-         SET otp_hash=$1, otp_exp=$2, otp_attempts=0, updated_at=now()
-         WHERE id=$3`,
-        [hmacOtp(otp), exp, rows[0].id],
-      );
-      // TODO: send via SMS/Email when provider configured
-      // await smsProvider.send(maskedPhone, otp);
-      await auditLog(rows[0].id, rows[0].patient_id, "resend_activation", req.ip, true);
-      // OTP intentionally NOT in response — delivery via provider only
-    }
-    // Always same response whether account found or not
-    res.json(GENERIC);
-  } catch {
-    res.json(GENERIC); // Never expose errors
-  }
-});
+// NOTE: No self-service OTP resend endpoint.
+// OTP generation is exclusively through the authenticated staff interface:
+//   POST /api/patient-portal-admin/accounts/:id/generate-otp
+//   (requires patient_portal.accounts.activate permission)
+//
+// Patients who need a new code must contact the reception desk.
 
 // ── POST /preview  (validate staff preview token → read-only JWT) ──────────────
 // Called by the patient portal frontend when opened with a preview link.
