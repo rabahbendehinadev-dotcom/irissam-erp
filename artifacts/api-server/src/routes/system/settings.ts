@@ -2,7 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/requireAuth.js";
 import { requirePermission } from "../../middleware/requirePermission.js";
-import { requireStepUp } from "../../middleware/requireStepUp.js";
+import { requireStepUp, requireStepUpFor } from "../../middleware/requireStepUp.js";
 
 const router = Router();
 
@@ -131,7 +131,7 @@ router.post(
   "/reset",
   requireAuth,
   requirePermission("system.settings.manage"),
-  requireStepUp,
+  requireStepUpFor("reset_settings"),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { rows } = await pool.query("SELECT id FROM system_settings LIMIT 1");

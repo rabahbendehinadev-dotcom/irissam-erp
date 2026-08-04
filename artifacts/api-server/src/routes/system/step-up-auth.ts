@@ -8,14 +8,30 @@ const router = Router();
 
 /**
  * POST /api/system/step-up-auth
- * Re-verifies the current user's password and issues a short-lived step-up token.
- * The token must be sent as the X-Step-Up-Token header on protected operations.
- * Valid for 15 minutes, single-use.
+ * Re-verifies the current user's password and issues a short-lived, single-use,
+ * operation-scoped step-up token.
+ *
+ * Body:
+ *   { password: string, operation?: string }
+ *
+ * `operation` defaults to "general" (accepted everywhere).
+ * Sensitive operations (restore, apply_migration, revoke_all_sessions, …) should
+ * pass a specific operation so the token cannot be reused across unrelated actions.
+ *
+ * The token is valid for 15 minutes and consumed on first use.
+ * It must be sent as the X-Step-Up-Token header on the protected route.
+ *
+ * After logout the token is invalidated (user_sessions revoked → step_up_tokens
+ * are checked against the current user_id which no longer has an active session).
  */
 router.post("/step-up-auth", requireAuth, async (req: AuthenticatedRequest, res) => {
-  const { password } = req.body ?? {};
+  const { password, operation = "general" } = req.body ?? {};
   if (!password || typeof password !== "string") {
     res.status(400).json({ message: "Mot de passe requis." });
+    return;
+  }
+  if (typeof operation !== "string" || operation.length > 64) {
+    res.status(400).json({ message: "Opération invalide." });
     return;
   }
 
@@ -36,28 +52,28 @@ router.post("/step-up-auth", requireAuth, async (req: AuthenticatedRequest, res)
       return;
     }
 
-    const raw      = "su_" + crypto.randomBytes(32).toString("hex");
-    const hash     = crypto.createHash("sha256").update(raw).digest("hex");
+    const raw       = "su_" + crypto.randomBytes(32).toString("hex");
+    const hash      = crypto.createHash("sha256").update(raw).digest("hex");
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
 
     await pool.query(
-      `INSERT INTO system_step_up_tokens (user_id, token_hash, expires_at)
-       VALUES ($1, $2, $3)`,
-      [req.auth!.userId, hash, expiresAt],
+      `INSERT INTO system_step_up_tokens (user_id, token_hash, expires_at, operation)
+       VALUES ($1, $2, $3, $4)`,
+      [req.auth!.userId, hash, expiresAt, operation],
     );
 
-    // Log audit
-    try {
-      await pool.query(
-        `INSERT INTO user_activity_logs (user_id, user_name, user_role, action, module, description, ip)
-         SELECT $1, u.first_name||' '||u.last_name, u.role, 'view'::user_activity_action,
-                'system', 'Step-up authentication réussie', $2
-         FROM users u WHERE u.id = $1`,
-        [req.auth!.userId, req.ip ?? null],
-      );
-    } catch { /* non-blocking */ }
+    // Audit — never log the raw token
+    pool.query(
+      `INSERT INTO user_activity_logs
+         (user_id, user_name, user_role, action, module, description, ip)
+       SELECT $1, u.first_name||' '||u.last_name, u.role,
+              'view'::user_activity_action, 'system',
+              'Step-up authentication réussie (opération: ' || $2 || ')', $3
+       FROM users u WHERE u.id = $1`,
+      [req.auth!.userId, operation, req.ip ?? null],
+    ).catch(() => {});
 
-    res.json({ token: raw, expiresAt, expiresInSeconds: 900 });
+    res.json({ token: raw, expiresAt, expiresInSeconds: 900, operation });
   } catch {
     res.status(500).json({ message: "Erreur serveur." });
   }

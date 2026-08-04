@@ -2,7 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/requireAuth.js";
 import { requirePermission } from "../../middleware/requirePermission.js";
-import { requireStepUp } from "../../middleware/requireStepUp.js";
+import { requireStepUp, requireStepUpFor } from "../../middleware/requireStepUp.js";
 import { invalidateMaintenanceCache } from "../../middleware/maintenanceGuard.js";
 
 const router = Router();
@@ -45,7 +45,7 @@ router.patch(
   "/",
   requireAuth,
   requirePermission("system.maintenance.manage"),
-  requireStepUp,
+  requireStepUpFor("maintenance"),
   async (req: AuthenticatedRequest, res) => {
     const { enabled, message, message_ar, message_en, start_at, end_at, allowed_roles, allowed_ips } = req.body ?? {};
     try {

@@ -46,6 +46,10 @@ const router: IRouter = Router();
 router.use(healthRouter);
 router.use("/auth", authRouter);
 
+// Global maintenance guard — exempt paths: /auth/*, /healthz, /system/health
+// Applied after public routes so auth/health always work.
+router.use(maintenanceGuard);
+
 // Protected routes — valid JWT required
 router.use("/dashboard",     requireAuth, dashboardRouter);
 router.use("/patients",      requireAuth, patientsRouter);
@@ -92,6 +96,6 @@ router.use("/payroll",             requireAuth, payrollRouter);
 // Object Storage (presigned upload URLs + file serving)
 router.use(storageRouter);
 // System / Super-Admin Control Center
-router.use("/system", maintenanceGuard, systemRouter);
+router.use("/system", systemRouter);
 
 export default router;

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/requireAuth.js";
 import { requirePermission } from "../../middleware/requirePermission.js";
-import { requireStepUp } from "../../middleware/requireStepUp.js";
+import { requireStepUp, requireStepUpFor } from "../../middleware/requireStepUp.js";
 
 const router = Router();
 
@@ -121,7 +121,7 @@ router.post(
   "/cancel-query",
   requireAuth,
   requirePermission("system.database.manage"),
-  requireStepUp,
+  requireStepUpFor("cancel_query"),
   async (req: AuthenticatedRequest, res) => {
     const pid = parseInt(String(req.body?.pid ?? ""), 10);
     if (!pid || pid < 1) {

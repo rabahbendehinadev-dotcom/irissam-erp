@@ -2,7 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/requireAuth.js";
 import { requirePermission } from "../../middleware/requirePermission.js";
-import { requireStepUp } from "../../middleware/requireStepUp.js";
+import { requireStepUp, requireStepUpFor } from "../../middleware/requireStepUp.js";
 
 const router = Router();
 
@@ -88,7 +88,7 @@ router.post(
   "/:id/restore-plan",
   requireAuth,
   requirePermission("system.backups.restore"),
-  requireStepUp,
+  requireStepUpFor("restore"),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { rows: bRows } = await pool.query("SELECT * FROM system_backups WHERE id=$1", [req.params.id]);

@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { pool } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/requireAuth.js";
 import { requirePermission } from "../../middleware/requirePermission.js";
-import { requireStepUp } from "../../middleware/requireStepUp.js";
+import { requireStepUp, requireStepUpFor } from "../../middleware/requireStepUp.js";
 
 const router = Router();
 
@@ -75,7 +75,7 @@ router.post(
   "/revoke-all-for-user",
   requireAuth,
   requirePermission("system.sessions.revoke"),
-  requireStepUp,
+  requireStepUpFor("revoke_all_sessions"),
   async (req: AuthenticatedRequest, res) => {
     const { userId } = req.body ?? {};
     if (!userId) {

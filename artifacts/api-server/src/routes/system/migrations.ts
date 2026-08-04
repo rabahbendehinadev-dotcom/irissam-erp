@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { pool } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/requireAuth.js";
 import { requirePermission } from "../../middleware/requirePermission.js";
-import { requireStepUp } from "../../middleware/requireStepUp.js";
+import { requireStepUp, requireStepUpFor } from "../../middleware/requireStepUp.js";
 import { runMigrations } from "../../lib/migrations.js";
 
 const router = Router();
@@ -92,7 +92,7 @@ router.get(
   requireAuth,
   requirePermission("system.migrations.view"),
   async (req, res) => {
-    const { name } = req.params;
+    const name = String(req.params.name);
     if (!MIGRATIONS_LIST.includes(name)) {
       res.status(404).json({ message: "Migration introuvable." });
       return;
@@ -152,7 +152,7 @@ router.post(
   "/apply",
   requireAuth,
   requirePermission("system.migrations.apply"),
-  requireStepUp,
+  requireStepUpFor("apply_migration"),
   async (req: AuthenticatedRequest, res) => {
     try {
       await runMigrations();

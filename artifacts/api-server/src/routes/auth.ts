@@ -374,6 +374,27 @@ router.post("/logout", async (req: AuthenticatedRequest, res: Response) => {
     );
   }
 
+  // Invalidate all pending step-up tokens for this user on logout.
+  // req.auth may be null (no requireAuth on logout) — decode the Bearer token directly.
+  const bearerToken = req.headers.authorization?.startsWith("Bearer ")
+    ? req.headers.authorization.slice(7)
+    : null;
+  const stepUpUserId: string | null = (() => {
+    if (req.auth?.userId) return req.auth.userId;
+    if (!bearerToken || !JWT_SECRET) return null;
+    try {
+      const p = jwt.decode(bearerToken) as { userId?: string } | null;
+      return p?.userId ?? null;
+    } catch { return null; }
+  })();
+  if (stepUpUserId) {
+    pool.query(
+      `UPDATE system_step_up_tokens SET used_at = now()
+       WHERE user_id = $1 AND used_at IS NULL`,
+      [stepUpUserId],
+    ).catch(() => {});
+  }
+
   if (req.auth?.userId) {
     const { rows } = await pool.query<{ first_name: string; last_name: string; role: string }>(
       `SELECT first_name, last_name, role FROM users WHERE id = $1`,

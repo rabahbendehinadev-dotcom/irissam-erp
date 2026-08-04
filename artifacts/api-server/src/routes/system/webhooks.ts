@@ -75,7 +75,9 @@ router.post(
         `INSERT INTO system_webhooks (name, endpoint_url, events, hashed_secret, active, retry_policy, created_by)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id, name, endpoint_url, events, active, retry_policy, created_by, created_at`,
-        [name, endpoint_url, events, hashed, active, retry_policy ?? null, req.auth!.userId]
+        [name, endpoint_url, events, hashed, active,
+         retry_policy != null ? JSON.stringify(retry_policy) : JSON.stringify({ maxAttempts: 3, backoffSeconds: 60 }),
+         req.auth!.userId]
       );
       await auditLog(req.auth!.userId, "webhooks", `Webhook créé: ${name}`, req.ip);
       res.status(201).json({ webhook: rows[0] });

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/requireAuth.js";
 import { requirePermission } from "../../middleware/requirePermission.js";
+import { requireStepUpFor } from "../../middleware/requireStepUp.js";
 
 const router = Router();
 
@@ -97,12 +98,46 @@ router.post(
 );
 
 // PATCH /:id
+// Secret fields (password, apiKey, secret, token) require step-up authentication.
+// Non-secret fields (label, enabled) do not.
 router.patch(
   "/:id",
   requireAuth,
   requirePermission("system.integrations.manage"),
   async (req: AuthenticatedRequest, res) => {
     const { label, enabled, config } = req.body ?? {};
+
+    // Enforce step-up when secrets are being updated
+    if (config && typeof config === "object") {
+      const secretFields = ["password", "apiKey", "secret", "token"];
+      const hasSecrets = secretFields.some((f) =>
+        Object.keys(config as object).some((k) => k.toLowerCase().includes(f.toLowerCase()))
+      );
+      if (hasSecrets) {
+        const rawToken = req.headers["x-step-up-token"] as string | undefined;
+        if (!rawToken) {
+          res.status(403).json({
+            code: "STEP_UP_REQUIRED",
+            message: "Authentification renforcée requise pour modifier des secrets d'intégration.",
+            requiredOperation: "update_integration_secret",
+          });
+          return;
+        }
+        const crypto = (await import("node:crypto")).default;
+        const hash = crypto.createHash("sha256").update(rawToken).digest("hex");
+        const { rows: su } = await pool.query(
+          `SELECT id FROM system_step_up_tokens
+           WHERE token_hash=$1 AND user_id=$2 AND expires_at>now() AND used_at IS NULL
+             AND (operation='general' OR operation='update_integration_secret')`,
+          [hash, req.auth!.userId],
+        );
+        if (!su[0]) {
+          res.status(403).json({ code: "STEP_UP_EXPIRED", message: "Token step-up invalide ou expiré." });
+          return;
+        }
+        await pool.query("UPDATE system_step_up_tokens SET used_at=now() WHERE id=$1", [su[0].id]).catch(() => {});
+      }
+    }
     try {
       const { rows: existing } = await pool.query(
         "SELECT id FROM system_integrations WHERE id=$1",

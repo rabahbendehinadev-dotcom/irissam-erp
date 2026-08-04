@@ -1,0 +1,172 @@
+نفّذ الآن مرحلة Security E2E النهائية لموديول Super Administration.
+
+مهم جدًا:
+- لا تضف Features جديدة.
+- لا تغيّر التصميم.
+- لا تعرض أو تكتب أي Password أو Token أو Secret في التقرير أو Logs.
+- بيانات حساب Super Admin التي استُعملت للاختبار أصبحت مكشوفة ويجب تغييرها فورًا.
+
+==================================================
+1. تأمين حساب Super Admin
+==================================================
+
+- غيّر كلمة سر حساب Super Admin إلى كلمة قوية جديدة، بدون عرضها في Logs أو التقرير.
+- forcePasswordChange = true إذا كان سيتم تسليم الحساب للمستخدم.
+- failedLoginAttempts = 0
+- lockedUntil = NULL
+- ألغِ جميع Sessions القديمة.
+- احذف أي Password ثابتة من:
+  - Seed files
+  - Test scripts
+  - README
+  - Console logs
+  - Reports
+- استعمل Environment Secret أو عملية إنشاء أولية آمنة.
+
+==================================================
+2. اختبارات العمليات الحساسة
+==================================================
+
+اختبر فعليًا:
+
+A. Revoke Session
+- الجلسة الملغاة لا تستطيع Refresh فورًا.
+
+B. Revoke All Sessions
+- يحتاج Step-up.
+- لا يبقى إلا السلوك المتفق عليه للجلسة الحالية.
+
+C. API Key
+- إنشاء المفتاح يحتاج Step-up.
+- يظهر كاملًا مرة واحدة فقط.
+- GET يعرض prefix فقط.
+- Revocation تمنع استعماله فورًا.
+- Scope غير مسموح يرجع 403.
+
+D. Maintenance Mode
+- التفعيل يحتاج Step-up.
+- المستخدم العادي يحصل على:
+  503 + SYSTEM_MAINTENANCE
+- Super Admin يمر.
+- Login وHealth يعملان حسب السياسة.
+- تعطيله يعيد النظام بدون Redirect Loop.
+
+E. Integration Secrets
+- إدخال SMTP/API secret.
+- GET يعيد masked value فقط.
+- تغيير Secret يحتاج Step-up.
+- لا يظهر Secret في Audit أو Logs.
+
+F. Webhook
+- HMAC signature صحيحة.
+- Test delivery يعمل.
+- Retry بعد فشل مؤقت.
+- Delivery logs لا تحتوي بيانات حساسة كاملة.
+
+G. Backups
+- إنشاء Backup record.
+- Verify checksum.
+- Delete يحتاج Step-up.
+- Restore Plan يحتاج Step-up.
+- وضّح بصدق هل النسخ والاسترجاع فعليان أم Workflow/Simulation فقط.
+
+H. Migrations
+- Dry Run.
+- منع تشغيل Migration نفسها مرتين.
+- Step-up single-use.
+- Migration lock يمنع عمليتين متزامنتين.
+
+I. Database Operations
+- Cancel long query يحتاج Permission + Step-up.
+- لا يوجد SQL Console حر.
+- لا يوجد DROP أو TRUNCATE من الواجهة.
+
+==================================================
+3. Step-up Authentication
+==================================================
+
+راجع:
+
+- مدة الصلاحية 15 دقيقة.
+- Single-use يعمل.
+- مرتبط بالمستخدم والجلسة والعملية المطلوبة.
+- Token خاص بعملية API Key لا يصلح لعملية Restore.
+- بعد Logout يصبح غير صالح.
+- لا يظهر في Logs أو Responses غير الضرورية.
+
+==================================================
+4. Logs وRedaction
+==================================================
+
+ابحث في Logs عن:
+
+- password
+- passwordHash
+- accessToken
+- refreshToken
+- cookie
+- authorization
+- apiKey
+- webhookSecret
+- SMTP password
+- connection string
+
+يجب ألا تظهر قيم حساسة.
+
+أضف Redaction موحدة قبل التخزين والعرض.
+
+==================================================
+5. RBAC
+==================================================
+
+اختبر ثلاثة مستخدمين:
+
+- super_admin
+- system_administrator
+- مستخدم عادي
+
+تحقق أن المستخدم العادي:
+- لا يرى رابط Super Administration.
+- GET /api/system/* يرجع 403 حسب الصلاحية.
+- لا يستطيع تجاوز الحماية بكتابة الرابط مباشرة.
+
+تحقق أن system_administrator لا يحصل تلقائيًا على عمليات Restore أو Migration إذا لم تكن ممنوحة له صراحة.
+
+==================================================
+6. Frontend
+==================================================
+
+اختبر:
+
+- Desktop
+- iPhone
+- Android
+- Tablet
+- PWA
+
+كل Tabs الـ17:
+
+- Loading State
+- Empty State
+- Error State
+- Retry
+- لا White Screen
+- لا Horizontal Overflow
+- Confirm Dialog واضح للعمليات الخطيرة
+
+==================================================
+7. التقرير النهائي
+==================================================
+
+أعطني:
+
+- نتائج الاختبارات A–I.
+- عدد العمليات الفعلية مقابل Simulation/Placeholder.
+- هل Backup فعلي أم مجرد Metadata Workflow.
+- هل Restore فعلي أم Plan فقط.
+- هل Webhook delivery فعلي.
+- إثبات تغيير بيانات Super Admin وإلغاء Sessions بدون كشف كلمة السر الجديدة.
+- عدد Secrets المكشوفة المكتشفة والمصلحة.
+- TypeScript = 0.
+- Runtime SQL = 0.
+- White Screens = 0.
