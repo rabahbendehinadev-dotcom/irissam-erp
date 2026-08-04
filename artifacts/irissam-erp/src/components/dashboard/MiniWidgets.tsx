@@ -4,13 +4,11 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import {
-  useGetBedsSummary,
-  useGetBedsByService,
-  useGetOrStatus,
   useGetBloodBankSummary,
   useGetVehiclesStatus,
   useGetMedicationsLowStock,
 } from "@workspace/api-client-react";
+import { useMockRepository } from "@/store/MockRepository";
 
 function WidgetCard({ title, children }: { title: string, children: React.ReactNode }) {
   return (
@@ -46,28 +44,46 @@ function SkeletonRow() {
 
 export function MiniWidgets() {
   const { t } = useLanguage();
+  const repo = useMockRepository();
 
-  const { data: beds } = useGetBedsSummary({ query: { refetchInterval: 60_000 } });
-  const { data: bedsByService } = useGetBedsByService({ query: { refetchInterval: 60_000 } });
-  const { data: or } = useGetOrStatus({ query: { refetchInterval: 60_000 } });
-  const { data: blood } = useGetBloodBankSummary({ query: { refetchInterval: 60_000 } });
+  // ── Ward bed stats derived from MockRepository (reflects live discharge/transfer) ──
+  const wardBeds = repo.beds;
+  const bedOccupied    = wardBeds.filter(b => b.status === 'occupe').length;
+  const bedFree        = wardBeds.filter(b => b.status === 'disponible').length;
+  const bedCleaning    = wardBeds.filter(b => b.status === 'nettoyage').length;
+  const bedOOS         = wardBeds.filter(b => b.status === 'hors_service' || b.status === 'maintenance').length;
+  const bedTotal       = wardBeds.length;
+  const bedOccupancy   = bedTotal > 0 ? Math.round((bedOccupied / bedTotal) * 100) : 0;
+
+  // ── Reanimation stats from ICU beds (unitName includes "Réanimation") ──
+  const reaBeds    = repo.icuBeds.filter(b => b.unitName.includes('Réanimation'));
+  const reaTotal   = reaBeds.length;
+  const reaOccuped = reaBeds.filter(b => b.status === 'occupe').length;
+  const reaFree    = reaBeds.filter(b => b.status === 'disponible').length;
+  const reaPercent = reaTotal > 0 ? Math.round((reaOccuped / reaTotal) * 100) : 0;
+
+  // ── OR stats from MockRepository ──
+  const rooms         = repo.operatingRooms;
+  const orTotal       = rooms.length;
+  const orAvailable   = rooms.filter(r => r.status === 'libre').length;
+  const orOccupied    = rooms.filter(r => r.status === 'en_intervention').length;
+  const orPrep        = rooms.filter(r => r.status === 'en_preparation' || r.status === 'reserve').length;
+
+  // ── API hooks for non-admission-related widgets ──
+  const { data: blood }    = useGetBloodBankSummary({ query: { refetchInterval: 60_000 } });
   const { data: vehicles } = useGetVehiclesStatus({ query: { refetchInterval: 60_000 } });
   const { data: lowStock } = useGetMedicationsLowStock({ limit: 3 }, { query: { refetchInterval: 60_000 } });
 
-  const reaSvc = bedsByService?.services.find((s) => s.service === "Réanimation");
-
   const bedsData = [
-    { name: 'Occupés',     value: beds?.occupied    ?? 312, color: '#3b82f6' },
-    { name: 'Libres',      value: beds?.free        ?? 88,  color: '#10b981' },
-    { name: 'Nettoyage',   value: beds?.cleaning    ?? 15,  color: '#f97316' },
-    { name: 'Hors service',value: beds?.outOfService ?? 5,  color: '#ef4444' },
+    { name: 'Occupés',      value: bedOccupied, color: '#3b82f6' },
+    { name: 'Libres',       value: bedFree,      color: '#10b981' },
+    { name: 'Nettoyage',    value: bedCleaning,  color: '#f97316' },
+    { name: 'Hors service', value: bedOOS,        color: '#ef4444' },
   ];
-  const occupancyPercent = beds?.occupancyPercent ?? 78;
-  const bedsTotal        = beds?.total            ?? 420;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-      {/* Widget 1: Beds */}
+      {/* Widget 1: Beds — live from MockRepository */}
       <WidgetCard title={t("widget.beds.title")}>
         <div className="flex h-full items-center">
           <div className="w-[45%] h-[70px] relative">
@@ -79,65 +95,47 @@ export function MiniWidgets() {
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex items-center justify-center flex-col">
-              <span className="text-[10px] font-bold text-gray-900 leading-none">{occupancyPercent}%</span>
+              <span className="text-[10px] font-bold text-gray-900 leading-none">{bedOccupancy}%</span>
             </div>
           </div>
           <div className="w-[55%] flex flex-col justify-center">
-            {beds ? (
-              <>
-                <StatRow label={t("widget.beds.occupied")}  value={beds.occupied}     colorClass="bg-blue-500" />
-                <StatRow label={t("widget.beds.free")}      value={beds.free}         colorClass="bg-green-500" />
-                <StatRow label={t("widget.beds.cleaning")}  value={beds.cleaning}     colorClass="bg-orange-500" />
-                <StatRow label={t("widget.beds.oos")}       value={beds.outOfService} colorClass="bg-red-500" />
-              </>
-            ) : (
-              <><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
-            )}
+            <StatRow label={t("widget.beds.occupied")}  value={bedOccupied}  colorClass="bg-blue-500" />
+            <StatRow label={t("widget.beds.free")}      value={bedFree}       colorClass="bg-green-500" />
+            <StatRow label={t("widget.beds.cleaning")}  value={bedCleaning}  colorClass="bg-orange-500" />
+            <StatRow label={t("widget.beds.oos")}       value={bedOOS}        colorClass="bg-red-500" />
             <div className="mt-1 pt-1 border-t border-gray-100 text-[9px] text-center text-gray-500">
-              {t("widget.beds.total")} {bedsTotal}
+              {t("widget.beds.total")} {bedTotal}
             </div>
           </div>
         </div>
       </WidgetCard>
 
-      {/* Widget 2: Resuscitation — live data from /beds/by-service for "Réanimation" */}
+      {/* Widget 2: Resuscitation — live from MockRepository ICU beds */}
       <WidgetCard title={t("widget.resuscitation.title")}>
         <div className="flex items-start gap-3 h-full">
           <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center shrink-0 mt-1">
             <Bed className="w-4 h-4" />
           </div>
           <div className="flex-1 flex flex-col justify-center gap-0.5">
-            {reaSvc ? (
-              <>
-                <StatRow label={t("widget.resuscitation.total_beds")}     value={reaSvc.totalBeds} />
-                <StatRow label={t("widget.beds.occupied")}                value={reaSvc.occupiedBeds} />
-                <StatRow label={t("widget.beds.free")}                    value={reaSvc.freeBeds} />
-                <StatRow label={t("widget.resuscitation.occupancy_rate")} value={`${reaSvc.occupancyPercent}%`} />
-              </>
-            ) : (
-              <><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
-            )}
+            <StatRow label={t("widget.resuscitation.total_beds")}     value={reaTotal} />
+            <StatRow label={t("widget.beds.occupied")}                value={reaOccuped} />
+            <StatRow label={t("widget.beds.free")}                    value={reaFree} />
+            <StatRow label={t("widget.resuscitation.occupancy_rate")} value={`${reaPercent}%`} />
           </div>
         </div>
       </WidgetCard>
 
-      {/* Widget 3: OR */}
+      {/* Widget 3: OR — live from MockRepository operating rooms */}
       <WidgetCard title={t("widget.or.title")}>
         <div className="flex items-start gap-3 h-full">
           <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center shrink-0 mt-1">
             <Scissors className="w-4 h-4" />
           </div>
           <div className="flex-1 flex flex-col justify-center gap-0.5">
-            {or ? (
-              <>
-                <StatRow label={t("widget.or.total_rooms")} value={or.totalRooms} />
-                <StatRow label={t("widget.or.available")}   value={or.available} />
-                <StatRow label={t("widget.or.occupied")}    value={or.occupied} />
-                <StatRow label={t("widget.or.prep")}        value={or.prep} />
-              </>
-            ) : (
-              <><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
-            )}
+            <StatRow label={t("widget.or.total_rooms")} value={orTotal} />
+            <StatRow label={t("widget.or.available")}   value={orAvailable} />
+            <StatRow label={t("widget.or.occupied")}    value={orOccupied} />
+            <StatRow label={t("widget.or.prep")}        value={orPrep} />
           </div>
         </div>
       </WidgetCard>
