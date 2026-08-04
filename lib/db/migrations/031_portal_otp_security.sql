@@ -9,8 +9,19 @@
 ALTER TABLE patient_portal_accounts
   ADD COLUMN IF NOT EXISTS otp_hash TEXT;
 
--- Invalidate existing plain-text OTPs (cannot hash retroactively)
-UPDATE patient_portal_accounts SET otp_hash = NULL WHERE otp_code IS NOT NULL;
+-- Invalidate existing plain-text OTPs (cannot hash retroactively).
+-- Guard: otp_code may have been dropped by a previous interrupted run
+-- (migrations are idempotent — __migrations only records completion).
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'patient_portal_accounts'
+      AND column_name = 'otp_code'
+  ) THEN
+    UPDATE patient_portal_accounts SET otp_hash = NULL WHERE otp_code IS NOT NULL;
+  END IF;
+END $$;
 
 ALTER TABLE patient_portal_accounts DROP COLUMN IF EXISTS otp_code;
 
