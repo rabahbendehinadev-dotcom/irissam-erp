@@ -124,118 +124,121 @@ export interface PayrollSettings {
 }
 
 // ── API functions ─────────────────────────────────────────────────────────────
-const BASE = '/api/payroll';
+// NOTE: apiClient is new ApiClient('/api') — use .get/.post/.patch/.delete/.request
+// The base URL '/api' is already baked into the instance; do NOT include it here.
+const BASE = '/payroll';
+
+const qs = (params?: Record<string, any>) =>
+  params ? new URLSearchParams(params as any).toString() : '';
 
 export const payrollApi = {
   // Dashboard
   getDashboard: (year?: number): Promise<PayrollDashboard> =>
-    apiClient(`${BASE}/dashboard${year ? `?year=${year}` : ''}`),
+    apiClient.get(`${BASE}/dashboard${year ? `?year=${year}` : ''}`),
 
   // Periods
   getPeriods: (params?: Record<string, any>) =>
-    apiClient(`${BASE}/periods?${new URLSearchParams(params as any).toString()}`),
-  getPeriod: (id: string) => apiClient(`${BASE}/periods/${id}`),
+    apiClient.get(`${BASE}/periods?${qs(params)}`),
+  getPeriod: (id: string) => apiClient.get(`${BASE}/periods/${id}`),
   createPeriod: (data: Partial<PayrollPeriod>): Promise<PayrollPeriod> =>
-    apiClient(`${BASE}/periods`, { method: 'POST', body: JSON.stringify(data) }),
+    apiClient.post(`${BASE}/periods`, data),
   updatePeriod: (id: string, data: Partial<PayrollPeriod>): Promise<PayrollPeriod> =>
-    apiClient(`${BASE}/periods/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    apiClient.patch(`${BASE}/periods/${id}`, data),
 
   // Runs
   getRuns: (params?: Record<string, any>) =>
-    apiClient(`${BASE}/runs?${new URLSearchParams(params as any).toString()}`),
-  getRun: (id: string): Promise<PayrollRun> => apiClient(`${BASE}/runs/${id}`),
+    apiClient.get(`${BASE}/runs?${qs(params)}`),
+  getRun: (id: string): Promise<PayrollRun> => apiClient.get(`${BASE}/runs/${id}`),
   createRun: (data: { periodId: string; label?: string }): Promise<PayrollRun> =>
-    apiClient(`${BASE}/runs`, { method: 'POST', body: JSON.stringify(data) }),
+    apiClient.post(`${BASE}/runs`, data),
   collectData: (id: string) =>
-    apiClient(`${BASE}/runs/${id}/collect`, { method: 'POST', body: '{}' }),
+    apiClient.post(`${BASE}/runs/${id}/collect`, {}),
   calculateRun: (id: string) =>
-    apiClient(`${BASE}/runs/${id}/calculate`, { method: 'POST', body: '{}' }),
+    apiClient.post(`${BASE}/runs/${id}/calculate`, {}),
   reviewRun: (id: string) =>
-    apiClient(`${BASE}/runs/${id}/review`, { method: 'POST', body: '{}' }),
+    apiClient.post(`${BASE}/runs/${id}/review`, {}),
   hrApprove: (id: string, comment?: string) =>
-    apiClient(`${BASE}/runs/${id}/hr-approve`, { method: 'POST', body: JSON.stringify({ comment }) }),
+    apiClient.post(`${BASE}/runs/${id}/hr-approve`, { comment }),
   financeApprove: (id: string, comment?: string) =>
-    apiClient(`${BASE}/runs/${id}/finance-approve`, { method: 'POST', body: JSON.stringify({ comment }) }),
+    apiClient.post(`${BASE}/runs/${id}/finance-approve`, { comment }),
   lockRun: (id: string) =>
-    apiClient(`${BASE}/runs/${id}/lock`, { method: 'POST', body: '{}' }),
+    apiClient.post(`${BASE}/runs/${id}/lock`, {}),
   generatePayslips: (id: string) =>
-    apiClient(`${BASE}/runs/${id}/generate-payslips`, { method: 'POST', body: '{}' }),
+    apiClient.post(`${BASE}/runs/${id}/generate-payslips`, {}),
   markPaid: (id: string) =>
-    apiClient(`${BASE}/runs/${id}/mark-paid`, { method: 'POST', body: '{}' }),
-  getAnomalies: (id: string) => apiClient(`${BASE}/runs/${id}/anomalies`),
+    apiClient.post(`${BASE}/runs/${id}/mark-paid`, {}),
+  getAnomalies: (id: string) => apiClient.get(`${BASE}/runs/${id}/anomalies`),
   resolveAnomaly: (runId: string, anomalyId: string, note?: string) =>
-    apiClient(`${BASE}/runs/${runId}/anomalies/${anomalyId}/resolve`, { method: 'PATCH', body: JSON.stringify({ note }) }),
-  getEmployeeProfile: (id: string) => apiClient(`${BASE}/employees/${id}`),
+    apiClient.patch(`${BASE}/runs/${runId}/anomalies/${anomalyId}/resolve`, { note }),
+  getEmployeeProfile: (id: string) => apiClient.get(`${BASE}/employees/${id}`),
 
   // Components
   getComponents: (params?: Record<string, any>) =>
-    apiClient(`${BASE}/components?${new URLSearchParams(params as any).toString()}`),
+    apiClient.get(`${BASE}/components?${qs(params)}`),
   createComponent: (data: Partial<SalaryComponent>): Promise<SalaryComponent> =>
-    apiClient(`${BASE}/components`, { method: 'POST', body: JSON.stringify(data) }),
+    apiClient.post(`${BASE}/components`, data),
   updateComponent: (id: string, data: Partial<SalaryComponent>): Promise<SalaryComponent> =>
-    apiClient(`${BASE}/components/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    apiClient.patch(`${BASE}/components/${id}`, data),
   deleteComponent: (id: string) =>
-    apiClient(`${BASE}/components/${id}`, { method: 'DELETE' }),
+    apiClient.delete(`${BASE}/components/${id}`),
 
   // Advances
   getAdvances: (params?: Record<string, any>) =>
-    apiClient(`${BASE}/advances?${new URLSearchParams(params as any).toString()}`),
+    apiClient.get(`${BASE}/advances?${qs(params)}`),
   createAdvance: (data: { employeeId: string; amount: number; deductionPeriodId?: string; reason?: string }) =>
-    apiClient(`${BASE}/advances`, { method: 'POST', body: JSON.stringify(data) }),
+    apiClient.post(`${BASE}/advances`, data),
   approveAdvance: (id: string) =>
-    apiClient(`${BASE}/advances/${id}/approve`, { method: 'PATCH', body: '{}' }),
+    apiClient.patch(`${BASE}/advances/${id}/approve`, {}),
   rejectAdvance: (id: string, reason: string) =>
-    apiClient(`${BASE}/advances/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
+    apiClient.patch(`${BASE}/advances/${id}/reject`, { reason }),
 
   // Loans
   getLoans: (params?: Record<string, any>) =>
-    apiClient(`${BASE}/loans?${new URLSearchParams(params as any).toString()}`),
-  getLoanInstallments: (id: string) => apiClient(`${BASE}/loans/${id}/installments`),
+    apiClient.get(`${BASE}/loans?${qs(params)}`),
+  getLoanInstallments: (id: string) => apiClient.get(`${BASE}/loans/${id}/installments`),
   createLoan: (data: any) =>
-    apiClient(`${BASE}/loans`, { method: 'POST', body: JSON.stringify(data) }),
+    apiClient.post(`${BASE}/loans`, data),
   approveLoan: (id: string) =>
-    apiClient(`${BASE}/loans/${id}/approve`, { method: 'PATCH', body: '{}' }),
+    apiClient.patch(`${BASE}/loans/${id}/approve`, {}),
   rejectLoan: (id: string, reason: string) =>
-    apiClient(`${BASE}/loans/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
+    apiClient.patch(`${BASE}/loans/${id}/reject`, { reason }),
 
   // Payslips
   getPayslips: (params?: Record<string, any>) =>
-    apiClient(`${BASE}/payslips?${new URLSearchParams(params as any).toString()}`),
-  getPayslipPdfUrl: (id: string) => `${BASE}/payslips/${id}/pdf`,
-  getEmployeeHistory: (employeeId: string) => apiClient(`${BASE}/employees/${employeeId}/history`),
+    apiClient.get(`${BASE}/payslips?${qs(params)}`),
+  getPayslipPdfUrl: (id: string) => `/api${BASE}/payslips/${id}/pdf`,
+  getEmployeeHistory: (employeeId: string) => apiClient.get(`${BASE}/employees/${employeeId}/history`),
 
   // Payment orders
   getPaymentOrders: (params?: Record<string, any>) =>
-    apiClient(`${BASE}/payment-orders?${new URLSearchParams(params as any).toString()}`),
-  getPaymentOrder: (id: string) => apiClient(`${BASE}/payment-orders/${id}`),
+    apiClient.get(`${BASE}/payment-orders?${qs(params)}`),
+  getPaymentOrder: (id: string) => apiClient.get(`${BASE}/payment-orders/${id}`),
   createPaymentOrder: (data: any) =>
-    apiClient(`${BASE}/payment-orders`, { method: 'POST', body: JSON.stringify(data) }),
+    apiClient.post(`${BASE}/payment-orders`, data),
   approvePaymentOrder: (id: string) =>
-    apiClient(`${BASE}/payment-orders/${id}/approve`, { method: 'PATCH', body: '{}' }),
+    apiClient.patch(`${BASE}/payment-orders/${id}/approve`, {}),
   markPaymentOrderPaid: (id: string) =>
-    apiClient(`${BASE}/payment-orders/${id}/mark-paid`, { method: 'PATCH', body: '{}' }),
+    apiClient.patch(`${BASE}/payment-orders/${id}/mark-paid`, {}),
 
-  // Bank export
-  getBankExportUrl: (params: { runId?: string; orderId?: string; format?: string }) => {
-    const q = new URLSearchParams(params as any).toString();
-    return `${BASE}/bank-export?${q}`;
-  },
+  // Bank export (direct URL — not an API call)
+  getBankExportUrl: (params: { runId?: string; orderId?: string; format?: string }) =>
+    `/api${BASE}/bank-export?${new URLSearchParams(params as any).toString()}`,
 
   // Reports
   getReports: (params?: Record<string, any>) =>
-    apiClient(`${BASE}/reports?${new URLSearchParams(params as any).toString()}`),
+    apiClient.get(`${BASE}/reports?${qs(params)}`),
   getAuditLog: (params?: Record<string, any>) =>
-    apiClient(`${BASE}/audit?${new URLSearchParams(params as any).toString()}`),
+    apiClient.get(`${BASE}/audit?${qs(params)}`),
 
   // Settings
   getSettings: (): Promise<{ settings: PayrollSettings; taxRules: any[]; socialSecurityRules: any[] }> =>
-    apiClient(`${BASE}/settings`),
+    apiClient.get(`${BASE}/settings`),
   updateSettings: (data: Partial<PayrollSettings>) =>
-    apiClient(`${BASE}/settings`, { method: 'PATCH', body: JSON.stringify(data) }),
+    apiClient.patch(`${BASE}/settings`, data),
   updateTaxRule: (id: string, data: any) =>
-    apiClient(`${BASE}/settings/tax-rules/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    apiClient.patch(`${BASE}/settings/tax-rules/${id}`, data),
   updateSSRule: (id: string, data: any) =>
-    apiClient(`${BASE}/settings/ss-rules/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    apiClient.patch(`${BASE}/settings/ss-rules/${id}`, data),
 };
 
 // Helpers
