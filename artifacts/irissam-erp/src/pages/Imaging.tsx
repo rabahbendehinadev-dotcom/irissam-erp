@@ -1,31 +1,54 @@
 /**
  * Imagerie — Module Radiologie
  *
- * Lit directement depuis MockRepository (réactif, sans refresh).
- * Phase 2 : source unique partagée avec Urgences et Consultations.
- * Phase 5 : notification au médecin à l'interprétation.
- * Phase 7 : audit complet de chaque transition.
+ * Connecté au backend réel via GET /imaging-orders.
+ * Mutations : PATCH /imaging-orders/:id/status · POST /imaging-orders/:id/report
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageWrapper } from '@/components/shared/PageWrapper';
-import { useMockRepository } from '@/store/MockRepository';
+import { useQuery } from '@/hooks/useQuery';
+import { apiClient } from '@/services/api/client';
 import { useAuth } from '@/store/AuthContext';
 import { usePermission } from '@/hooks/usePermission';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
-  ScanLine, Search, ChevronRight, X, FileText, Eye,
+  ScanLine, Search, ChevronRight, X, FileText, Eye, AlertTriangle, RefreshCw,
 } from 'lucide-react';
-import type { RepoImagingOrder, AuditCtx } from '@/types/repository';
 import { PublishToPortalButton } from '@/components/portal/PublishToPortalButton';
+
+// ─── API type ─────────────────────────────────────────────────────────────────
+
+type ApiImagingOrder = {
+  id: string;
+  encounterId: string | null;
+  patientId: string;
+  patientName: string;
+  visitId: string | null;
+  exam: string;
+  region: string;
+  side: string | null;
+  urgency: 'STAT' | 'urgent' | 'routine';
+  withContrast: boolean;
+  requestedByName: string;
+  requestedAt: string | null;
+  status: 'demandee' | 'planifiee' | 'realisee' | 'interpretee' | 'annulee';
+  result: string | null;
+  resultAt: string | null;
+  report: string | null;
+  reportedByName: string | null;
+  interpretedByName: string | null;
+  interpretedAt: string | null;
+  sourceModule: string;
+};
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const IMG_STATUS: Record<RepoImagingOrder['status'], {
+const IMG_STATUS: Record<ApiImagingOrder['status'], {
   label: string; badge: string;
-  next?: RepoImagingOrder['status']; nextLabel?: string; nextColor?: string;
+  next?: ApiImagingOrder['status']; nextLabel?: string; nextColor?: string;
 }> = {
   demandee:    { label: 'Demandée',    badge: 'bg-blue-100 text-blue-700 border-blue-200',     next: 'planifiee',   nextLabel: 'Planifier',    nextColor: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
   planifiee:   { label: 'Planifiée',   badge: 'bg-purple-100 text-purple-700 border-purple-200', next: 'realisee',   nextLabel: 'Réalisé',      nextColor: 'bg-purple-50 text-purple-700 hover:bg-purple-100' },
@@ -34,7 +57,7 @@ const IMG_STATUS: Record<RepoImagingOrder['status'], {
   annulee:     { label: 'Annulée',     badge: 'bg-gray-100 text-gray-500 border-gray-200' },
 };
 
-const URGENCY: Record<RepoImagingOrder['urgency'], { label: string; badge: string }> = {
+const URGENCY: Record<ApiImagingOrder['urgency'], { label: string; badge: string }> = {
   STAT:    { label: 'STAT',    badge: 'bg-red-100 text-red-700 font-bold border border-red-200' },
   urgent:  { label: 'Urgent',  badge: 'bg-orange-100 text-orange-700 border border-orange-200' },
   routine: { label: 'Routine', badge: 'bg-gray-100 text-gray-600 border border-gray-200' },
@@ -48,7 +71,7 @@ function ReportModal({
   onClose,
   radiologistName,
 }: {
-  order: RepoImagingOrder;
+  order: ApiImagingOrder;
   onConfirm: (result: string, report: string) => void;
   onClose: () => void;
   radiologistName: string;
@@ -94,7 +117,7 @@ function ReportModal({
           <p className="font-semibold text-gray-900">{order.exam} — {order.region}{order.side ? ` (${order.side})` : ''}</p>
           <p className="text-sm text-gray-500">{order.patientName}</p>
           <div className="flex gap-3 text-xs text-gray-400 mt-1">
-            <span>Demandé par {order.requestedBy}</span>
+            <span>Demandé par {order.requestedByName}</span>
             <span className="capitalize">{order.sourceModule}</span>
             {order.withContrast && <span className="text-purple-600 font-medium">Avec contraste</span>}
           </div>
@@ -152,16 +175,16 @@ function ReportModal({
 
 // ─── Row detail expand ────────────────────────────────────────────────────────
 
-function ReportPanel({ order }: { order: RepoImagingOrder }) {
+function ReportPanel({ order }: { order: ApiImagingOrder }) {
   return (
     <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-sm">
       <p className="font-medium text-gray-700 mb-1">Compte rendu :</p>
       <pre className="whitespace-pre-wrap text-gray-600 text-xs font-mono leading-relaxed bg-white border border-gray-100 rounded-lg p-3">
         {order.report}
       </pre>
-      {order.interpretedBy && (
+      {order.interpretedByName && (
         <p className="text-xs text-gray-400 mt-2">
-          Interprété par {order.interpretedBy} · {order.interpretedAt ? new Date(order.interpretedAt).toLocaleString('fr-FR') : ''}
+          Interprété par {order.interpretedByName} · {order.interpretedAt ? new Date(order.interpretedAt).toLocaleString('fr-FR') : ''}
         </p>
       )}
     </div>
@@ -174,24 +197,20 @@ export default function ImagingPage() {
   const { user } = useAuth();
   const { can } = usePermission();
   const { toast } = useToast();
-  const repo = useMockRepository();
 
-  const [statusFilter, setStatusFilter] = useState<RepoImagingOrder['status'] | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<ApiImagingOrder['status'] | 'all'>('all');
   const [search, setSearch] = useState('');
-  const [interpreting, setInterpreting] = useState<RepoImagingOrder | null>(null);
+  const [interpreting, setInterpreting] = useState<ApiImagingOrder | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const radiologistName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'Dr. Radiologue';
 
-  const ctx: AuditCtx = {
-    userId:   user?.id ?? 'unknown',
-    userName: radiologistName,
-    userRole: user?.role ?? 'unknown',
-  };
+  const { data: rawOrders, loading, error, refetch } = useQuery<ApiImagingOrder[]>('/imaging-orders');
+  const allOrders = rawOrders ?? [];
 
   // ── Filtered list ─────────────────────────────────────────────────────────
   const orders = useMemo(() => {
-    let list = repo.imagingOrders;
+    let list = allOrders;
     if (statusFilter !== 'all') list = list.filter(o => o.status === statusFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -199,40 +218,83 @@ export default function ImagingPage() {
         o.patientName.toLowerCase().includes(q) ||
         o.exam.toLowerCase().includes(q) ||
         o.region.toLowerCase().includes(q) ||
-        o.requestedBy.toLowerCase().includes(q),
+        o.requestedByName.toLowerCase().includes(q),
       );
     }
     return [...list].sort((a, b) => {
       const aScore = a.urgency === 'STAT' ? 3 : a.urgency === 'urgent' ? 1 : 0;
       const bScore = b.urgency === 'STAT' ? 3 : b.urgency === 'urgent' ? 1 : 0;
       if (aScore !== bScore) return bScore - aScore;
-      return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
+      return new Date(b.requestedAt ?? 0).getTime() - new Date(a.requestedAt ?? 0).getTime();
     });
-  }, [repo.imagingOrders, statusFilter, search]);
+  }, [allOrders, statusFilter, search]);
 
   const counts = useMemo(() => {
-    const base = { all: repo.imagingOrders.length, demandee: 0, planifiee: 0, realisee: 0, interpretee: 0, annulee: 0 };
-    repo.imagingOrders.forEach(o => { if (o.status in base) (base as Record<string, number>)[o.status]++; });
+    const base = { all: allOrders.length, demandee: 0, planifiee: 0, realisee: 0, interpretee: 0, annulee: 0 };
+    allOrders.forEach(o => { if (o.status in base) (base as Record<string, number>)[o.status]++; });
     return base;
-  }, [repo.imagingOrders]);
+  }, [allOrders]);
 
-  const handleAdvance = (order: RepoImagingOrder) => {
+  const handleAdvance = useCallback(async (order: ApiImagingOrder) => {
     const cfg = IMG_STATUS[order.status];
     if (!cfg.next) return;
     if (cfg.next === 'interpretee') {
       setInterpreting(order);
       return;
     }
-    repo.updateImagingStatus(order.id, cfg.next, undefined, undefined, ctx);
-    toast({ title: 'Statut mis à jour', description: `${order.exam} → ${IMG_STATUS[cfg.next].label}` });
-  };
+    try {
+      await apiClient.request(`/imaging-orders/${order.id}/status`, { method: 'PATCH', body: { status: cfg.next } });
+      toast({ title: 'Statut mis à jour', description: `${order.exam} → ${IMG_STATUS[cfg.next].label}` });
+      refetch();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Mise à jour impossible' });
+    }
+  }, [toast, refetch]);
 
-  const handleInterpret = (result: string, report: string) => {
+  const handleInterpret = useCallback(async (result: string, report: string) => {
     if (!interpreting) return;
-    repo.updateImagingStatus(interpreting.id, 'interpretee', result, { report, interpretedBy: radiologistName }, ctx);
-    toast({ title: 'Rapport validé', description: `${interpreting.exam} — ${interpreting.patientName}` });
-    setInterpreting(null);
-  };
+    try {
+      await apiClient.request(`/imaging-orders/${interpreting.id}/report`, { method: 'POST', body: { result, report } });
+      toast({ title: 'Rapport validé', description: `${interpreting.exam} — ${interpreting.patientName}` });
+      setInterpreting(null);
+      refetch();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Validation impossible' });
+    }
+  }, [interpreting, toast, refetch]);
+
+  // ── Loading / error states ─────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <PageWrapper>
+          <PageHeader title="Imagerie médicale" subtitle="Gestion des examens radiologiques" />
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        </PageWrapper>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <PageWrapper>
+          <PageHeader title="Imagerie médicale" subtitle="Gestion des examens radiologiques" />
+          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <span>Impossible de charger les examens : {error}</span>
+            <button onClick={refetch} className="ml-auto flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-800 border border-red-300 rounded-lg px-2.5 py-1.5">
+              <RefreshCw className="w-3.5 h-3.5" /> Réessayer
+            </button>
+          </div>
+        </PageWrapper>
+      </DashboardLayout>
+    );
+  }
 
   if (!can('imaging.view')) {
     return (
@@ -352,14 +414,14 @@ export default function ImagingPage() {
                           <span className={cn('px-2 py-0.5 rounded-full text-xs', urg.badge)}>{urg.label}</span>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="text-gray-700 text-sm">{order.requestedBy}</p>
+                          <p className="text-gray-700 text-sm">{order.requestedByName}</p>
                           <p className="text-xs text-gray-400 capitalize">{order.sourceModule}</p>
                         </td>
                         <td className="px-4 py-3">
                           <span className={cn('px-2 py-0.5 rounded-full text-xs border', st.badge)}>{st.label}</span>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                          {new Date(order.requestedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          {order.requestedAt ? new Date(order.requestedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
                         </td>
                         <td className="px-4 py-3">
                           <PublishToPortalButton

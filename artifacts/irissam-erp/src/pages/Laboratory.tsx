@@ -1,33 +1,52 @@
 /**
  * Laboratory — Module Laboratoire
  *
- * Lit directement depuis MockRepository (réactif, sans refresh).
- * Phase 2 : source unique de vérité partagée avec Urgences et Consultations.
- * Phase 5 : notifications au médecin lors de la validation.
- * Phase 7 : audit complet de chaque transition.
+ * Connecté au backend réel via GET /lab-orders.
+ * Mutations : PATCH /lab-orders/:id/status · POST /lab-orders/:id/result
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageWrapper } from '@/components/shared/PageWrapper';
-import { useMockRepository } from '@/store/MockRepository';
+import { useQuery } from '@/hooks/useQuery';
+import { apiClient } from '@/services/api/client';
 import { useAuth } from '@/store/AuthContext';
 import { usePermission } from '@/hooks/usePermission';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
   FlaskConical, Search, AlertTriangle, Microscope,
-  ChevronRight, X, CheckCircle2, Clock,
+  ChevronRight, X, CheckCircle2, RefreshCw,
 } from 'lucide-react';
-import type { RepoLabOrder } from '@/types/repository';
-import type { AuditCtx } from '@/types/repository';
 import { PublishToPortalButton } from '@/components/portal/PublishToPortalButton';
+
+// ─── API type ─────────────────────────────────────────────────────────────────
+
+type ApiLabOrder = {
+  id: string;
+  encounterId: string | null;
+  patientId: string;
+  patientName: string;
+  visitId: string | null;
+  test: string;
+  category: string;
+  urgency: 'STAT' | 'urgent' | 'routine';
+  requestedByName: string;
+  requestedAt: string | null;
+  status: 'demandee' | 'prelevee' | 'en_cours' | 'validee' | 'annulee';
+  result: string | null;
+  isCritical: boolean;
+  resultAt: string | null;
+  validatedByName: string | null;
+  laboratory: string | null;
+  sourceModule: string;
+};
 
 // ─── Status / urgency config ──────────────────────────────────────────────────
 
-const LAB_STATUS: Record<RepoLabOrder['status'], {
+const LAB_STATUS: Record<ApiLabOrder['status'], {
   label: string; badge: string; row: string;
-  next?: RepoLabOrder['status']; nextLabel?: string; nextColor?: string;
+  next?: ApiLabOrder['status']; nextLabel?: string; nextColor?: string;
 }> = {
   demandee:  { label: 'Demandée',  badge: 'bg-blue-100 text-blue-700 border-blue-200',   row: '',              next: 'prelevee', nextLabel: 'Prélever',  nextColor: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
   prelevee:  { label: 'Prélevée',  badge: 'bg-yellow-100 text-yellow-700 border-yellow-200', row: '',           next: 'en_cours', nextLabel: 'Analyser',  nextColor: 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' },
@@ -36,7 +55,7 @@ const LAB_STATUS: Record<RepoLabOrder['status'], {
   annulee:   { label: 'Annulée',   badge: 'bg-gray-100 text-gray-500 border-gray-200',    row: 'opacity-60' },
 };
 
-const URGENCY: Record<RepoLabOrder['urgency'], { label: string; badge: string }> = {
+const URGENCY: Record<ApiLabOrder['urgency'], { label: string; badge: string }> = {
   STAT:    { label: 'STAT',    badge: 'bg-red-100 text-red-700 font-bold border border-red-200' },
   urgent:  { label: 'Urgent',  badge: 'bg-orange-100 text-orange-700 border border-orange-200' },
   routine: { label: 'Routine', badge: 'bg-gray-100 text-gray-600 border border-gray-200' },
@@ -52,7 +71,7 @@ function ValidationModal({
   onConfirm,
   onClose,
 }: {
-  order: RepoLabOrder;
+  order: ApiLabOrder;
   onConfirm: (result: string, isCritical: boolean) => void;
   onClose: () => void;
 }) {
@@ -85,7 +104,7 @@ function ValidationModal({
           <p className="font-semibold text-gray-900">{order.test}</p>
           <p className="text-sm text-gray-500">{order.patientName}</p>
           <p className="text-xs text-gray-400">
-            Demandé par {order.requestedBy} · {order.sourceModule}
+            Demandé par {order.requestedByName} · {order.sourceModule}
             {order.encounterId && <span className="font-mono ml-2 text-gray-400">{order.encounterId}</span>}
           </p>
         </div>
@@ -141,28 +160,24 @@ export default function LaboratoryPage() {
   const { user } = useAuth();
   const { can } = usePermission();
   const { toast } = useToast();
-  const repo = useMockRepository();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
-  const [validating, setValidating] = useState<RepoLabOrder | null>(null);
+  const [validating, setValidating] = useState<ApiLabOrder | null>(null);
 
-  const ctx: AuditCtx = {
-    userId:   user?.id ?? 'unknown',
-    userName: `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'Inconnu',
-    userRole: user?.role ?? 'unknown',
-  };
+  const { data: rawOrders, loading, error, refetch } = useQuery<ApiLabOrder[]>('/lab-orders');
+  const allOrders = rawOrders ?? [];
 
-  // ── Filtered + sorted list (reactive — no local copy) ──────────────────────
+  // ── Filtered + sorted list ─────────────────────────────────────────────────
   const orders = useMemo(() => {
-    let list = repo.labOrders;
+    let list = allOrders;
     if (statusFilter !== 'all') list = list.filter(o => o.status === statusFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(o =>
         o.patientName.toLowerCase().includes(q) ||
         o.test.toLowerCase().includes(q) ||
-        o.requestedBy.toLowerCase().includes(q) ||
+        o.requestedByName.toLowerCase().includes(q) ||
         (o.encounterId ?? '').toLowerCase().includes(q),
       );
     }
@@ -171,41 +186,84 @@ export default function LaboratoryPage() {
       const aScore = (a.urgency === 'STAT' ? 4 : a.urgency === 'urgent' ? 2 : 0) + (a.isCritical ? 1 : 0);
       const bScore = (b.urgency === 'STAT' ? 4 : b.urgency === 'urgent' ? 2 : 0) + (b.isCritical ? 1 : 0);
       if (aScore !== bScore) return bScore - aScore;
-      return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
+      return new Date(b.requestedAt ?? 0).getTime() - new Date(a.requestedAt ?? 0).getTime();
     });
-  }, [repo.labOrders, statusFilter, search]);
+  }, [allOrders, statusFilter, search]);
 
   // ── Counts ─────────────────────────────────────────────────────────────────
   const counts = useMemo(() => {
-    const base = { all: repo.labOrders.length, demandee: 0, prelevee: 0, en_cours: 0, validee: 0, annulee: 0 };
-    repo.labOrders.forEach(o => { if (o.status in base) (base as Record<string, number>)[o.status]++; });
+    const base = { all: allOrders.length, demandee: 0, prelevee: 0, en_cours: 0, validee: 0, annulee: 0 };
+    allOrders.forEach(o => { if (o.status in base) (base as Record<string, number>)[o.status]++; });
     return base;
-  }, [repo.labOrders]);
+  }, [allOrders]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  const handleAdvance = (order: RepoLabOrder) => {
+  const handleAdvance = useCallback(async (order: ApiLabOrder) => {
     const cfg = LAB_STATUS[order.status];
     if (!cfg.next) return;
     if (cfg.next === 'validee') {
       setValidating(order);
       return;
     }
-    repo.updateLabOrderStatus(order.id, cfg.next, undefined, undefined, ctx);
-    toast({ title: `Statut mis à jour`, description: `${order.test} → ${LAB_STATUS[cfg.next].label}` });
-  };
+    try {
+      await apiClient.request(`/lab-orders/${order.id}/status`, { method: 'PATCH', body: { status: cfg.next } });
+      toast({ title: 'Statut mis à jour', description: `${order.test} → ${LAB_STATUS[cfg.next].label}` });
+      refetch();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Mise à jour impossible' });
+    }
+  }, [toast, refetch]);
 
-  const handleValidate = (result: string, isCritical: boolean) => {
+  const handleValidate = useCallback(async (result: string, isCritical: boolean) => {
     if (!validating) return;
-    repo.updateLabOrderStatus(validating.id, 'validee', result, isCritical, ctx);
-    toast({
-      title: isCritical ? '⚠ Résultat critique envoyé' : 'Résultat validé',
-      description: `${validating.test} — ${validating.patientName}`,
-      variant: isCritical ? 'destructive' : 'default',
-    });
-    setValidating(null);
-  };
+    try {
+      await apiClient.request(`/lab-orders/${validating.id}/result`, { method: 'POST', body: { result, isCritical } });
+      toast({
+        title: isCritical ? '⚠ Résultat critique envoyé' : 'Résultat validé',
+        description: `${validating.test} — ${validating.patientName}`,
+        variant: isCritical ? 'destructive' : 'default',
+      });
+      setValidating(null);
+      refetch();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Validation impossible' });
+    }
+  }, [validating, toast, refetch]);
 
   // ── Permission gate ────────────────────────────────────────────────────────
+  // ── Loading / error states ─────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <PageWrapper>
+          <PageHeader title="Laboratoire" subtitle="Gestion des analyses biologiques" />
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        </PageWrapper>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <PageWrapper>
+          <PageHeader title="Laboratoire" subtitle="Gestion des analyses biologiques" />
+          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <span>Impossible de charger les analyses : {error}</span>
+            <button onClick={refetch} className="ml-auto flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-800 border border-red-300 rounded-lg px-2.5 py-1.5">
+              <RefreshCw className="w-3.5 h-3.5" /> Réessayer
+            </button>
+          </div>
+        </PageWrapper>
+      </DashboardLayout>
+    );
+  }
+
   if (!can('laboratory.view')) {
     return (
       <DashboardLayout>
@@ -327,7 +385,7 @@ export default function LaboratoryPage() {
                           <span className={cn('px-2 py-0.5 rounded-full text-xs', urg.badge)}>{urg.label}</span>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="text-gray-700 text-sm">{order.requestedBy}</p>
+                          <p className="text-gray-700 text-sm">{order.requestedByName}</p>
                           <p className="text-xs text-gray-400 capitalize">{order.sourceModule}</p>
                         </td>
                         <td className="px-4 py-3">
@@ -337,9 +395,9 @@ export default function LaboratoryPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                          {new Date(order.requestedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                          {order.validatedBy && (
-                            <p className="text-[10px] text-green-600 mt-0.5">par {order.validatedBy}</p>
+                          {order.requestedAt ? new Date(order.requestedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                          {order.validatedByName && (
+                            <p className="text-[10px] text-green-600 mt-0.5">par {order.validatedByName}</p>
                           )}
                         </td>
                         <td className="px-4 py-3">
