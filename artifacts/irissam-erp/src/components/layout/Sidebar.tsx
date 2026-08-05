@@ -6,9 +6,9 @@ import { useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/store/AuthContext";
 import {
   LayoutDashboard, Users, Calendar, ClipboardList, AlertTriangle,
-  Stethoscope, Bed, Scissors, HeartPulse, Baby, FlaskConical, Scan,
-  Pill, Droplets, Package, Microscope, UserCheck, Users2, DollarSign,
-  Truck, FolderOpen, BarChart3, Settings, ChevronLeft, Bell, Shield,
+  Stethoscope, Bed, Scissors, HeartPulse, FlaskConical, Scan,
+  Pill, Package, Microscope, UserCheck, Users2, DollarSign,
+  Truck, Settings, ChevronLeft, Bell, Shield,
   ShieldCheck, BarChart2, FolderArchive, Wallet, Globe
 } from "lucide-react";
 
@@ -101,7 +101,6 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
       items: [
         { path: "/operating-room", icon: Scissors,   label: "nav.operating_room" },
         { path: "/resuscitation",  icon: HeartPulse, label: "nav.resuscitation" },
-        { path: "/maternity",      icon: Baby,       label: "nav.maternity" },
       ]
     },
     {
@@ -110,7 +109,6 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
         { path: "/laboratory",    icon: FlaskConical, label: "nav.laboratory" },
         { path: "/imaging",       icon: Scan,         label: "nav.imaging" },
         { path: "/pharmacy",      icon: Pill,         label: "nav.pharmacy" },
-        { path: "/blood-bank",    icon: Droplets,     label: "nav.blood_bank" },
         { path: "/medical-stock", icon: Package,      label: "nav.medical_stock" },
         { path: "/biomedical",    icon: Microscope,   label: "nav.biomedical" },
       ]
@@ -152,10 +150,8 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
         { path: "/hr",        icon: Users2,    label: "nav.hr" },
         { path: "/patient-portal-admin", icon: Globe, label: "Portail Patient" },
         { path: "/finance",   icon: DollarSign,label: "nav.finance" },
-        { path: "/ambulances",icon: Truck,     label: "nav.ambulances" },
-        { path: "/archives",  icon: FolderOpen,label: "nav.archives" },
-        { path: "/reports",   icon: BarChart3, label: "nav.reports" },
-        { path: "/settings",  icon: Settings,  label: "nav.settings" },
+        { path: "/ambulances",icon: Truck,    label: "nav.ambulances" },
+        { path: "/settings",  icon: Settings, label: "nav.settings" },
         { path: "/super-admin", icon: Shield, label: "nav.superAdmin", roleRequired: ["super_admin","system_administrator"] },
       ]
     }

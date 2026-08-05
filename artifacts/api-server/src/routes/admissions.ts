@@ -81,10 +81,12 @@ function mapAdmission(a: typeof admissionsTable.$inferSelect) {
 /** GET /admissions */
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { status, search, date } = req.query as {
+    const { status, search, date, patientId, type } = req.query as {
       status?: string;
       search?: string;
       date?: string;
+      patientId?: string;
+      type?: string;
     };
 
     let query = db
@@ -93,6 +95,18 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       .where(isNull(admissionsTable.deletedAt))
       .orderBy(desc(admissionsTable.createdAt))
       .$dynamic();
+
+    if (patientId) {
+      query = query.where(
+        and(isNull(admissionsTable.deletedAt), eq(admissionsTable.patientId, patientId)),
+      );
+    }
+
+    if (type) {
+      query = query.where(
+        and(isNull(admissionsTable.deletedAt), eq(admissionsTable.type, type as "hospitalisation" | "preadmission" | "transfert_interne" | "transfert_externe")),
+      );
+    }
 
     if (status && status !== "all") {
       query = query.where(

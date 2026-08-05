@@ -83,12 +83,15 @@ router.get("/upcoming", async (_req, res, next) => {
 /** GET /appointments — full appointment list */
 router.get("/", async (req, res, next) => {
   try {
-    const { search, status, departmentId } =
+    const { search, status, departmentId, patientId } =
       req.query as Record<string, string | undefined>;
 
-    const result = await appointmentService.list({ limit: 200 });
+    const result = await appointmentService.list({ limit: 500 });
     let rows = result.data;
 
+    if (patientId) {
+      rows = rows.filter((a) => a.patientId === patientId);
+    }
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter((a) =>

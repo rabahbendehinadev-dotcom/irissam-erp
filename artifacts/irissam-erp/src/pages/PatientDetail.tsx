@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { ArrowLeft, AlertTriangle, Phone, Droplets, User, Shield, Clock, Stethoscope, ChevronRight, PlusCircle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Phone, Droplets, User, Shield, Stethoscope, ChevronRight, PlusCircle } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PatientProfileHeader } from '@/components/patients/PatientProfileHeader';
 import { PatientTimeline } from '@/components/patients/PatientTimeline';
@@ -21,6 +21,12 @@ import { PatientInvoicesTab } from '@/components/billing/PatientInvoicesTab';
 import { PatientPaymentsTab } from '@/components/billing/PatientPaymentsTab';
 import { PatientBillingTab } from '@/components/billing/PatientBillingTab';
 import { PatientPortalTab } from '@/components/patients/PatientPortalTab';
+import { PatientLabOrdersTab } from '@/components/patients/PatientLabOrdersTab';
+import { PatientImagingOrdersTab } from '@/components/patients/PatientImagingOrdersTab';
+import { PatientPrescriptionsTab } from '@/components/patients/PatientPrescriptionsTab';
+import { PatientAppointmentsTab } from '@/components/patients/PatientAppointmentsTab';
+import { PatientAdmissionsHistoryTab } from '@/components/patients/PatientAdmissionsHistoryTab';
+import { PatientEmergencyVisitsTab } from '@/components/patients/PatientEmergencyVisitsTab';
 import { ConsultationTable } from '@/components/consultations/ConsultationTable';
 import { ConsultationForm } from '@/components/consultations/ConsultationForm';
 import { ConsultationStatusBadge } from '@/components/consultations/ConsultationStatusBadge';
@@ -53,17 +59,6 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
         <h3 className="font-semibold text-gray-800 text-sm">{title}</h3>
       </div>
       <div className="space-y-3">{children}</div>
-    </div>
-  );
-}
-
-function PlaceholderTab({ label }: { label: string }) {
-  const { t } = useLanguage();
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[300px] text-gray-400 space-y-3">
-      <Clock size={40} className="opacity-30" />
-      <p className="font-semibold">{label}</p>
-      <p className="text-sm">{t('page.coming_soon_desc')}</p>
     </div>
   );
 }
@@ -138,12 +133,7 @@ function DernieresConsultations({ consultations, onOpen, onNew }: {
   );
 }
 
-// ─── Tabs that remain as placeholders ────────────────────────────────────────
-
-const SOON_TABS = [
-  'appointments', 'admissions', 'emergencies', 'hospitalizations',
-  'laboratory', 'imaging', 'prescriptions',
-];
+// (no more SOON_TABS — all tabs are now connected to real APIs)
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -487,14 +477,20 @@ export default function PatientDetailPage() {
         {activeTab === 'portal' && <PatientPortalTab patientId={patient.id} patientEmail={patient.email} />}
 
         {/* ─── BILLING TABS ─── */}
-        {activeTab === 'invoices' && <PatientInvoicesTab patientId={patient.id} />}
-        {activeTab === 'payments' && <PatientPaymentsTab patientId={patient.id} />}
-        {activeTab === 'billing'  && <PatientBillingTab  patientId={patient.id} />}
+        {activeTab === 'invoices'  && <PatientInvoicesTab  patientId={patient.id} />}
+        {activeTab === 'payments'  && <PatientPaymentsTab  patientId={patient.id} />}
+        {activeTab === 'billing'   && <PatientBillingTab   patientId={patient.id} />}
 
-        {/* ─── PLACEHOLDER TABS ─── */}
-        {SOON_TABS.includes(activeTab) && (
-          <PlaceholderTab label={t(`pat.tab.${activeTab}` as any)} />
-        )}
+        {/* ─── CLINICAL ORDER TABS ─── */}
+        {activeTab === 'laboratory'      && <PatientLabOrdersTab    patientId={patient.id} />}
+        {activeTab === 'imaging'         && <PatientImagingOrdersTab patientId={patient.id} />}
+        {activeTab === 'prescriptions'   && <PatientPrescriptionsTab patientId={patient.id} />}
+
+        {/* ─── SCHEDULING & MOVEMENT TABS ─── */}
+        {activeTab === 'appointments'    && <PatientAppointmentsTab    patientId={patient.id} />}
+        {activeTab === 'admissions'      && <PatientAdmissionsHistoryTab patientId={patient.id} />}
+        {activeTab === 'hospitalizations'&& <PatientAdmissionsHistoryTab patientId={patient.id} typeFilter="hospitalisation" />}
+        {activeTab === 'emergencies'     && <PatientEmergencyVisitsTab   patientId={patient.id} />}
       </div>
 
       {/* Edit form */}
