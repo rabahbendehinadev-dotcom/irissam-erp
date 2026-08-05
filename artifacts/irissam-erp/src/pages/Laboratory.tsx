@@ -350,8 +350,8 @@ export default function LaboratoryPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {orders.map(order => {
-                    const st  = LAB_STATUS[order.status];
-                    const urg = URGENCY[order.urgency];
+                    const st  = LAB_STATUS[order.status]  ?? { label: order.status,  badge: 'bg-gray-100 text-gray-500 border-gray-200', row: '' };
+                    const urg = URGENCY[order.urgency]    ?? { label: order.urgency,  badge: 'bg-gray-100 text-gray-600 border border-gray-200' };
                     const canAdvance = order.status !== 'validee' && order.status !== 'annulee' &&
                       (can('laboratory.validate') || (can('laboratory.create') && order.status !== 'en_cours'));
 
