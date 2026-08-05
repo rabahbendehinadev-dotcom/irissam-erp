@@ -43,6 +43,14 @@ const MIGRATIONS_LIST = [
   "025_payroll_permissions.sql",
   "026_super_admin_tables.sql",
   "027_super_admin_permissions.sql",
+  "028_patient_portal_tables.sql",
+  "029_patient_portal_permissions.sql",
+  "030_patient_portal_admin.sql",
+  "031_portal_otp_security.sql",
+  "032_unlock_admin_raise_lockout.sql",
+  "033_doctor_portal_tables.sql",
+  "034_doctor_portal_permissions.sql",
+  "035_reset_admin_password.sql",
 ];
 
 async function auditLog(userId: string, desc: string, ip?: string) {
