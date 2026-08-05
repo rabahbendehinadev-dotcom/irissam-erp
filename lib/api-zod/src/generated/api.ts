@@ -128,6 +128,7 @@ export const GetPatientsListResponse = zod.array(GetPatientsListResponseItem)
  */
 export const GetUpcomingAppointmentsResponseItem = zod.object({
   "id": zod.number(),
+  "patientId": zod.string().optional(),
   "patientName": zod.string(),
   "service": zod.string(),
   "doctorName": zod.string(),

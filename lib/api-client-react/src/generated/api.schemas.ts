@@ -82,7 +82,7 @@ export interface PatientListItem {
 
 export interface UpcomingAppointment {
   id: number;
-  patientId?: string | null;
+  patientId?: string;
   patientName: string;
   service: string;
   doctorName: string;

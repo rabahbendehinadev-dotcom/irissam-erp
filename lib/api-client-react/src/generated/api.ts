@@ -2154,3 +2154,9 @@ export function useGetVehiclesStatus<TData = Awaited<ReturnType<typeof getVehicl
   return withQueryKey(query, queryOptions.queryKey);
 }
 
+
+
+
+
+
+
