@@ -1,0 +1,78 @@
+ها هو الخطأ الحقيقي أخيرًا:
+
+```text
+TypeError: r is not a function
+at Object.getDashboard
+at PayrollDashboard
+```
+
+يعني المشكل داخل دالة `getDashboard` الخاصة بالـ payroll. غالبًا كاين parameter أو callback اسمو تبدّل أثناء build، والكود راهو يحاول ينادي قيمة ماشي function.
+
+ابعث لـ Replit Agent هذا البرومبت:
+
+```text
+لقينا الخطأ الحقيقي من Console في production:
+
+TypeError: r is not a function
+at Object.getDashboard
+at PayrollDashboard
+
+الـ stack يظهر أن الخطأ داخل getDashboard المستعملة من PayrollDashboard.
+
+المطلوب منك إصلاح السبب الحقيقي فقط، دون تخمين:
+
+1. ابحث عن تعريف واستعمال getDashboard في كامل المشروع، خصوصًا:
+   - service payroll
+   - API client
+   - PayrollDashboard
+   - hooks الخاصة بالـ payroll
+
+2. افحص signature تاع getDashboard:
+   - واش تستقبل siteId؟
+   - departmentId؟
+   - query function؟
+   - api client؟
+   - callback؟
+   وحدد أي argument راهو يتم تمريره بقيمة ليست function.
+
+3. شغّل production build واستعمل source maps أو الكود غير minified لتحديد السطر الأصلي المقابل لـ:
+   Object.getDashboard
+   PayrollDashboard
+
+4. افحص خصوصًا أخطاء من هذا النوع:
+   - getDashboard(fetcher) بينما fetcher undefined/object
+   - parameter اسمه request أو client يتم استدعاؤه كـ function
+   - destructuring خاطئ من hook أو context
+   - import default بدل named import أو العكس
+   - API client export تغيّر من function إلى object
+   - تمرير departmentId في مكان callback
+   - استخدام service factory بدون تهيئتها
+
+5. استعمل البحث:
+   grep -R "getDashboard" artifacts -n
+   grep -R "PayrollDashboard" artifacts -n
+
+6. شغّل الصفحة /payroll في production محليًا، واستخرج stack trace الأصلي قبل وبعد التصحيح.
+
+7. لا تضف try/catch لإخفاء الخطأ، ولا تستبدل البيانات بـ mock.
+
+8. بعد التصحيح، اختبر:
+   - /payroll تفتح بلا ErrorBoundary
+   - Console بلا TypeError
+   - dashboard KPI تظهر
+   - جميع tabs تفتح
+   - API payroll requests ترجع 200
+   - Docker build كامل ينجح
+
+9. اعمل commit محلي فقط، بلا git push.
+
+وفي النهاية أعطني:
+- الملف والسطر المسؤول
+- القيمة التي كانت ليست function
+- سبب الخطأ
+- الملفات المعدلة
+- نتائج الاختبارات
+- commit hash
+```
+
+الآن عندنا دليل قوي: المشكل ماشي cache ولا Dokploy ولا PostgreSQL، بل **استدعاء خاطئ داخل `getDashboard`**.
