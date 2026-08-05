@@ -24,7 +24,8 @@ router.get('/dashboard', requirePermission('payroll.dashboard.view'), async (req
       latestRun ? pool.query(
         `SELECT total_brut, total_net, total_employees,
                 total_earnings, total_deductions, total_advances, total_loans,
-                total_anomalies, total_critical_anomalies
+                total_anomalies, total_critical_anomalies,
+                total_tax, total_social_sec
          FROM payroll_runs WHERE id = $1`,
         [latestRun.id],
       ) : Promise.resolve({ rows: [{}] }),

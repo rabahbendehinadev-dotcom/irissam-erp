@@ -23,7 +23,14 @@ export default function PayrollDashboardTab() {
   if (error)   return <div className="p-6 bg-red-50 text-red-700 rounded-xl">{error}</div>;
   if (!data)   return null;
 
-  const { kpis, charts, latestRun, anomalies, activeAdvances, activeLoans } = data;
+  const {
+    kpis = {} as PayrollDashboard['kpis'],
+    charts = { monthlySalary: [], byDepartment: [] },
+    latestRun,
+    anomalies,
+    activeAdvances,
+    activeLoans,
+  } = data ?? {};
   const variationNum = parseFloat(kpis.variation_vs_previous || '0');
   const VariationIcon = variationNum > 0 ? TrendingUp : variationNum < 0 ? TrendingDown : Minus;
   const variationColor = variationNum > 0 ? 'text-green-600' : variationNum < 0 ? 'text-red-600' : 'text-gray-500';
@@ -80,7 +87,7 @@ export default function PayrollDashboardTab() {
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <h3 className="font-semibold text-gray-800 mb-4 text-sm">Masse salariale mensuelle {year}</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={charts.monthlySalary.map(d => ({ ...d, mois: MONTH_NAMES_FR[d.month - 1]?.slice(0,3) }))}>
+            <BarChart data={(Array.isArray(charts.monthlySalary) ? charts.monthlySalary : []).map(d => ({ ...d, mois: MONTH_NAMES_FR[Math.max(0, (d.month ?? 1) - 1)]?.slice(0,3) ?? '' }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={v => (v/1000).toFixed(0)+'k'} />
@@ -94,11 +101,18 @@ export default function PayrollDashboardTab() {
         {/* By department */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <h3 className="font-semibold text-gray-800 mb-4 text-sm">Répartition par département</h3>
-          {charts.byDepartment.length === 0
+          {(!Array.isArray(charts.byDepartment) || charts.byDepartment.length === 0)
             ? <div className="h-48 flex items-center justify-center text-gray-400 text-sm">Aucune donnée</div>
             : <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
-                  <Pie data={charts.byDepartment} dataKey="total_net" nameKey="department" cx="50%" cy="50%" outerRadius={80} label={({ department, percent }) => `${department?.slice(0,8)} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                  <Pie
+                    data={charts.byDepartment.map(d => ({ ...d, department: d.department ?? 'N/A' }))}
+                    dataKey="total_net" nameKey="department" cx="50%" cy="50%" outerRadius={80}
+                    label={({ department, percent }: { department?: string | null; percent?: number }) =>
+                      `${String(department ?? 'N/A').slice(0,8)} ${((percent ?? 0) * 100).toFixed(0)}%`
+                    }
+                    labelLine={false}
+                  >
                     {charts.byDepartment.map((_, i) => <Cell key={i} fill={DEPT_COLORS[i % DEPT_COLORS.length]} />)}
                   </Pie>
                   <Tooltip formatter={(v: any) => formatAmount(v)} />
