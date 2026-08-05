@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { execApi, ExecFilters } from '@/services/api/executive-dashboard';
 import { DrillTarget } from '@/pages/ExecutiveDashboard';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
 
@@ -15,16 +15,26 @@ function fmt(n: number) {
 export default function ExecFinance({ filters, onDrill }: { filters: ExecFilters; onDrill: (t: DrillTarget) => void }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     setLoading(true);
+    setErr(false);
     execApi.finance(filters)
-      .then((r: any) => setData(r.data))
-      .catch(() => {})
+      .then((r: any) => setData(r))
+      .catch(() => setErr(true))
       .finally(() => setLoading(false));
-  }, [filters]);
+  }, [filters, retryKey]);
 
-  if (loading) return <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
+  if (err) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-400">
+      <AlertTriangle className="w-10 h-10 text-red-300" />
+      <p className="text-sm">Erreur de chargement — Finance</p>
+      <button onClick={() => setRetryKey(k => k + 1)} className="text-xs bg-slate-800 text-white px-3 py-1.5 rounded hover:bg-slate-700 transition-colors">Réessayer</button>
+    </div>
+  );
   if (!data) return null;
 
   const revByMonth = (data.revenueByMonth ?? []).map((r: any) => ({

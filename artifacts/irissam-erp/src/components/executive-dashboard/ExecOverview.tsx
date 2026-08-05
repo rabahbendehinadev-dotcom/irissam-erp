@@ -44,18 +44,19 @@ function Skeleton() {
   return <div className="h-28 bg-gray-100 rounded-xl animate-pulse" />;
 }
 
-export default function ExecOverview({ overview: d, loading, onDrill }: Props) {
-  if (loading && !d) {
+export default function ExecOverview({ overview, loading, onDrill }: Props) {
+  if (loading && !overview) {
     return (
       <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {Array.from({length:20}).map((_,i) => <Skeleton key={i} />)}
       </div>
     );
   }
-  if (!d) return null;
 
-  const occRate = d.beds?.occupancyRate ?? 0;
-  const icuRate = d.icu?.rate ?? 0;
+  // Use fallback empty object so KPIs render as 0 when API returns nothing
+  const d = overview ?? {};
+  const occRate = (d as any).beds?.occupancyRate ?? 0;
+  const icuRate = (d as any).icu?.rate ?? 0;
 
   return (
     <div className="p-4 space-y-6">

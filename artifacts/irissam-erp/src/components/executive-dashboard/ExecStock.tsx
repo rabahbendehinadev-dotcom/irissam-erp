@@ -13,16 +13,26 @@ function fmt(n: number) {
 export default function ExecStock({ filters, onDrill }: { filters: ExecFilters; onDrill: (t: DrillTarget) => void }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     setLoading(true);
+    setErr(false);
     execApi.stock(filters)
-      .then((r: any) => setData(r.data))
-      .catch(() => {})
+      .then((r: any) => setData(r))
+      .catch(() => setErr(true))
       .finally(() => setLoading(false));
-  }, [filters]);
+  }, [filters, retryKey]);
 
-  if (loading) return <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
+  if (err) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-400">
+      <AlertTriangle className="w-10 h-10 text-red-300" />
+      <p className="text-sm">Erreur de chargement — Stock médical</p>
+      <button onClick={() => setRetryKey(k => k + 1)} className="text-xs bg-slate-800 text-white px-3 py-1.5 rounded hover:bg-slate-700 transition-colors">Réessayer</button>
+    </div>
+  );
   if (!data) return null;
 
   const s = data.summary ?? {};

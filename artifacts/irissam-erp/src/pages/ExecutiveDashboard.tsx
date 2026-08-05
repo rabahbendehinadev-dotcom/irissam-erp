@@ -48,8 +48,8 @@ export default function ExecutiveDashboard() {
         execApi.overview(filters),
         execApi.alerts(filters),
       ]);
-      if (ov.status === 'fulfilled') setOverview((ov.value as any).data);
-      if (al.status === 'fulfilled') setAlerts((al.value as any).data);
+      if (ov.status === 'fulfilled') setOverview(ov.value as any);
+      if (al.status === 'fulfilled') setAlerts(al.value as any);
       setLastUpdate(new Date());
     } catch { /* silent */ } finally {
       setLoadingOv(false);

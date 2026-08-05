@@ -43,7 +43,7 @@ export default function DrillDownDrawer({ target, filters, onClose }: Props) {
     let cancelled = false;
     setLoading(true); setError(''); setData([]);
     execApi.drilldown(target.metric, filters)
-      .then((res: any) => { if (!cancelled) setData(res.data?.data ?? []); })
+      .then((res: any) => { if (!cancelled) setData((res as any)?.data ?? res ?? []); })
       .catch(() => { if (!cancelled) setError('Impossible de charger les données.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

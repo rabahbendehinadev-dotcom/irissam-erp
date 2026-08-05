@@ -1,23 +1,33 @@
 import { useEffect, useState } from 'react';
 import { execApi, ExecFilters } from '@/services/api/executive-dashboard';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
 
 export default function ExecMedical({ filters }: { filters: ExecFilters }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     setLoading(true);
+    setErr(false);
     execApi.medical(filters)
-      .then((r: any) => setData(r.data))
-      .catch(() => {})
+      .then((r: any) => setData(r))
+      .catch(() => setErr(true))
       .finally(() => setLoading(false));
-  }, [filters]);
+  }, [filters, retryKey]);
 
-  if (loading) return <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
+  if (err) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-400">
+      <AlertTriangle className="w-10 h-10 text-red-300" />
+      <p className="text-sm">Erreur de chargement — Activité médicale</p>
+      <button onClick={() => setRetryKey(k => k + 1)} className="text-xs bg-slate-800 text-white px-3 py-1.5 rounded hover:bg-slate-700 transition-colors">Réessayer</button>
+    </div>
+  );
   if (!data) return null;
 
   const admByDay = (data.admissionsByDay ?? []).map((r: any) => ({ day: String(r.day).slice(5), val: Number(r.count) }));
@@ -62,14 +72,17 @@ export default function ExecMedical({ filters }: { filters: ExecFilters }) {
 
         {/* Urgences par priorité */}
         <ChartCard title="Urgences par priorité">
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={urgPriority} dataKey="val" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, val }) => `${name}: ${val}`}>
-                {urgPriority.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Pie>
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          {urgPriority.length === 0
+            ? <div className="flex items-center justify-center h-[200px] text-gray-400 text-sm">Aucune donnée</div>
+            : <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={urgPriority} dataKey="val" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, val }) => `${name}: ${val}`}>
+                    {urgPriority.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+          }
         </ChartCard>
 
         {/* Top diagnostics */}
