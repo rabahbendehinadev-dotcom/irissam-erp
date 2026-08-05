@@ -70,13 +70,32 @@ const PUBLIC_ROOT =
 const ERP_DIST    = path.join(PUBLIC_ROOT, "erp");
 const PORTAL_DIST = path.join(PUBLIC_ROOT, "portal");
 
+// Hashed asset filenames (e.g. main-Abc1De2f.js) are immutable — cache 1 year.
+// Non-hashed files (index.html, favicon…) must never be cached by the browser.
+function staticOpts(dist: string): Parameters<typeof express.static>[1] {
+  return {
+    index: false,
+    setHeaders(res, filePath) {
+      // Vite outputs hashed JS/CSS/font chunks — safe to cache indefinitely
+      if (/\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.(js|css|woff2?|ttf|eot|svg|png|jpg|webp)$/
+            .test(filePath)) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      } else {
+        // index.html and anything else: always revalidate
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      }
+    },
+  };
+}
+
 if (fs.existsSync(PORTAL_DIST)) {
   // Patient Portal at /patient-portal/
   // Asset URLs baked by Vite: /patient-portal/assets/main.js → served from PORTAL_DIST/assets/
-  app.use("/patient-portal", express.static(PORTAL_DIST, { index: false }));
+  app.use("/patient-portal", express.static(PORTAL_DIST, staticOpts(PORTAL_DIST)));
 
   // SPA fallback: /patient-portal/any-react-route → portal index.html
   app.use("/patient-portal", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     res.sendFile(path.join(PORTAL_DIST, "index.html"));
   });
 
@@ -86,11 +105,12 @@ if (fs.existsSync(PORTAL_DIST)) {
 if (fs.existsSync(ERP_DIST)) {
   // Main ERP at /
   // Asset URLs baked by Vite: /assets/main.js → served from ERP_DIST/assets/
-  app.use(express.static(ERP_DIST, { index: false }));
+  app.use(express.static(ERP_DIST, staticOpts(ERP_DIST)));
 
   // SPA catch-all: every unmatched route → ERP index.html
   // /api and /patient-portal are already handled above; this only fires for remainder
   app.use((_req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     res.sendFile(path.join(ERP_DIST, "index.html"));
   });
 

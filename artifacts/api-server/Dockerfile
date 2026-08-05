@@ -53,7 +53,11 @@ ENV BASE_PATH=/ PORT=3000 NODE_ENV=production
 # Run vite directly — do NOT use pnpm --filter, which in pnpm v10 triggers builds
 # for all workspace packages with a "build" script (including irissam-erp in the
 # portal stage where its vite.config.ts is absent → exit 1).
-RUN cd artifacts/irissam-erp && node_modules/.bin/vite build --config vite.config.ts
+# NODE_OPTIONS=--max-old-space-size=3072 prevents OOM on VPS with ≥4 GB RAM;
+# lower to 1536 if the host has only 2 GB.
+RUN cd artifacts/irissam-erp && \
+    NODE_OPTIONS="--max-old-space-size=3072" \
+    node_modules/.bin/vite build --config vite.config.ts
 # Output: artifacts/irissam-erp/dist/public/
 
 # ── Stage 2: Patient Portal Frontend ─────────────────────────────────────────
@@ -73,7 +77,9 @@ COPY artifacts/patient-portal/ ./artifacts/patient-portal/
 
 # BASE_PATH=/patient-portal/ so asset URLs: /patient-portal/assets/main.js
 ENV BASE_PATH=/patient-portal/ PORT=3000 NODE_ENV=production
-RUN cd artifacts/patient-portal && node_modules/.bin/vite build --config vite.config.ts
+RUN cd artifacts/patient-portal && \
+    NODE_OPTIONS="--max-old-space-size=3072" \
+    node_modules/.bin/vite build --config vite.config.ts
 # Output: artifacts/patient-portal/dist/public/
 
 # ── Stage 3: API Server ───────────────────────────────────────────────────────
