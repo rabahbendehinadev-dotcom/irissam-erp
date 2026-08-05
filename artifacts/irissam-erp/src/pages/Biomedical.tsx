@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ScrollableTabBar } from "@/components/ui/ScrollableTabBar";
 
@@ -16,18 +16,18 @@ const CatalogPage      = lazy(() => import("@/components/biomedical/CatalogPage"
 const AnalyticsPage    = lazy(() => import("@/components/biomedical/BiomedAnalyticsPage"));
 
 const TABS = [
-  { id: "dashboard",   label: "Tableau de bord" },
-  { id: "equipment",   label: "Équipements" },
-  { id: "work-orders", label: "Ordres de travail" },
-  { id: "calibrations",label: "Calibrations" },
-  { id: "incidents",   label: "Incidents" },
-  { id: "spare-parts", label: "Pièces détachées" },
-  { id: "contracts",   label: "Contrats" },
-  { id: "inspections", label: "Inspections" },
-  { id: "disposals",   label: "Réformes" },
-  { id: "suppliers",   label: "Fournisseurs" },
-  { id: "catalog",     label: "Catalogue" },
-  { id: "analytics",   label: "Analytique" },
+  { id: "dashboard",    label: "Tableau de bord" },
+  { id: "equipment",    label: "Équipements" },
+  { id: "work-orders",  label: "Ordres de travail" },
+  { id: "calibrations", label: "Calibrations" },
+  { id: "incidents",    label: "Incidents" },
+  { id: "spare-parts",  label: "Pièces détachées" },
+  { id: "contracts",    label: "Contrats" },
+  { id: "inspections",  label: "Inspections" },
+  { id: "disposals",    label: "Réformes" },
+  { id: "suppliers",    label: "Fournisseurs" },
+  { id: "catalog",      label: "Catalogue" },
+  { id: "analytics",    label: "Analytique" },
 ];
 
 const Spinner = () => (
@@ -37,26 +37,36 @@ const Spinner = () => (
 );
 
 export default function BiomedicalPage() {
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return localStorage.getItem("biomed-tab") ?? "dashboard"; } catch { return "dashboard"; }
+  });
+
+  const handleTabChange = (id: string) => {
+    setActiveTab(id);
+    try { localStorage.setItem("biomed-tab", id); } catch { /* ignore */ }
+  };
+
   return (
-    <DashboardLayout title="Gestion Biomédicale">
-      <ScrollableTabBar tabs={TABS} storageKey="biomed-tab">
-        {(tab: string) => (
+    <DashboardLayout>
+      <div className="flex flex-col h-full min-h-0">
+        <ScrollableTabBar tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+        <div className="flex-1 overflow-auto">
           <Suspense fallback={<Spinner />}>
-            {tab === "dashboard"    && <BiomedDashboard />}
-            {tab === "equipment"    && <EquipmentPage />}
-            {tab === "work-orders"  && <WorkOrdersPage />}
-            {tab === "calibrations" && <CalibrationsPage />}
-            {tab === "incidents"    && <IncidentsPage />}
-            {tab === "spare-parts"  && <SparePartsPage />}
-            {tab === "contracts"    && <ContractsPage />}
-            {tab === "inspections"  && <InspectionsPage />}
-            {tab === "disposals"    && <DisposalsPage />}
-            {tab === "suppliers"    && <SuppliersPage />}
-            {tab === "catalog"      && <CatalogPage />}
-            {tab === "analytics"    && <AnalyticsPage />}
+            {activeTab === "dashboard"    && <BiomedDashboard />}
+            {activeTab === "equipment"    && <EquipmentPage />}
+            {activeTab === "work-orders"  && <WorkOrdersPage />}
+            {activeTab === "calibrations" && <CalibrationsPage />}
+            {activeTab === "incidents"    && <IncidentsPage />}
+            {activeTab === "spare-parts"  && <SparePartsPage />}
+            {activeTab === "contracts"    && <ContractsPage />}
+            {activeTab === "inspections"  && <InspectionsPage />}
+            {activeTab === "disposals"    && <DisposalsPage />}
+            {activeTab === "suppliers"    && <SuppliersPage />}
+            {activeTab === "catalog"      && <CatalogPage />}
+            {activeTab === "analytics"    && <AnalyticsPage />}
           </Suspense>
-        )}
-      </ScrollableTabBar>
+        </div>
+      </div>
     </DashboardLayout>
   );
 }

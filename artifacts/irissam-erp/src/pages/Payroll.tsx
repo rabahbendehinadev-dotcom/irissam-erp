@@ -16,16 +16,16 @@ const PayrollReportsTab    = lazy(() => import('@/components/payroll/PayrollRepo
 const PayrollSettingsTab   = lazy(() => import('@/components/payroll/PayrollSettings'));
 
 const TABS = [
-  { id: 'dashboard',   label: 'nav.payroll.dashboard'   },
-  { id: 'periods',     label: 'nav.payroll.periods'     },
-  { id: 'runs',        label: 'nav.payroll.runs'        },
-  { id: 'payslips',    label: 'nav.payroll.payslips'    },
-  { id: 'advances',    label: 'nav.payroll.advances'    },
-  { id: 'loans',       label: 'nav.payroll.loans'       },
-  { id: 'components',  label: 'nav.payroll.components'  },
-  { id: 'orders',      label: 'nav.payroll.orders'      },
-  { id: 'reports',     label: 'nav.payroll.reports'     },
-  { id: 'settings',    label: 'nav.payroll.settings'    },
+  { id: 'dashboard',   label: 'nav.payroll.dashboard'   as const },
+  { id: 'periods',     label: 'nav.payroll.periods'     as const },
+  { id: 'runs',        label: 'nav.payroll.runs'        as const },
+  { id: 'payslips',    label: 'nav.payroll.payslips'    as const },
+  { id: 'advances',    label: 'nav.payroll.advances'    as const },
+  { id: 'loans',       label: 'nav.payroll.loans'       as const },
+  { id: 'components',  label: 'nav.payroll.components'  as const },
+  { id: 'orders',      label: 'nav.payroll.orders'      as const },
+  { id: 'reports',     label: 'nav.payroll.reports'     as const },
+  { id: 'settings',    label: 'nav.payroll.settings'    as const },
 ];
 
 const TAB_COMPONENTS: Record<string, React.LazyExoticComponent<any>> = {
@@ -65,7 +65,6 @@ export default function PayrollPage() {
             tabs={tabs}
             activeTab={activeTab}
             onTabChange={handleTabChange}
-            storageKey="payroll-tab"
           />
         </div>
         <div className="flex-1 overflow-auto p-4">

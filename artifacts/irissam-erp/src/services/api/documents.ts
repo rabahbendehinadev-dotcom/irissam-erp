@@ -147,14 +147,14 @@ export const docsApi = {
         else params.set(k, String(v));
       }
     });
-    return apiClient.get(`${BASE}/records?${params}`).then(r => r.data);
+    return apiClient.get<DocListResponse>(`${BASE}/records?${params}`);
   },
   get: (id: string): Promise<DocRecord> =>
-    apiClient.get(`${BASE}/records/${id}`).then(r => r.data),
+    apiClient.get<DocRecord>(`${BASE}/records/${id}`),
   create: (body: Partial<DocRecord> & { storageKey: string }): Promise<DocRecord> =>
-    apiClient.post(`${BASE}/records`, body).then(r => r.data),
+    apiClient.post<DocRecord>(`${BASE}/records`, body),
   update: (id: string, body: Partial<DocRecord>): Promise<DocRecord> =>
-    apiClient.patch(`${BASE}/records/${id}`, body).then(r => r.data),
+    apiClient.patch<DocRecord>(`${BASE}/records/${id}`, body),
   delete: (id: string): Promise<void> =>
     apiClient.delete(`${BASE}/records/${id}`).then(() => {}),
   approve: (id: string, comment?: string): Promise<void> =>
@@ -162,7 +162,7 @@ export const docsApi = {
   reject: (id: string, comment: string): Promise<void> =>
     apiClient.post(`${BASE}/records/${id}/reject`, { comment }).then(() => {}),
   sign: (id: string, reason: string, signatureType?: string): Promise<DocSignature> =>
-    apiClient.post(`${BASE}/records/${id}/sign`, { reason, signatureType }).then(r => r.data),
+    apiClient.post<DocSignature>(`${BASE}/records/${id}/sign`, { reason, signatureType }),
   archive: (id: string): Promise<void> =>
     apiClient.post(`${BASE}/records/${id}/archive`, {}).then(() => {}),
   restore: (id: string): Promise<void> =>
@@ -170,62 +170,62 @@ export const docsApi = {
   favorite: (id: string): Promise<void> =>
     apiClient.post(`${BASE}/records/${id}/favorite`, {}).then(() => {}),
   addComment: (id: string, content: string, isInternal?: boolean): Promise<DocComment> =>
-    apiClient.post(`${BASE}/records/${id}/comments`, { content, isInternal }).then(r => r.data),
+    apiClient.post<DocComment>(`${BASE}/records/${id}/comments`, { content, isInternal }),
   getDownloadUrl: (id: string) => `${BASE}/records/${id}/download-url`,
   getPreviewUrl: (id: string) => `${BASE}/records/${id}/preview-url`,
 
   // Versions
   getVersions: (docId: string): Promise<{ versions: DocVersion[] }> =>
-    apiClient.get(`${BASE}/versions/${docId}`).then(r => r.data),
+    apiClient.get<{ versions: DocVersion[] }>(`${BASE}/versions/${docId}`),
   createVersion: (docId: string, body: { storageKey: string; fileName: string; mimeType: string; fileSize?: number; checksum?: string; changeReason?: string }) =>
-    apiClient.post(`${BASE}/versions/${docId}`, body).then(r => r.data),
+    apiClient.post(`${BASE}/versions/${docId}`, body),
   restoreVersion: (docId: string, versionNumber: number) =>
-    apiClient.post(`${BASE}/versions/${docId}/restore/${versionNumber}`, {}).then(r => r.data),
+    apiClient.post(`${BASE}/versions/${docId}/restore/${versionNumber}`, {}),
 
   // Folders
   getFolders: (): Promise<{ folders: DocFolder[] }> =>
-    apiClient.get(`${BASE}/folders`).then(r => r.data),
+    apiClient.get<{ folders: DocFolder[] }>(`${BASE}/folders`),
   createFolder: (body: { name: string; parentId?: string; category?: string; description?: string; confidentiality?: string }) =>
-    apiClient.post(`${BASE}/folders`, body).then(r => r.data),
+    apiClient.post(`${BASE}/folders`, body),
   updateFolder: (id: string, body: Partial<DocFolder>) =>
-    apiClient.patch(`${BASE}/folders/${id}`, body).then(r => r.data),
+    apiClient.patch(`${BASE}/folders/${id}`, body),
   deleteFolder: (id: string) =>
     apiClient.delete(`${BASE}/folders/${id}`).then(() => {}),
 
   // Workflows
-  getWorkflows: (): Promise<{ workflows: any[] }> =>
-    apiClient.get(`${BASE}/workflows`).then(r => r.data),
-  startWorkflow: (body: any) =>
-    apiClient.post(`${BASE}/workflows`, body).then(r => r.data),
+  getWorkflows: (): Promise<{ workflows: unknown[] }> =>
+    apiClient.get<{ workflows: unknown[] }>(`${BASE}/workflows`),
+  startWorkflow: (body: unknown) =>
+    apiClient.post(`${BASE}/workflows`, body),
   decideStep: (stepId: string, action: string, comment?: string) =>
-    apiClient.post(`${BASE}/workflows/step/${stepId}/decide`, { action, comment }).then(r => r.data),
+    apiClient.post(`${BASE}/workflows/step/${stepId}/decide`, { action, comment }),
 
   // Shares
   getShares: (docId: string) =>
-    apiClient.get(`${BASE}/shares/${docId}`).then(r => r.data),
-  createShare: (body: any) =>
-    apiClient.post(`${BASE}/shares`, body).then(r => r.data),
+    apiClient.get(`${BASE}/shares/${docId}`),
+  createShare: (body: unknown) =>
+    apiClient.post(`${BASE}/shares`, body),
   deleteShare: (shareId: string) =>
     apiClient.delete(`${BASE}/shares/${shareId}`).then(() => {}),
 
   // Dashboard
   getDashboardKpis: (): Promise<DocDashboardKpis> =>
-    apiClient.get(`${BASE}/dashboard/kpis`).then(r => r.data),
+    apiClient.get<DocDashboardKpis>(`${BASE}/dashboard/kpis`),
   getDashboardCharts: (): Promise<DocDashboardCharts> =>
-    apiClient.get(`${BASE}/dashboard/charts`).then(r => r.data),
+    apiClient.get<DocDashboardCharts>(`${BASE}/dashboard/charts`),
   getRecent: (): Promise<{ documents: DocRecord[] }> =>
-    apiClient.get(`${BASE}/dashboard/recent`).then(r => r.data),
-  getNotifications: () =>
-    apiClient.get(`${BASE}/dashboard/notifications`).then(r => r.data),
+    apiClient.get<{ documents: DocRecord[] }>(`${BASE}/dashboard/recent`),
+  getNotifications: (): Promise<{ notifications: unknown[] }> =>
+    apiClient.get<{ notifications: unknown[] }>(`${BASE}/dashboard/notifications`),
   markNotificationRead: (id: string) =>
     apiClient.patch(`${BASE}/dashboard/notifications/${id}/read`, {}).then(() => {}),
 
   // Audit
-  getDocumentAudit: (docId: string, limit?: number) =>
-    apiClient.get(`${BASE}/audit/${docId}?limit=${limit ?? 50}`).then(r => r.data),
+  getDocumentAudit: (docId: string, limit?: number): Promise<{ logs: unknown[] }> =>
+    apiClient.get<{ logs: unknown[] }>(`${BASE}/audit/${docId}?limit=${limit ?? 50}`),
   getGlobalAudit: (params?: Record<string, string>) => {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-    return apiClient.get(`${BASE}/audit${qs}`).then(r => r.data);
+    return apiClient.get(`${BASE}/audit${qs}`);
   },
 };
 

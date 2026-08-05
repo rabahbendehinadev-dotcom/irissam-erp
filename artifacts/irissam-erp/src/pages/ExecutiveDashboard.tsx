@@ -19,7 +19,7 @@ export interface DrillTarget { metric: string; label: string; }
 
 export default function ExecutiveDashboard() {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState('0');
   const [filters, setFilters] = useState<ExecFilters>({ period: 'day' });
   const [overview, setOverview] = useState<any>(null);
   const [alerts, setAlerts]     = useState<any>(null);
@@ -31,15 +31,15 @@ export default function ExecutiveDashboard() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const tabs = [
-    t('exec.tab.overview'),
-    t('exec.tab.medical'),
-    t('exec.tab.capacity'),
-    t('exec.tab.finance'),
-    t('exec.tab.hr'),
-    t('exec.tab.stock'),
-    t('exec.tab.biomedical'),
-    t('exec.tab.quality'),
-    t('exec.tab.alerts'),
+    { id: '0', label: t('exec.tab.overview') },
+    { id: '1', label: t('exec.tab.medical') },
+    { id: '2', label: t('exec.tab.capacity') },
+    { id: '3', label: t('exec.tab.finance') },
+    { id: '4', label: t('exec.tab.hr') },
+    { id: '5', label: t('exec.tab.stock') },
+    { id: '6', label: t('exec.tab.biomedical') },
+    { id: '7', label: t('exec.tab.quality') },
+    { id: '8', label: t('exec.tab.alerts') },
   ];
 
   const fetchOverview = useCallback(async () => {
@@ -119,7 +119,7 @@ export default function ExecutiveDashboard() {
 
         {/* Alert badge */}
         {alertCount > 0 && (
-          <button onClick={() => setActiveTab(8)}
+          <button onClick={() => setActiveTab('8')}
             className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium
               ${critCount > 0 ? 'bg-red-600 hover:bg-red-500' : 'bg-amber-500 hover:bg-amber-400'}`}>
             {critCount > 0 ? '🔴' : '🟡'} {alertCount} alerte{alertCount > 1 ? 's' : ''}
@@ -160,15 +160,15 @@ export default function ExecutiveDashboard() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {activeTab === 0 && <ExecOverview  overview={overview} loading={loadingOv} filters={filters} onDrill={setDrill} />}
-        {activeTab === 1 && <ExecMedical   filters={filters} />}
-        {activeTab === 2 && <ExecCapacity  filters={filters} />}
-        {activeTab === 3 && <ExecFinance   filters={filters} onDrill={setDrill} />}
-        {activeTab === 4 && <ExecHR        filters={filters} onDrill={setDrill} />}
-        {activeTab === 5 && <ExecStock     filters={filters} onDrill={setDrill} />}
-        {activeTab === 6 && <ExecBiomedical filters={filters} onDrill={setDrill} />}
-        {activeTab === 7 && <ExecQuality   filters={filters} onDrill={setDrill} />}
-        {activeTab === 8 && <ExecAlerts    alerts={alerts}   loading={loadingOv} onDrill={setDrill} />}
+        {activeTab === '0' && <ExecOverview  overview={overview} loading={loadingOv} filters={filters} onDrill={setDrill} />}
+        {activeTab === '1' && <ExecMedical   filters={filters} />}
+        {activeTab === '2' && <ExecCapacity  filters={filters} />}
+        {activeTab === '3' && <ExecFinance   filters={filters} onDrill={setDrill} />}
+        {activeTab === '4' && <ExecHR        filters={filters} onDrill={setDrill} />}
+        {activeTab === '5' && <ExecStock     filters={filters} onDrill={setDrill} />}
+        {activeTab === '6' && <ExecBiomedical filters={filters} onDrill={setDrill} />}
+        {activeTab === '7' && <ExecQuality   filters={filters} onDrill={setDrill} />}
+        {activeTab === '8' && <ExecAlerts    alerts={alerts}   loading={loadingOv} onDrill={setDrill} />}
       </div>
 
       {/* Drill-down drawer */}

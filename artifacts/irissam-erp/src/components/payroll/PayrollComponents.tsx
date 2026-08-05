@@ -62,7 +62,7 @@ export default function PayrollComponents() {
     const [form, setForm] = useState({ fixedAmount: comp.fixed_amount, percentage: parseFloat(String(comp.percentage)) * 100, taxable: comp.taxable, socialSecurityApplicable: comp.social_security_applicable, active: comp.active, priority: comp.priority });
     const save = async () => {
       try {
-        await payrollApi.updateComponent(comp.id, { fixedAmount: form.fixedAmount, percentage: form.percentage / 100, taxable: form.taxable, socialSecurityApplicable: form.socialSecurityApplicable, active: form.active, priority: form.priority });
+        await payrollApi.updateComponent(comp.id, { fixed_amount: form.fixedAmount, percentage: form.percentage / 100, taxable: form.taxable, social_security_applicable: form.socialSecurityApplicable, active: form.active, priority: form.priority });
         setEditing(null); load();
       } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Opération impossible' }); }
     };

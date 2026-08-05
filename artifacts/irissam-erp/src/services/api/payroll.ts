@@ -104,6 +104,7 @@ export interface PayrollDashboard {
     total_earnings?: number; total_deductions?: number;
     total_advances?: number; total_loans?: number;
     total_anomalies?: number; total_critical_anomalies?: number;
+    total_social_sec?: number; total_tax?: number;
     variation_vs_previous?: string;
   };
   anomalies: { critical?: number; warning?: number };
@@ -123,13 +124,29 @@ export interface PayrollSettings {
   absence_deduction_method: string; rounding_decimal: number; currency: string;
 }
 
+// ── Paginated response wrapper ─────────────────────────────────────────────────
+export interface PagedResponse<T> {
+  data: T[];
+  pagination?: {
+    total: number;
+    limit: number;
+    offset: number;
+    page?: number;
+    totalPages?: number;
+  };
+}
+
 // ── API functions ─────────────────────────────────────────────────────────────
 // NOTE: apiClient is new ApiClient('/api') — use .get/.post/.patch/.delete/.request
 // The base URL '/api' is already baked into the instance; do NOT include it here.
 const BASE = '/payroll';
 
-const qs = (params?: Record<string, any>) =>
-  params ? new URLSearchParams(params as any).toString() : '';
+const qs = (params?: Record<string, unknown>) =>
+  params ? new URLSearchParams(
+    Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== null)
+      .map(([k, v]) => [k, String(v)])
+  ).toString() : '';
 
 export const payrollApi = {
   // Dashboard
@@ -137,16 +154,16 @@ export const payrollApi = {
     apiClient.get(`${BASE}/dashboard${year ? `?year=${year}` : ''}`),
 
   // Periods
-  getPeriods: (params?: Record<string, any>) =>
+  getPeriods: (params?: Record<string, unknown>): Promise<PagedResponse<PayrollPeriod>> =>
     apiClient.get(`${BASE}/periods?${qs(params)}`),
-  getPeriod: (id: string) => apiClient.get(`${BASE}/periods/${id}`),
+  getPeriod: (id: string): Promise<PayrollPeriod> => apiClient.get(`${BASE}/periods/${id}`),
   createPeriod: (data: Partial<PayrollPeriod>): Promise<PayrollPeriod> =>
     apiClient.post(`${BASE}/periods`, data),
   updatePeriod: (id: string, data: Partial<PayrollPeriod>): Promise<PayrollPeriod> =>
     apiClient.patch(`${BASE}/periods/${id}`, data),
 
   // Runs
-  getRuns: (params?: Record<string, any>) =>
+  getRuns: (params?: Record<string, unknown>): Promise<PagedResponse<PayrollRun>> =>
     apiClient.get(`${BASE}/runs?${qs(params)}`),
   getRun: (id: string): Promise<PayrollRun> => apiClient.get(`${BASE}/runs/${id}`),
   createRun: (data: { periodId: string; label?: string }): Promise<PayrollRun> =>
@@ -167,13 +184,16 @@ export const payrollApi = {
     apiClient.post(`${BASE}/runs/${id}/generate-payslips`, {}),
   markPaid: (id: string) =>
     apiClient.post(`${BASE}/runs/${id}/mark-paid`, {}),
-  getAnomalies: (id: string) => apiClient.get(`${BASE}/runs/${id}/anomalies`),
+  getAnomalies: (id: string): Promise<{ anomalies: PayrollAnomaly[] }> =>
+    apiClient.get(`${BASE}/runs/${id}/anomalies`),
+  getLoanInstallments: (id: string): Promise<{ data: unknown[] }> =>
+    apiClient.get(`${BASE}/loans/${id}/installments`),
   resolveAnomaly: (runId: string, anomalyId: string, note?: string) =>
     apiClient.patch(`${BASE}/runs/${runId}/anomalies/${anomalyId}/resolve`, { note }),
   getEmployeeProfile: (id: string) => apiClient.get(`${BASE}/employees/${id}`),
 
   // Components
-  getComponents: (params?: Record<string, any>) =>
+  getComponents: (params?: Record<string, unknown>): Promise<PagedResponse<SalaryComponent>> =>
     apiClient.get(`${BASE}/components?${qs(params)}`),
   createComponent: (data: Partial<SalaryComponent>): Promise<SalaryComponent> =>
     apiClient.post(`${BASE}/components`, data),
@@ -183,7 +203,7 @@ export const payrollApi = {
     apiClient.delete(`${BASE}/components/${id}`),
 
   // Advances
-  getAdvances: (params?: Record<string, any>) =>
+  getAdvances: (params?: Record<string, unknown>): Promise<PagedResponse<PayrollAdvance>> =>
     apiClient.get(`${BASE}/advances?${qs(params)}`),
   createAdvance: (data: { employeeId: string; amount: number; deductionPeriodId?: string; reason?: string }) =>
     apiClient.post(`${BASE}/advances`, data),
@@ -193,9 +213,8 @@ export const payrollApi = {
     apiClient.patch(`${BASE}/advances/${id}/reject`, { reason }),
 
   // Loans
-  getLoans: (params?: Record<string, any>) =>
+  getLoans: (params?: Record<string, unknown>): Promise<PagedResponse<PayrollLoan>> =>
     apiClient.get(`${BASE}/loans?${qs(params)}`),
-  getLoanInstallments: (id: string) => apiClient.get(`${BASE}/loans/${id}/installments`),
   createLoan: (data: any) =>
     apiClient.post(`${BASE}/loans`, data),
   approveLoan: (id: string) =>
@@ -204,13 +223,13 @@ export const payrollApi = {
     apiClient.patch(`${BASE}/loans/${id}/reject`, { reason }),
 
   // Payslips
-  getPayslips: (params?: Record<string, any>) =>
+  getPayslips: (params?: Record<string, unknown>): Promise<PagedResponse<Payslip>> =>
     apiClient.get(`${BASE}/payslips?${qs(params)}`),
   getPayslipPdfUrl: (id: string) => `/api${BASE}/payslips/${id}/pdf`,
   getEmployeeHistory: (employeeId: string) => apiClient.get(`${BASE}/employees/${employeeId}/history`),
 
   // Payment orders
-  getPaymentOrders: (params?: Record<string, any>) =>
+  getPaymentOrders: (params?: Record<string, unknown>): Promise<PagedResponse<PaymentOrder>> =>
     apiClient.get(`${BASE}/payment-orders?${qs(params)}`),
   getPaymentOrder: (id: string) => apiClient.get(`${BASE}/payment-orders/${id}`),
   createPaymentOrder: (data: any) =>
@@ -225,9 +244,9 @@ export const payrollApi = {
     `/api${BASE}/bank-export?${new URLSearchParams(params as any).toString()}`,
 
   // Reports
-  getReports: (params?: Record<string, any>) =>
+  getReports: (params?: Record<string, unknown>): Promise<PagedResponse<unknown>> =>
     apiClient.get(`${BASE}/reports?${qs(params)}`),
-  getAuditLog: (params?: Record<string, any>) =>
+  getAuditLog: (params?: Record<string, unknown>) =>
     apiClient.get(`${BASE}/audit?${qs(params)}`),
 
   // Settings

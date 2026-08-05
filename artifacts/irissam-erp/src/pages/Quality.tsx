@@ -68,13 +68,12 @@ export default function QualityPage() {
   const ActiveComponent = TAB_COMPONENTS[tab] ?? QualityDashboard;
 
   return (
-    <DashboardLayout title="Qualité & Gestion des Risques">
+    <DashboardLayout>
       <div className="flex flex-col h-full">
         <ScrollableTabBar
           tabs={TABS}
           activeTab={tab}
           onTabChange={handleTab}
-          storageKey="quality-tab"
         />
         <div className="flex-1 overflow-auto p-4 sm:p-6">
           <Suspense fallback={<Skeleton />}>

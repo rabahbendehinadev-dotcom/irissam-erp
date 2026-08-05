@@ -172,7 +172,7 @@ export default function PayrollRuns() {
                 <div className="flex items-start justify-between flex-wrap gap-2">
                   <div>
                     <div className="font-semibold text-gray-900">
-                      {run.month ? `${MONTH_NAMES_FR[run.month-1]} ${run.year}` : 'Run'} — {run.label || `Run #${run.run_number || ''}`}
+                      {run.month ? `${MONTH_NAMES_FR[run.month-1]} ${run.year}` : 'Run'} — {run.label || 'Run'}
                     </div>
                     <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
                       <span><Users className="w-3 h-3 inline" /> {run.total_employees} employés</span>

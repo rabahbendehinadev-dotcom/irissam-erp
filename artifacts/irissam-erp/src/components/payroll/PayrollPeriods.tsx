@@ -26,7 +26,7 @@ export default function PayrollPeriods() {
     }
     setCreating(true);
     try {
-      await payrollApi.createPeriod({ month: form.month, year: form.year, startDate: form.startDate, endDate: form.endDate, paymentDate: form.paymentDate || undefined, notes: form.notes });
+      await payrollApi.createPeriod({ month: form.month, year: form.year, start_date: form.startDate, end_date: form.endDate, payment_date: form.paymentDate || undefined, notes: form.notes });
       setShowCreate(false);
       load();
     } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Impossible de créer la période' }); }

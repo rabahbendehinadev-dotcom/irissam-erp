@@ -57,7 +57,7 @@ export default function ExecBiomedical({ filters, onDrill }: { filters: ExecFilt
                 label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
                 {byStatus.map((r: any, i: number) => <Cell key={i} fill={r.fill} />)}
               </Pie>
-              <Legend formatter={(v) => ({ operational:'Opérationnel', out_of_service:'En panne', under_maintenance:'Maintenance', decommissioned:'Retiré' }[v] ?? v)} />
+              <Legend formatter={(v: string) => (({ operational:'Opérationnel', out_of_service:'En panne', under_maintenance:'Maintenance', decommissioned:'Retiré' } as Record<string, string>)[v] ?? v)} />
             </PieChart>
           </ResponsiveContainer>
         </div>
