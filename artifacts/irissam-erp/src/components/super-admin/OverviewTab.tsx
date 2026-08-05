@@ -346,3 +346,4 @@ export function OverviewTab() {
     </div>
   );
 }
+export { OverviewTab as default };

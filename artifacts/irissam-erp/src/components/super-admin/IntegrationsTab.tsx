@@ -35,7 +35,7 @@ export default function IntegrationsTab() {
     getIntegrations()
       .then(d => {
         const list = d.integrations || [];
-        if (list.length === 0) return seedIntegrations().then(() => getIntegrations().then(d2 => setIntegrations(d2.integrations||[])));
+        if (list.length === 0) { seedIntegrations().then(() => getIntegrations().then(d2 => setIntegrations(d2.integrations||[]))); return; }
         setIntegrations(list);
       })
       .catch(e => setError(e?.response?.data?.message||"Erreur serveur"))

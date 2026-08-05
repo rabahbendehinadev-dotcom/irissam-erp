@@ -223,3 +223,4 @@ export function HealthTab() {
     </div>
   );
 }
+export { HealthTab as default };

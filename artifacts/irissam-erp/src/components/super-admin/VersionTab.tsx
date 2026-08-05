@@ -34,7 +34,7 @@ export default function VersionTab() {
   const [form, setForm] = useState({ version:"", title:"", body:"", publishedAt:"" });
   const [creating, setCreating] = useState(false);
 
-  const isSuperAdmin = user?.role === "super_admin" || user?.role === "system_administrator";
+  const isSuperAdmin = user?.role === "super_admin" || (user?.role as string) === "system_administrator";
 
   const load = useCallback(() => {
     setLoading(true);

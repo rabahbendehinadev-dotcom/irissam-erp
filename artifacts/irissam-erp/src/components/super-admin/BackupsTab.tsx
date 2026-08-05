@@ -16,7 +16,9 @@ import {
   protectBackup,
   deleteBackup,
 } from "@/services/api/system";
-import { StepUpDialog } from "./StepUpDialog";
+import { StepUpDialog as StepUpDialogBase } from "./StepUpDialog";
+import type { ComponentType } from "react";
+const StepUpDialog = StepUpDialogBase as ComponentType<{ open: boolean; onClose: () => void; onSuccess: (t: string) => void; title?: string; description?: string }>;
 
 function Spinner() {
   return (
@@ -194,13 +196,8 @@ export function BackupsTab() {
   return (
     <div className="space-y-6">
       {/* Step-up for restore plan */}
-      <StepUpDialog
-        open={stepUpOpen}
-        onClose={() => setStepUpOpen(false)}
-        onSuccess={handleStepUpSuccess}
-        title="Plan de restauration"
-        description="Confirmez votre mot de passe pour afficher le plan de restauration."
-      />
+      {/* StepUpDialog — explicit cast to avoid JSX inference on unknown return */}
+      {(StepUpDialog as any)({ open: stepUpOpen, onClose: () => setStepUpOpen(false), onSuccess: handleStepUpSuccess, title: "Plan de restauration", description: "Confirmez votre mot de passe pour afficher le plan de restauration." })}
 
       {/* Restore Plan Modal */}
       {restorePlanOpen && restorePlan && (
@@ -400,7 +397,7 @@ export function BackupsTab() {
                   <td className="px-4 py-3 text-sm text-gray-700 capitalize">
                     <div className="flex items-center gap-1.5">
                       {b.protected && (
-                        <Lock className="w-3.5 h-3.5 text-indigo-500" title="Protégée" />
+                        <Lock className="w-3.5 h-3.5 text-indigo-500" aria-label="Protégée" />
                       )}
                       {b.type}
                     </div>
@@ -467,3 +464,4 @@ export function BackupsTab() {
     </div>
   );
 }
+export { BackupsTab as default };

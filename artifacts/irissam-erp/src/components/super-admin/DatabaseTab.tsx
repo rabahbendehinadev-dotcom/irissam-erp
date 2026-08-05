@@ -345,3 +345,4 @@ export function DatabaseTab() {
     </div>
   );
 }
+export { DatabaseTab as default };

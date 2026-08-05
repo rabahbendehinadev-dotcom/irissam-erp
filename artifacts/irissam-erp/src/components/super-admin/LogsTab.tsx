@@ -81,7 +81,7 @@ export function LogsTab() {
       if (filterUserId) params.userId = filterUserId;
       if (filterRequestId) params.requestId = filterRequestId;
       getSystemLogs(params)
-        .then((d) => {
+        .then((d: any) => {
           setData(d);
           const newLogs: LogEntry[] = d?.logs ?? [];
           if (append) {
@@ -325,3 +325,4 @@ export function LogsTab() {
     </div>
   );
 }
+export { LogsTab as default };

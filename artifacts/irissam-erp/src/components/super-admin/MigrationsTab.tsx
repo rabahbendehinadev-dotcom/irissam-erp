@@ -348,3 +348,4 @@ export function MigrationsTab() {
     </div>
   );
 }
+export { MigrationsTab as default };

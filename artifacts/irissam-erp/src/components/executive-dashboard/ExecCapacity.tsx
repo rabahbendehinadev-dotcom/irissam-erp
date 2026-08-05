@@ -31,7 +31,7 @@ export default function ExecCapacity({ filters }: { filters: ExecFilters }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         <OccGauge label="Occupation globale lits"
           value={bedsByService.length > 0
-            ? Math.round(bedsByService.reduce((s, r) => s + r.rate, 0) / bedsByService.length) : 0}
+            ? Math.round(bedsByService.reduce((s: number, r: { rate: number }) => s + r.rate, 0) / bedsByService.length) : 0}
           icon={<BedDouble className="w-5 h-5" />} color="blue" />
         <OccGauge label="ICU / Réanimation" value={icuRate}
           icon={<HeartPulse className="w-5 h-5" />} color={icuRate >= 100 ? 'red' : icuRate >= 80 ? 'orange' : 'green'} />
@@ -65,7 +65,7 @@ export default function ExecCapacity({ filters }: { filters: ExecFilters }) {
               <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={90} />
               <Tooltip formatter={(v: any) => `${v}%`} />
               <Bar dataKey="rate" name="Occupation" radius={[0, 4, 4, 0]}>
-                {bedsByService.map((r, i) => (
+                {bedsByService.map((r: any, i: number) => (
                   <Cell key={i} fill={r.rate >= 90 ? '#ef4444' : r.rate >= 75 ? '#f59e0b' : '#10b981'} />
                 ))}
               </Bar>

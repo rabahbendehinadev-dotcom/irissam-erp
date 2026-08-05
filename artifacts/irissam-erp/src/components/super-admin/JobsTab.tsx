@@ -398,3 +398,4 @@ export function JobsTab() {
     </div>
   );
 }
+export { JobsTab as default };

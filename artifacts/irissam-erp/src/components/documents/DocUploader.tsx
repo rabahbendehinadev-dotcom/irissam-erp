@@ -106,7 +106,7 @@ export function DocUploader({ folders, defaultFolderId, defaultCategory, entityT
           <h2 className="font-semibold text-gray-800">Ajouter un document</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(e as any); }} className="p-4 space-y-4">
           {/* Drop zone */}
           <div
             className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors

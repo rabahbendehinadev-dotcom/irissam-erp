@@ -5,7 +5,6 @@ export { PatientFilters } from './PatientFilters';
 export type { PatientFiltersState } from './PatientFilters';
 export { PatientQuickActions } from './PatientQuickActions';
 export { PatientTimeline } from './PatientTimeline';
-export { PatientDocuments } from './PatientDocuments';
 export { PatientDocumentsV2 } from './PatientDocumentsV2';
 export { PatientAlertBanner } from './PatientAlertBanner';
 export { PatientStatsCards } from './PatientStatsCards';

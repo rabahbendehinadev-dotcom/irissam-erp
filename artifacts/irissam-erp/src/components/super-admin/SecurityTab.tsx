@@ -453,3 +453,4 @@ export function SecurityTab() {
     </div>
   );
 }
+export { SecurityTab as default };

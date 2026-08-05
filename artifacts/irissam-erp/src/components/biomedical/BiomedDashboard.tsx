@@ -8,7 +8,7 @@ const STATUS_COLORS: Record<string,string> = {
   retire:"#94A3B8", en_attente_installation:"#6366F1", reserve:"#8B5CF6",
 };
 
-function KPI(props: { label: string; value: unknown; color?: string; sub?: string }) {
+function KPI(props: { label: string; value: string | number | null | undefined; color?: string; sub?: string }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
       <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{props.label}</p>

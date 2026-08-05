@@ -310,3 +310,4 @@ export function SessionsTab() {
     </div>
   );
 }
+export { SessionsTab as default };

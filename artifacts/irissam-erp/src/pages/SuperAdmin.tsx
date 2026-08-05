@@ -55,7 +55,7 @@ function TabSpinner() {
 
 function AccessDenied() {
   return (
-    <DashboardLayout title="Super Administration">
+    <DashboardLayout>
       <div className="flex flex-col items-center justify-center h-64 gap-4 p-6">
         <Shield className="w-16 h-16 text-gray-300" />
         <p className="text-lg font-semibold text-gray-500">Accès refusé</p>
@@ -75,13 +75,13 @@ export default function SuperAdminPage() {
   // Permission guard
   const hasAccess =
     user?.role === "super_admin" ||
-    user?.role === "system_administrator" ||
-    user?.permissions?.includes("system.view");
+    (user?.role as string) === "system_administrator" ||
+    (user?.permissions as string[] | undefined)?.includes("system.view");
 
   if (!hasAccess) return <AccessDenied />;
 
   return (
-    <DashboardLayout title="Super Administration">
+    <DashboardLayout>
       <PageErrorBoundary>
         <div className="flex flex-col min-h-full">
           {/* Page header */}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactElement } from "react";
 import { Lock, X } from "lucide-react";
 import { stepUpAuth } from "@/services/api/system";
 
@@ -40,7 +40,7 @@ export function StepUpDialog({
       setError(null);
       try {
         const result = await stepUpAuth(password);
-        const token: string = result?.token ?? result?.stepUpToken ?? result;
+        const token: string = (result as any)?.token ?? (result as any)?.stepUpToken ?? String(result);
         onSuccess(token);
         setPassword("");
       } catch (err: unknown) {

@@ -83,7 +83,7 @@ export function AuditTab() {
       if (filterDateFrom) params.from = filterDateFrom;
       if (filterDateTo) params.to = filterDateTo;
       getAuditLogs(params)
-        .then((d) => {
+        .then((d: any) => {
           setData(d);
           const newLogs: AuditEntry[] = d?.logs ?? [];
           if (append) {
@@ -114,7 +114,7 @@ export function AuditTab() {
 
   const handleExport = async (format: "csv" | "pdf") => {
     try {
-      const blob = await exportAuditLogs(format);
+      const blob = await exportAuditLogs({ format });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -340,3 +340,4 @@ export function AuditTab() {
     </div>
   );
 }
+export { AuditTab as default };
