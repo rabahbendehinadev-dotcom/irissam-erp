@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getImprovements, createImprovement, transitionImprovement } from "@/services/api/quality";
 
@@ -40,13 +41,13 @@ export default function ImprovementsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createImprovement(form); setShowCreate(false); setForm({ category:"processus", priority:"normale" }); refetch(); }
-    catch { alert("Erreur création amélioration"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer l'amélioration" }); }
   };
 
   const handleTransition = async (imp: any, action: string) => {
     const notes = prompt("Notes :", ""); if (notes === null) return;
     try { await transitionImprovement(imp.id, action, { notes }); refetch(); }
-    catch { alert("Erreur transition"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Transition impossible" }); }
   };
 
   return (

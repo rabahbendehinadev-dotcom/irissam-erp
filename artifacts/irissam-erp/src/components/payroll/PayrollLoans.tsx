@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from 'react';
 import { payrollApi, PAYROLL_STATUS_COLORS, formatAmount, type PayrollLoan } from '@/services/api/payroll';
 import { Plus, RefreshCw, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
@@ -37,7 +38,7 @@ export default function PayrollLoans() {
   };
 
   const act = async (fn: () => Promise<any>) => {
-    try { await fn(); load(); } catch (e: any) { alert(e.message); }
+    try { await fn(); load(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Opération impossible' }); }
   };
 
   const STATUS_LABELS: Record<string, string> = {
@@ -88,7 +89,7 @@ export default function PayrollLoans() {
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm border rounded-lg">Annuler</button>
             <button onClick={async () => {
-              if (!form.employeeId || !form.totalAmount || !form.installmentAmount || !form.numberOfInstallments) return alert('Tous les champs requis');
+              if (!form.employeeId || !form.totalAmount || !form.installmentAmount || !form.numberOfInstallments) return (() => { toast({ variant: 'destructive', title: 'Champs requis', description: 'Veuillez remplir tous les champs' }); return; })();
               await act(() => payrollApi.createLoan({ employeeId: form.employeeId, totalAmount: parseFloat(form.totalAmount), installmentAmount: parseFloat(form.installmentAmount), numberOfInstallments: parseInt(form.numberOfInstallments), reason: form.reason }));
               setShowCreate(false); setForm({ employeeId: '', totalAmount: '', installmentAmount: '', numberOfInstallments: '', reason: '' });
             }} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg">Enregistrer</button>

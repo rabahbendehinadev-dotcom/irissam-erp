@@ -133,6 +133,15 @@ export default function Personnel() {
           </div>
         )}
 
+        {/* Empty state */}
+        {filteredDoctors.length === 0 && filteredNurses.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
+            <Users size={40} className="opacity-30" />
+            <p className="text-sm font-medium">Aucun personnel trouvé</p>
+            {search && <p className="text-xs">Essayez un autre terme de recherche.</p>}
+          </div>
+        )}
+
         {/* Nurses table */}
         {roleFilter !== 'doctors' && filteredNurses.length > 0 && (
           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">

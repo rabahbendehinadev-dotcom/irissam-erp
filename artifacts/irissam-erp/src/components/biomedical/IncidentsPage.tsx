@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getIncidents, createIncident, transitionIncident } from "@/services/api/biomedical";
 
@@ -40,7 +41,7 @@ export default function IncidentsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createIncident(form); setShowCreate(false); setForm({}); refetch(); }
-    catch { alert("Erreur création incident"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer l'incident" }); }
   };
 
   const handleTransition = async (inc: any) => {
@@ -48,7 +49,7 @@ export default function IncidentsPage() {
     if (!tr) return;
     const notes = prompt(`Notes pour "${tr.label}" :`, ""); if (notes === null) return;
     try { await transitionIncident(inc.id, tr.action, { notes }); refetch(); }
-    catch { alert("Transition impossible"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Transition impossible" }); }
   };
 
   return (

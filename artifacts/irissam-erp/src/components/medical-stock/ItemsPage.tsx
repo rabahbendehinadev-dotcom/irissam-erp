@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@/hooks/useQuery";
 import { stockApi } from "@/services/api/medical-stock";
+import { toast } from "@/hooks/use-toast";
 import { Search, Plus, Filter, AlertTriangle, RefreshCw, Package, ChevronRight, Edit2, Trash2 } from "lucide-react";
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
@@ -63,14 +64,14 @@ export default function ItemsPage() {
       setForm({});
       refetch();
     } catch (e: any) {
-      alert(e?.message ?? "Erreur lors de la création");
+      toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Création impossible" });
     } finally { setSaving(false); }
   }, [form, refetch]);
 
   const handleDelete = useCallback(async (item: any) => {
     if (!confirm(`Supprimer l'article "${item.name}" ?`)) return;
     try { await stockApi.deleteItem(item.id); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Impossible de supprimer"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Suppression impossible" }); }
   }, [refetch]);
 
   return (

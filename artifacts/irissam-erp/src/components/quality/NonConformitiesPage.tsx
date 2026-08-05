@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getNonConformities, createNonConformity, transitionNC } from "@/services/api/quality";
 
@@ -41,14 +42,14 @@ export default function NonConformitiesPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createNonConformity(form); setShowCreate(false); setForm({ type:"processus",gravity:"mineur" }); refetch(); }
-    catch { alert("Erreur création NC"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer la NC" }); }
   };
 
   const handleTransition = async (nc: any) => {
     const tr = TRANSITIONS[nc.status]; if (!tr) return;
     const notes = prompt(`Notes (${tr.label}) :`, ""); if (notes === null) return;
     try { await transitionNC(nc.id, tr.action, { notes }); refetch(); }
-    catch { alert("Erreur transition"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Transition impossible" }); }
   };
 
   return (

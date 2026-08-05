@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import { PlusCircle, Download, AlertTriangle } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
@@ -396,10 +397,12 @@ export default function AdmissionsPage() {
                 });
               } catch (err: any) {
                 // Bed assignment failed — admission is saved but bed status may
-                // not have updated. Alert so staff can re-assign manually.
-                window.alert(
-                  `Admission enregistrée, mais l'assignation du lit a échoué : ${err?.message ?? 'erreur inconnue'}. Veuillez vérifier la disponibilité du lit.`
-                );
+                // not have updated. Notify so staff can re-assign manually.
+                toast({
+                  variant: 'destructive',
+                  title: 'Assignation du lit incomplète',
+                  description: `Admission enregistrée, mais l'assignation du lit a échoué : ${err?.message ?? 'erreur inconnue'}. Veuillez vérifier la disponibilité du lit.`,
+                });
               }
             }
             setBedRefreshKey(k => k + 1);

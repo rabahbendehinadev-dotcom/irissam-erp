@@ -197,12 +197,9 @@ export function PatientConsentsTab() {
 
                     {/* PDF download */}
                     {c.hasPdf ? (
-                      <button
-                        onClick={() => alert('Téléchargement PDF — disponible avec le backend')}
-                        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-colors flex-shrink-0"
-                      >
+                      <span className="flex items-center gap-1.5 text-xs text-gray-400 border border-gray-200 px-2.5 py-1.5 rounded-lg flex-shrink-0 cursor-not-allowed">
                         <Download size={12} /> PDF
-                      </button>
+                      </span>
                     ) : (
                       <span className="text-xs text-gray-300 px-2 py-1.5">Pas de PDF</span>
                     )}

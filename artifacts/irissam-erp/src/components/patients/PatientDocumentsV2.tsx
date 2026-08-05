@@ -105,7 +105,6 @@ function PreviewModal({ doc, onClose }: { doc: PatientDocument; onClose: () => v
           <Icon size={48} className={doc.type === 'radiologie' ? 'text-gray-300' : 'text-gray-300'} />
           <p className="text-sm text-gray-500 italic">
             {isImage ? 'Aperçu image' : 'Aperçu document'}
-            {' — '}prévisualisation réelle disponible avec le backend
           </p>
         </div>
 
@@ -118,16 +117,14 @@ function PreviewModal({ doc, onClose }: { doc: PatientDocument; onClose: () => v
           {doc.version && <div><p className="text-gray-400 uppercase tracking-wide mb-0.5">Version</p><p className="text-gray-800 font-medium">v{doc.version}</p></div>}
         </div>
 
-        {/* Actions */}
+        {/* Actions — download/print require backend file-serve URL */}
         <div className="flex gap-2 px-5 pb-4">
-          <button onClick={() => alert('Téléchargement disponible avec le backend')}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <span className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-100 text-gray-400 rounded-lg cursor-not-allowed" title="Téléchargement disponible via le module GED">
             <Download size={13} /> Télécharger
-          </button>
-          <button onClick={() => alert('Impression disponible avec le backend')}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
+          </span>
+          <span className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-100 text-gray-400 rounded-lg cursor-not-allowed" title="Impression disponible via le module GED">
             <Printer size={13} /> Imprimer
-          </button>
+          </span>
         </div>
       </div>
     </div>
@@ -155,9 +152,9 @@ function DocCard({ doc, onDelete, onPreview }: { doc: PatientDocument; onDelete:
           <button onClick={() => onPreview(doc)} className="w-8 h-8 bg-white rounded-full shadow flex items-center justify-center hover:bg-gray-50 text-gray-700" title="Prévisualiser">
             <Eye size={14} />
           </button>
-          <button onClick={() => alert('Téléchargement disponible avec le backend')} className="w-8 h-8 bg-white rounded-full shadow flex items-center justify-center hover:bg-gray-50 text-gray-700" title="Télécharger">
+          <span className="w-8 h-8 bg-white rounded-full shadow flex items-center justify-center text-gray-300 cursor-not-allowed" title="Téléchargement via GED">
             <Download size={14} />
-          </button>
+          </span>
           <button onClick={() => onDelete(doc.id)} className="w-8 h-8 bg-white rounded-full shadow flex items-center justify-center hover:bg-red-50 text-red-500" title="Supprimer">
             <Trash2 size={14} />
           </button>

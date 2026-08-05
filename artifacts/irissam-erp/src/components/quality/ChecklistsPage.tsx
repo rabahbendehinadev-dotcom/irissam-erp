@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getChecklists, createChecklist, getChecklistDetail, recordChecklistItem } from "@/services/api/quality";
 
@@ -42,12 +43,12 @@ export default function ChecklistsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createChecklist(form); setShowCreate(false); setForm({ items:[] }); refetch(); }
-    catch { alert("Erreur création checklist"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer la checklist" }); }
   };
 
   const handleItemCheck = async (checklistId: string, itemId: string, is_ok: boolean) => {
     try { await recordChecklistItem(checklistId, itemId, { is_ok }); setSelectedId(null); setTimeout(() => setSelectedId(checklistId), 50); }
-    catch { alert("Erreur enregistrement réponse"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Enregistrement impossible" }); }
   };
 
   const completedCount = detail?.items?.filter((i: any) => i.is_ok !== null).length ?? 0;

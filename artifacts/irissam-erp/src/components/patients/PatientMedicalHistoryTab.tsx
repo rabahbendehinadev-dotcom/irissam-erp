@@ -172,12 +172,6 @@ function CategorySection({ category, records }: { category: HistoryCategory; rec
             );
           })}
           <div className="px-5 py-2">
-            <button
-              onClick={() => alert('Ajout d\'antécédent — disponible avec le backend')}
-              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              <Plus size={11} /> Ajouter un antécédent
-            </button>
           </div>
         </div>
       )}

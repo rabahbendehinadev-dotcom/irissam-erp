@@ -944,13 +944,13 @@ export default function EmergenciesPage() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => alert('Formulaire d\'accueil patient — disponible dans la prochaine sous-page')}
+              onClick={() => setLocation('/emergencies')}
               className="flex items-center gap-1.5 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
             >
               <AlertTriangle size={14} /> Nouveau passage
             </button>
             <button
-              onClick={() => alert('Dispatch ambulance — disponible dans la sous-page Ambulances')}
+              onClick={() => setLocation('/ambulances')}
               className="flex items-center gap-1.5 px-3 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
             >
               <AmbulanceIcon size={14} /> Appeler ambulance
@@ -1033,7 +1033,10 @@ export default function EmergenciesPage() {
               label={tile.label}
               count={tile.count}
               countColor={tile.countColor}
-              onClick={() => alert(`Sous-page "${tile.label}" — disponible prochainement`)}
+              onClick={() => {
+                if (tile.label === 'Ambulances') setLocation('/ambulances');
+                else if (tile.label === 'Analyses') setLocation('/laboratory');
+              }}
               isDark={isDark}
             />
           ))}

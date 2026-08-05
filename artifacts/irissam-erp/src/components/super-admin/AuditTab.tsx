@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useCallback, useEffect } from "react";
 import { RefreshCw, Download, X } from "lucide-react";
 import { getAuditLogs, exportAuditLogs } from "@/services/api/system";
@@ -122,7 +123,7 @@ export function AuditTab() {
       URL.revokeObjectURL(url);
     } catch (e: unknown) {
       const err = e as { message?: string };
-      alert(err?.message ?? "Erreur export");
+      toast({ variant: "destructive", title: "Erreur", description: err?.message ?? "Export impossible" });
     }
   };
 

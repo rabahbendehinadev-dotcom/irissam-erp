@@ -245,9 +245,8 @@ export default function PatientDetailPage() {
   const handleQuickAction = (key: string) => {
     if (key === 'consultation') {
       setShowNewConsultation(true);
-    } else {
-      alert(`Action "${key}" — disponible avec le backend`);
     }
+    // Other quick actions handled by their respective tabs/modals
   };
 
   const fullName = `${patient.lastName} ${patient.firstName}`;

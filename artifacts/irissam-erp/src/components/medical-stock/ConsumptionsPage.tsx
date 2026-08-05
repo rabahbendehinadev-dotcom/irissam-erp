@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useCallback } from "react";
 import { useQuery } from "@/hooks/useQuery";
 import { stockApi } from "@/services/api/medical-stock";
@@ -40,13 +41,13 @@ export default function ConsumptionsPage() {
     if (!form.department || !form.items?.length) return;
     setSaving(true);
     try { await stockApi.createConsumption(form); setShowCreate(false); setForm({ items: [], auto_validate: true }); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Opération impossible" }); }
     finally { setSaving(false); }
   }, [form, refetch]);
 
   const handleValidate = useCallback(async (cons: any) => {
     try { await stockApi.validateConsumption(cons.id); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Opération impossible" }); }
   }, [refetch]);
 
   return (

@@ -158,7 +158,6 @@ function PaymentDetail({ payment, onClose }: { payment: InsuranceOrgPayment; onC
             <div className="flex items-center justify-center py-6 text-gray-300">
               <div className="text-center">
                 <CreditCard size={24} className="mx-auto mb-2"/>
-                <p className="text-xs text-gray-400">Distribution sur sinistres disponible bientôt</p>
               </div>
             </div>
           </div>

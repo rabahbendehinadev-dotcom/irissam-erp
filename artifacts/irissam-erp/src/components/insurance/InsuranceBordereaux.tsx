@@ -269,10 +269,9 @@ function BordereauDetail({ bordereau, onClose }: { bordereau: InsuranceBordereau
               <CheckCircle size={13}/> Marquer reçu
             </button>
           )}
-          <button onClick={() => alert('Export en développement')}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600">
+          <span className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-100 rounded-xl text-gray-400 cursor-not-allowed" title="Export PDF en développement">
             <FileText size={13}/> Export PDF
-          </button>
+          </span>
         </div>
       )}
 

@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from 'react';
 import { payrollApi, formatAmount, type SalaryComponent } from '@/services/api/payroll';
 import { Plus, RefreshCw, Pencil, Trash2 } from 'lucide-react';
@@ -27,7 +28,7 @@ export default function PayrollComponents() {
   const deductions = filtered.filter(c => c.type === 'deduction');
 
   const toggleActive = async (c: SalaryComponent) => {
-    try { await payrollApi.updateComponent(c.id, { active: !c.active }); load(); } catch (e: any) { alert(e.message); }
+    try { await payrollApi.updateComponent(c.id, { active: !c.active }); load(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Opération impossible' }); }
   };
 
   const ComponentRow = ({ c }: { c: SalaryComponent }) => (
@@ -63,7 +64,7 @@ export default function PayrollComponents() {
       try {
         await payrollApi.updateComponent(comp.id, { fixedAmount: form.fixedAmount, percentage: form.percentage / 100, taxable: form.taxable, socialSecurityApplicable: form.socialSecurityApplicable, active: form.active, priority: form.priority });
         setEditing(null); load();
-      } catch (e: any) { alert(e.message); }
+      } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Opération impossible' }); }
     };
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

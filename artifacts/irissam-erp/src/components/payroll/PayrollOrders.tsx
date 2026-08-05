@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from 'react';
 import { payrollApi, PAYROLL_STATUS_COLORS, formatAmount, type PaymentOrder } from '@/services/api/payroll';
 import { Plus, RefreshCw, CheckCircle, Download } from 'lucide-react';
@@ -25,7 +26,7 @@ export default function PayrollOrders() {
   useEffect(load, []);
 
   const act = async (fn: () => Promise<any>) => {
-    try { await fn(); load(); } catch (e: any) { alert(e.message); }
+    try { await fn(); load(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Opération impossible' }); }
   };
 
   return (
@@ -65,7 +66,7 @@ export default function PayrollOrders() {
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm border rounded-lg">Annuler</button>
             <button onClick={async () => {
-              if (!form.runId) return alert('Sélectionner un run');
+              if (!form.runId) return (() => { toast({ variant: 'destructive', title: 'Champ requis', description: 'Veuillez sélectionner un run de paie' }); return; })();
               await act(() => payrollApi.createPaymentOrder({ runId: form.runId, method: form.method, bank: form.bank }));
               setShowCreate(false);
             }} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg">Créer</button>

@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useCallback, useEffect } from "react";
 import {
   RefreshCw,
@@ -108,7 +109,7 @@ export function DatabaseTab() {
       slowQueries.reload();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } }; message?: string };
-      alert(err?.response?.data?.message ?? err?.message ?? "Erreur");
+      toast({ variant: "destructive", title: "Erreur", description: err?.response?.data?.message ?? err?.message ?? "Opération impossible" });
     } finally {
       setCancelPid(null);
     }

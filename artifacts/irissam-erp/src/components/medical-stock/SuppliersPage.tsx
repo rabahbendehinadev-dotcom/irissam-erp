@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@/hooks/useQuery";
 import { stockApi } from "@/services/api/medical-stock";
+import { toast } from "@/hooks/use-toast";
 import { Search, Plus, AlertTriangle, RefreshCw, Truck } from "lucide-react";
 
 export default function SuppliersPage() {
@@ -23,13 +24,13 @@ export default function SuppliersPage() {
     if (!form.code || !form.name) return;
     setSaving(true);
     try { await stockApi.createSupplier(form); setShowCreate(false); setForm({}); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Opération impossible" }); }
     finally { setSaving(false); }
   }, [form, refetch]);
 
   const handleToggleActive = useCallback(async (s: any) => {
     try { await stockApi.updateSupplier(s.id, { is_active: !s.is_active }); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Opération impossible" }); }
   }, [refetch]);
 
   const FIELDS = [

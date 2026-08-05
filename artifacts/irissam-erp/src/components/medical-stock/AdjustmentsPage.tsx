@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@/hooks/useQuery";
 import { stockApi } from "@/services/api/medical-stock";
+import { toast } from "@/hooks/use-toast";
 import { Plus, AlertTriangle, RefreshCw, SlidersHorizontal } from "lucide-react";
 
 const REASONS: { value: string; label: string }[] = [
@@ -32,7 +33,7 @@ export default function AdjustmentsPage() {
     if (!form.item_id || !form.reason || form.quantity_change === undefined) return;
     setSaving(true);
     try { await stockApi.createAdjustment(form); setShowCreate(false); setForm({}); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Opération impossible" }); }
     finally { setSaving(false); }
   }, [form, refetch]);
 

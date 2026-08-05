@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getEquipment, createEquipment, updateEquipment,
          getBiomedCategories, getBiomedLocations, getBiomedManufacturers } from "@/services/api/biomedical";
@@ -50,12 +51,12 @@ export default function EquipmentPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createEquipment(form); setShowCreate(false); setForm({}); refetch(); }
-    catch { alert("Erreur lors de la création"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Création impossible" }); }
   };
 
   const handleStatusChange = async (eq: any, newStatus: string) => {
     try { await updateEquipment(eq.id, { status: newStatus }); refetch(); }
-    catch { alert("Erreur mise à jour statut"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Mise à jour impossible" }); }
   };
 
   const f = (k: string) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));

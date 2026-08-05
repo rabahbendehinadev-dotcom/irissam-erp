@@ -155,7 +155,7 @@ export function PatientProfileHeader({ patient, activeTab, onTabChange, onEdit, 
                     return (
                       <button
                         key={a.key}
-                        onClick={() => { onQuickAction ? onQuickAction(a.key) : alert(`${a.label} — disponible avec le backend`); setQaOpen(false); }}
+                        onClick={() => { if (onQuickAction) onQuickAction(a.key); setQaOpen(false); }}
                         className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
                       >
                         <Icon size={14} className="text-gray-400" />

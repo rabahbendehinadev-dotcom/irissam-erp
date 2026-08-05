@@ -80,7 +80,7 @@ export default function EmployeeList() {
           <p className="text-sm text-gray-500">{total.toLocaleString("fr-FR")} employé{total > 1 ? "s" : ""}</p>
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" disabled title="Import (bientôt disponible)">
+          <button className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
             <Download className="w-4 h-4"/>
             <span className="hidden sm:inline">Exporter</span>
           </button>

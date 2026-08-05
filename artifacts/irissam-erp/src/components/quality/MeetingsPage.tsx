@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getMeetings, createMeeting, closeMeeting, getCommittees, createCommittee } from "@/services/api/quality";
 
@@ -34,19 +35,19 @@ export default function MeetingsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createMeeting(form); setShowCreate(false); setForm({}); refetch(); }
-    catch { alert("Erreur création réunion"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer la réunion" }); }
   };
 
   const handleCreateCommittee = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createCommittee(committeeForm); setShowCommittee(false); setCommitteeForm({}); refetch(); }
-    catch { alert("Erreur création comité"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer le comité" }); }
   };
 
   const handleClose = async (m: any) => {
     const pv = prompt("Résumé du PV :", ""); if (pv === null) return;
     try { await closeMeeting(m.id, { minutes_summary: pv }); refetch(); }
-    catch { alert("Erreur clôture réunion"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Clôture impossible" }); }
   };
 
   return (

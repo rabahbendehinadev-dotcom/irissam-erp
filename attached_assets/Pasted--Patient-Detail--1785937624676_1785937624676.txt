@@ -1,0 +1,82 @@
+هذا تقدم ممتاز، وإذا التقرير يعكس ما تم فعلاً في الكود، فأنتم أنهيتم أهم جزء من **Patient Detail**.
+
+لكن قبل الانتقال إلى المرحلة الثانية، أنصحك ترسل له برومبت يمنعه من التسرع ويطلب منه **التحقق** وليس مجرد التطوير، لأن هدفنا الآن هو **0 مشاكل في Production**.
+
+ابعث له هذا:
+
+ممتاز.
+
+إذا كانت جميع Tabs الخاصة بـ Patient Detail أصبحت مربوطة بالـ API الحقيقية وتم حذف جميع الـ Placeholders، فلا تبدأ أي Module جديد.
+
+الآن ننتقل إلى المرحلة الثانية من **Production Hardening**.
+
+أريد منك تنفيذ Audit شامل على كامل النظام.
+
+ابدأ بمراجعة جميع Routes الموجودة في الـ Sidebar.
+
+لكل Route تحقق من:
+
+* تعمل بدون Runtime Error.
+* لا يوجد White Screen.
+* Loading State موجود.
+* Empty State موجود.
+* Error State موجود.
+* Retry موجود.
+* Permission يعمل بشكل صحيح.
+* 403 تعرض "Accès refusé".
+* 404 تعرض "Page introuvable".
+* إذا كانت الـ Feature غير جاهزة يجب إخفاء العنصر، وليس عرض Placeholder.
+
+بعد ذلك راجع:
+
+* Employee Detail
+* Dashboard
+* Admissions
+* Consultations
+* Urgences
+* Hospitalisation
+* Bloc Opératoire
+* Réanimation
+* Laboratoire
+* Imagerie
+* Pharmacie
+* Facturation
+* Assurance
+* RH
+* Stock
+* Biomédical
+* Qualité
+* Executive Dashboard
+* Super Administration
+
+ولا تترك أي:
+
+* Placeholder
+* Coming Soon
+* Soon Badge
+* Disabled Tab
+* Broken Route
+* White Screen
+* Console Error
+* Runtime Error
+
+لا تقم بإعادة بناء أي Module.
+
+إذا كانت الـ API موجودة فاستعملها.
+
+إذا كانت الـ Feature غير موجودة أصلًا فأخفها من الواجهة.
+
+في نهاية العمل أريد تقريرًا يتضمن:
+
+* عدد Routes التي تمت مراجعتها.
+* عدد الصفحات التي تم إصلاحها.
+* عدد Runtime Errors التي تم إصلاحها.
+* عدد White Screens التي تم إصلاحها.
+* عدد Console Errors التي تم إصلاحها.
+* هل بقي أي Placeholder ظاهر للمستخدم؟
+* هل بقي أي Route مكسور؟
+* هل بقي أي Tab غير مرتبط؟
+
+ولا تعتبر المهمة منتهية حتى يصبح النظام Production Ready بدون أي أخطاء ظاهرة للمستخدم.
+
+**ملاحظة:** قبل ما تبدأ المرحلة الثانية، خليه يدير **Git Commit** للتعديلات الحالية (Commit `597f200`) ويدفعها إلى GitHub بعد إعادة ربط GitHub في Replit. هكذا إذا ظهر مشكل في المرحلة الثانية، تقدر ترجع بسهولة إلى النسخة النظيفة.

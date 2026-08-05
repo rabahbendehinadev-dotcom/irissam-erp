@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getAudits, createAudit, transitionAudit } from "@/services/api/quality";
 
@@ -37,7 +38,7 @@ export default function AuditsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createAudit(form); setShowCreate(false); setForm({ type:"interne" }); refetch(); }
-    catch { alert("Erreur création audit"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer l'audit" }); }
   };
 
   const handleTransition = async (audit: any) => {
@@ -45,7 +46,7 @@ export default function AuditsPage() {
     const notes = audit.status === "en_cours" ? prompt("Résumé de l'audit :", "") : undefined;
     if (notes === null) return;
     try { await transitionAudit(audit.id, tr.action, notes ? { summary: notes } : {}); refetch(); }
-    catch { alert("Erreur transition"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Transition impossible" }); }
   };
 
   return (

@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getSpareParts, createSparePart, sparePartMovement } from "@/services/api/biomedical";
 
@@ -27,7 +28,7 @@ export default function SparePartsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createSparePart(form); setShowCreate(false); setForm({}); refetch(); }
-    catch { alert("Erreur création pièce"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer la pièce" }); }
   };
 
   const handleMovement = async (e: React.FormEvent) => {
@@ -35,7 +36,7 @@ export default function SparePartsPage() {
     try {
       await sparePartMovement(movementTarget.id, mvtForm);
       setMovementTarget(null); setMvtForm({ movement_type: "entree", quantity: "" }); refetch();
-    } catch(err: any) { alert(err?.response?.data?.error ?? "Erreur mouvement"); }
+    } catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.response?.data?.error ?? "Mouvement impossible" }); }
   };
 
   return (

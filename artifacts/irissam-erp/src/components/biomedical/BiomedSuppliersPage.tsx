@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getBiomedSuppliers, createBiomedSupplier } from "@/services/api/biomedical";
 
@@ -19,7 +20,7 @@ export default function BiomedSuppliersPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createBiomedSupplier(form); setShowCreate(false); setForm({}); refetch(); }
-    catch(err: any) { alert(err?.response?.data?.error ?? "Erreur"); }
+    catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.response?.data?.error ?? "Opération impossible" }); }
   };
 
   return (

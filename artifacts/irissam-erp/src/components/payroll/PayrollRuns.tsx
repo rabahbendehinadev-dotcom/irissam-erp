@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from 'react';
 import { payrollApi, PAYROLL_STATUS_LABELS, PAYROLL_STATUS_COLORS, MONTH_NAMES_FR, formatAmount, type PayrollRun, type PayrollAnomaly } from '@/services/api/payroll';
 import { Play, CheckCircle, Lock, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Users, X } from 'lucide-react';
@@ -54,7 +55,7 @@ export default function PayrollRuns() {
       await fn();
       await load();
       if (selectedRun) await loadRun(selectedRun.id);
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Opération impossible' }); }
     finally { setActionLoading(''); setShowComment(''); setComment(''); }
   };
 

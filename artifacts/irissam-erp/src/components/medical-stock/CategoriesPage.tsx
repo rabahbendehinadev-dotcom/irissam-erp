@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@/hooks/useQuery";
 import { stockApi } from "@/services/api/medical-stock";
+import { toast } from "@/hooks/use-toast";
 import { Plus, AlertTriangle, RefreshCw, Tag } from "lucide-react";
 
 export default function CategoriesPage() {
@@ -15,13 +16,13 @@ export default function CategoriesPage() {
     if (!form.code || !form.name) return;
     setSaving(true);
     try { await stockApi.createCategory(form); setShowCreate(false); setForm({ color: "#3B82F6", sort_order: 0 }); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Opération impossible" }); }
     finally { setSaving(false); }
   }, [form, refetch]);
 
   const handleToggle = useCallback(async (cat: any) => {
     try { await stockApi.updateCategory(cat.id, { ...cat, is_active: !cat.is_active }); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Opération impossible" }); }
   }, [refetch]);
 
   return (

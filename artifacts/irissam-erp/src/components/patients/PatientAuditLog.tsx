@@ -127,22 +127,6 @@ export function PatientAuditLog() {
           >
             <Download size={13} /> CSV
           </button>
-          {/* Export Excel (mock) */}
-          <button
-            onClick={() => alert('Export Excel — disponible avec le backend')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
-            title="Exporter Excel"
-          >
-            <FileSpreadsheet size={13} /> Excel
-          </button>
-          {/* Export PDF (mock) */}
-          <button
-            onClick={() => alert('Export PDF — disponible avec le backend')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
-            title="Exporter PDF"
-          >
-            <Printer size={13} /> PDF
-          </button>
           {/* Toggle filters */}
           <button
             onClick={() => setShowFilters(v => !v)}
@@ -309,7 +293,7 @@ export function PatientAuditLog() {
       </div>
 
       <p className="text-xs text-gray-400 text-center">
-        Export CSV fonctionnel · Export PDF/Excel disponible avec le backend
+        Export CSV
       </p>
     </div>
   );

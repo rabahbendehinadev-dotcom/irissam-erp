@@ -315,7 +315,7 @@ export default function ClaimDetail({ claimId, onClose }: Props) {
           {(activeTab === 'documents' || activeTab === 'audit' || activeTab === 'messages') && (
             <div className="flex flex-col items-center justify-center py-16 text-gray-300">
               <Settings size={32} className="mb-3"/>
-              <p className="text-sm text-gray-400">Section disponible bientôt</p>
+              <p className="text-sm text-gray-400">Aucun contenu disponible</p>
             </div>
           )}
 

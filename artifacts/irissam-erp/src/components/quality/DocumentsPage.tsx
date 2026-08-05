@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getQualityDocuments, createQualityDocument, publishQualityDocument, archiveQualityDocument } from "@/services/api/quality";
 
@@ -35,7 +36,7 @@ export default function DocumentsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createQualityDocument(form); setShowCreate(false); setForm({ type:"procedure" }); refetch(); }
-    catch { alert("Erreur création document"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer le document" }); }
   };
 
   return (
@@ -75,11 +76,11 @@ export default function DocumentsPage() {
             )}
             <div className="flex gap-2">
               {doc.status === "approuve" && (
-                <button onClick={async () => { try { await publishQualityDocument(doc.id); refetch(); } catch { alert("Erreur"); } }}
+                <button onClick={async () => { try { await publishQualityDocument(doc.id); refetch(); } catch { toast({ variant: "destructive", title: "Erreur", description: "Opération impossible" }); } }}
                   className="text-xs bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg font-medium hover:bg-emerald-100">Publier</button>
               )}
               {["publie","approuve"].includes(doc.status) && (
-                <button onClick={async () => { if (!confirm("Archiver ce document ?")) return; try { await archiveQualityDocument(doc.id); refetch(); } catch { alert("Erreur"); } }}
+                <button onClick={async () => { if (!confirm("Archiver ce document ?")) return; try { await archiveQualityDocument(doc.id); refetch(); } catch { toast({ variant: "destructive", title: "Erreur", description: "Opération impossible" }); } }}
                   className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-lg font-medium hover:bg-gray-200">Archiver</button>
               )}
             </div>

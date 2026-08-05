@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@/hooks/useQuery";
 import { stockApi } from "@/services/api/medical-stock";
+import { toast } from "@/hooks/use-toast";
 import { Plus, AlertTriangle, RefreshCw, ClipboardList, CheckCircle } from "lucide-react";
 
 const INV_STATUS: Record<string, { label: string; className: string }> = {
@@ -26,14 +27,14 @@ export default function InventoryPage() {
     if (!form.name) return;
     setSaving(true);
     try { await stockApi.createInventorySession(form); setShowCreate(false); setForm({}); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Impossible de créer l'inventaire" }); }
     finally { setSaving(false); }
   }, [form, refetch]);
 
   const handleValidate = useCallback(async (session: any) => {
     if (!confirm(`Valider l'inventaire "${session.name}" ? Cette action appliquera toutes les variations au stock.`)) return;
     try { await stockApi.validateInventory(session.id); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Validation impossible" }); }
   }, [refetch]);
 
   return (

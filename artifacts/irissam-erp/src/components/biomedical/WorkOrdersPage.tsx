@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getWorkOrders, createWorkOrder, startWorkOrder, closeWorkOrder, getEquipment } from "@/services/api/biomedical";
 
@@ -49,7 +50,7 @@ export default function WorkOrdersPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createWorkOrder(form); setShowCreate(false); setForm({ tasks:[] }); refetch(); }
-    catch { alert("Erreur création OT"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer l'OT" }); }
   };
 
   const handleAction = async (wo: any, action: string) => {
@@ -61,7 +62,7 @@ export default function WorkOrdersPage() {
         await closeWorkOrder(wo.id, { actual_hours: Number(h), resolution_notes: notes });
       }
       refetch();
-    } catch { alert("Erreur"); }
+    } catch { toast({ variant: "destructive", title: "Erreur", description: "Opération impossible" }); }
   };
 
   return (

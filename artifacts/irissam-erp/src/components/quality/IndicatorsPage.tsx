@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getIndicators, createIndicator, recordIndicatorValue, getIndicatorHistory } from "@/services/api/quality";
 
@@ -37,7 +38,7 @@ export default function IndicatorsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createIndicator(form); setShowCreate(false); setForm({ frequency:"mensuel" }); refetch(); }
-    catch { alert("Erreur création indicateur"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer l'indicateur" }); }
   };
 
   const handleRecord = async (e: React.FormEvent) => {
@@ -46,7 +47,7 @@ export default function IndicatorsPage() {
       await recordIndicatorValue(recordTarget.id, recordForm);
       setRecordTarget(null); setRecordForm({}); refetch();
       if (selectedId === recordTarget.id) setSelectedId(prev => { setSelectedId(null); setTimeout(()=>setSelectedId(prev),10); return null; });
-    } catch { alert("Erreur enregistrement valeur"); }
+    } catch { toast({ variant: "destructive", title: "Erreur", description: "Enregistrement impossible" }); }
   };
 
   const trendsColor = (ind: any) => {

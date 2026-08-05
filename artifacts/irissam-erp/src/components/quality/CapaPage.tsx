@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getCapas, createCapa, transitionCapa } from "@/services/api/quality";
 
@@ -40,14 +41,14 @@ export default function CapaPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createCapa(form); setShowCreate(false); setForm({ type:"corrective", priority:"normale" }); refetch(); }
-    catch { alert("Erreur création CAPA"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer le CAPA" }); }
   };
 
   const handleTransition = async (capa: any) => {
     const tr = TRANSITIONS[capa.status]; if (!tr) return;
     const notes = prompt(`Notes (${tr.label}) :`, ""); if (notes === null) return;
     try { await transitionCapa(capa.id, tr.action, { notes }); refetch(); }
-    catch { alert("Erreur transition"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Transition impossible" }); }
   };
 
   return (

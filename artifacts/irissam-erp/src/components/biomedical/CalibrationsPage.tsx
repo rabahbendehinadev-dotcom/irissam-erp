@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getCalibrations, createCalibration, recordCalibration, getEquipment } from "@/services/api/biomedical";
 
@@ -39,13 +40,13 @@ export default function CalibrationsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createCalibration(form); setShowCreate(false); setForm({}); refetch(); }
-    catch { alert("Erreur création calibration"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer la calibration" }); }
   };
 
   const handleRecord = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await recordCalibration(showRecord!, recordForm); setShowRecord(null); setRecordForm({}); refetch(); }
-    catch { alert("Erreur enregistrement résultat"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Enregistrement impossible" }); }
   };
 
   return (

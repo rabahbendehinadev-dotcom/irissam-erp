@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getDisposals, createDisposal, approveDisposal, finalizeDisposal, getEquipment } from "@/services/api/biomedical";
 
@@ -40,20 +41,20 @@ export default function DisposalsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createDisposal(form); setShowCreate(false); setForm({ method:"autre" }); refetch(); }
-    catch { alert("Erreur création réforme"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer la réforme" }); }
   };
 
   const handleApprove = async (d: any) => {
     if (!confirm(`Approuver la réforme de "${d.equipment_name}" ?`)) return;
     try { await approveDisposal(d.id); refetch(); }
-    catch { alert("Erreur approbation"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Approbation impossible" }); }
   };
 
   const handleFinalize = async (d: any) => {
     const date = prompt("Date de réforme (YYYY-MM-DD):", new Date().toISOString().split("T")[0]);
     if (!date) return;
     try { await finalizeDisposal(d.id, { disposal_date: date }); refetch(); }
-    catch { alert("Erreur finalisation"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Finalisation impossible" }); }
   };
 
   return (

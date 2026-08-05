@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getRisks, createRisk, getRiskMatrix } from "@/services/api/quality";
 
@@ -42,7 +43,7 @@ export default function RisksPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createRisk(form); setShowCreate(false); setForm({ probability:3, impact:3, category:"operationnel" }); refetch(); }
-    catch { alert("Erreur création risque"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer le risque" }); }
   };
 
   const heatCells = Array.from({ length: 5 }, (_, pi) => {

@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getBiomedCategories, getBiomedManufacturers, getBiomedModels, getBiomedLocations,
          createBiomedCategory, createBiomedManufacturer, createBiomedModel, createBiomedLocation } from "@/services/api/biomedical";
@@ -39,7 +40,7 @@ export default function CatalogPage() {
       if (tab === "models")        { await createBiomedModel(form);        setModTick(t=>t+1); }
       if (tab === "locations")     { await createBiomedLocation(form);     setLocTick(t=>t+1); }
       setShowCreate(false); setForm({});
-    } catch(err: any) { alert(err?.response?.data?.error ?? "Erreur"); }
+    } catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.response?.data?.error ?? "Opération impossible" }); }
   };
 
   return (

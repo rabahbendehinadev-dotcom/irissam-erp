@@ -94,6 +94,13 @@ export default function Ambulances() {
         </div>
 
         {/* Ambulance cards */}
+        {ambulances.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3 border border-dashed border-gray-200 rounded-2xl">
+            <Truck size={40} className="opacity-30" />
+            <p className="text-sm font-medium">Aucune ambulance enregistrée</p>
+            <p className="text-xs">Ajoutez des ambulances depuis le module Paramètres.</p>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {ambulances.map(amb => {
             const StatusIcon = STATUS_ICON[amb.status] ?? Truck;

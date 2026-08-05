@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useCallback, useEffect } from "react";
 import {
   RefreshCw,
@@ -108,7 +109,7 @@ export function JobsTab() {
       load();
     } catch (e: unknown) {
       const err = e as { message?: string };
-      alert(err?.message ?? "Erreur");
+      toast({ variant: "destructive", title: "Erreur", description: err?.message ?? "Opération impossible" });
     }
   };
 
@@ -118,7 +119,7 @@ export function JobsTab() {
       load();
     } catch (e: unknown) {
       const err = e as { message?: string };
-      alert(err?.message ?? "Erreur");
+      toast({ variant: "destructive", title: "Erreur", description: err?.message ?? "Opération impossible" });
     }
   };
 

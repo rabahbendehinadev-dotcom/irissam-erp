@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getQualityIncidents, createQualityIncident, transitionQualityIncident } from "@/services/api/quality";
 
@@ -42,14 +43,14 @@ export default function IncidentsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createQualityIncident(form); setShowCreate(false); setForm({ severity:"modere",category:"processus" }); refetch(); }
-    catch { alert("Erreur création incident qualité"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer l'incident" }); }
   };
 
   const handleTransition = async (inc: any) => {
     const tr = TRANSITIONS[inc.status]; if (!tr) return;
     const notes = prompt(`Notes (${tr.label}) :`, ""); if (notes === null) return;
     try { await transitionQualityIncident(inc.id, tr.action, { notes }); refetch(); }
-    catch { alert("Erreur transition"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Transition impossible" }); }
   };
 
   return (

@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getContracts, createContract, updateContract, getBiomedSuppliers } from "@/services/api/biomedical";
 
@@ -31,12 +32,12 @@ export default function ContractsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createContract(form); setShowCreate(false); setForm({}); refetch(); }
-    catch(err: any) { alert(err?.response?.data?.error ?? "Erreur création contrat"); }
+    catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.response?.data?.error ?? "Création de contrat impossible" }); }
   };
 
   const handleStatusChange = async (c: any, status: string) => {
     try { await updateContract(c.id, { status }); refetch(); }
-    catch { alert("Erreur mise à jour statut"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Mise à jour impossible" }); }
   };
 
   const daysUntil = (dateStr: string) => Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);

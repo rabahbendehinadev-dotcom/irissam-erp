@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useCallback, useEffect } from "react";
 import {
   RefreshCw,
@@ -158,7 +159,7 @@ export function BackupsTab() {
       setRestorePlanOpen(true);
     } catch (e: unknown) {
       const err = e as { message?: string };
-      alert(err?.message ?? "Erreur");
+      toast({ variant: "destructive", title: "Erreur", description: err?.message ?? "Opération impossible" });
     }
   };
 

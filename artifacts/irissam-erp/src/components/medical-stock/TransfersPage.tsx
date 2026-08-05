@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@/hooks/useQuery";
 import { stockApi } from "@/services/api/medical-stock";
+import { toast } from "@/hooks/use-toast";
 import { Plus, AlertTriangle, RefreshCw, ArrowRightLeft, CheckCircle } from "lucide-react";
 
 const TRF_STATUS: Record<string, { label: string; className: string }> = {
@@ -35,7 +36,7 @@ export default function TransfersPage() {
     if (!form.from_location || !form.to_location || !form.items?.length) return;
     setSaving(true);
     try { await stockApi.createTransfer(form); setShowCreate(false); setForm({ items: [] }); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Impossible de créer le transfert" }); }
     finally { setSaving(false); }
   }, [form, refetch]);
 
@@ -44,7 +45,7 @@ export default function TransfersPage() {
       if (action === "submit")  await stockApi.submitTransfer(trf.id);
       if (action === "approve") await stockApi.approveTransfer(trf.id);
       refetch();
-    } catch (e: any) { alert(e?.message ?? "Erreur"); }
+    } catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Action impossible" }); }
   }, [refetch]);
 
   return (

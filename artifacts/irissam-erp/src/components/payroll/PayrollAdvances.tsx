@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from 'react';
 import { payrollApi, PAYROLL_STATUS_COLORS, formatAmount, type PayrollAdvance } from '@/services/api/payroll';
 import { Plus, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
@@ -24,7 +25,7 @@ export default function PayrollAdvances() {
   }, []);
 
   const act = async (fn: () => Promise<any>) => {
-    try { await fn(); load(); } catch (e: any) { alert(e.message); }
+    try { await fn(); load(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Opération impossible' }); }
     finally { setActioning(''); }
   };
 
@@ -68,7 +69,7 @@ export default function PayrollAdvances() {
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm border rounded-lg">Annuler</button>
             <button onClick={async () => {
-              if (!form.employeeId || !form.amount) return alert('Champs requis');
+              if (!form.employeeId || !form.amount) return (() => { toast({ variant: 'destructive', title: 'Champs requis', description: 'Veuillez remplir tous les champs obligatoires' }); return; })();
               await act(() => payrollApi.createAdvance({ employeeId: form.employeeId, amount: parseFloat(form.amount), reason: form.reason }));
               setShowCreate(false); setForm({ employeeId: '', amount: '', reason: '' });
             }} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg">Enregistrer</button>

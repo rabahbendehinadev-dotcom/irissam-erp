@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { payrollApi, PAYROLL_STATUS_LABELS, PAYROLL_STATUS_COLORS, MONTH_NAMES_FR, type PayrollPeriod } from '@/services/api/payroll';
+import { toast } from '@/hooks/use-toast';
 import { Plus, RefreshCw, ChevronRight } from 'lucide-react';
 
 export default function PayrollPeriods() {
@@ -19,13 +20,16 @@ export default function PayrollPeriods() {
   useEffect(load, []);
 
   const handleCreate = async () => {
-    if (!form.startDate || !form.endDate) return alert('Dates requises');
+    if (!form.startDate || !form.endDate) {
+      toast({ variant: 'destructive', title: 'Champs requis', description: 'Les dates de début et de fin sont obligatoires' });
+      return;
+    }
     setCreating(true);
     try {
       await payrollApi.createPeriod({ month: form.month, year: form.year, startDate: form.startDate, endDate: form.endDate, paymentDate: form.paymentDate || undefined, notes: form.notes });
       setShowCreate(false);
       load();
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Impossible de créer la période' }); }
     finally { setCreating(false); }
   };
 

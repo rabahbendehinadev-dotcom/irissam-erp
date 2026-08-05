@@ -54,21 +54,14 @@ const RX_STATUS: Record<RepoPrescription['status'], {
   annule:   { label: 'Annulée',    badge: 'bg-gray-100 text-gray-500 border-gray-200',    row: 'opacity-60' },
 };
 
-// ─── Mock stock & allergy alerts ──────────────────────────────────────────────
+// ─── Stock & prescription alerts ─────────────────────────────────────────────
 
-const MOCK_ALLERGIES: Record<string, string[]> = {
-  'ep-01': ['Aspirine', 'HBPM'],
-  'ep-02': ['Morphine'],
-};
-
+// Drugs that commonly show low-stock situations; will be replaced by
+// a real stock-level API call when the inventory bridge is wired.
 const LOW_STOCK_DRUGS = ['Adrénaline', 'Kétamine', 'Rocuronium'];
 
 function getAlerts(rx: RepoPrescription): string[] {
   const alerts: string[] = [];
-  const allergies = MOCK_ALLERGIES[rx.patientId] ?? [];
-  if (allergies.some(a => rx.drug.toLowerCase().includes(a.toLowerCase()))) {
-    alerts.push(`⚠ Allergie connue : ${rx.drug}`);
-  }
   if (LOW_STOCK_DRUGS.some(d => rx.drug.includes(d))) {
     alerts.push(`📦 Stock faible : ${rx.drug}`);
   }

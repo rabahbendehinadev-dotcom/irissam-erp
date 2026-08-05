@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from 'react';
 import { payrollApi, type PayrollSettings } from '@/services/api/payroll';
 import { Save, RefreshCw } from 'lucide-react';
@@ -19,7 +20,7 @@ export default function PayrollSettingsTab() {
 
   const save = async () => {
     setSaving(true);
-    try { await payrollApi.updateSettings(form); alert('Paramètres enregistrés'); } catch (e: any) { alert(e.message); }
+    try { await payrollApi.updateSettings(form); toast({ title: 'Succès', description: 'Paramètres enregistrés' }); } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e?.message ?? 'Opération impossible' }); }
     finally { setSaving(false); }
   };
 

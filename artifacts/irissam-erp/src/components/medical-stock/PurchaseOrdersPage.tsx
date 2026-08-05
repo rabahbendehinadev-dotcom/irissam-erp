@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@/hooks/useQuery";
 import { stockApi } from "@/services/api/medical-stock";
+import { toast } from "@/hooks/use-toast";
 import { Search, Plus, AlertTriangle, RefreshCw, ShoppingCart, ChevronRight, CheckCircle, Truck } from "lucide-react";
 
 const PO_STATUS: Record<string, { label: string; className: string }> = {
@@ -41,7 +42,7 @@ export default function PurchaseOrdersPage() {
     if (!form.supplier_id || !form.items?.length) return;
     setSaving(true);
     try { await stockApi.createPurchaseOrder(form); setShowCreate(false); setForm({ items: [] }); refetch(); }
-    catch (e: any) { alert(e?.message ?? "Erreur"); }
+    catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Opération impossible" }); }
     finally { setSaving(false); }
   }, [form, refetch]);
 
@@ -50,7 +51,7 @@ export default function PurchaseOrdersPage() {
       if (action === "submit")   await stockApi.submitPurchaseOrder(po.id);
       if (action === "approve")  await stockApi.approvePurchaseOrder(po.id);
       refetch();
-    } catch (e: any) { alert(e?.message ?? "Erreur"); }
+    } catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Opération impossible" }); }
   }, [refetch]);
 
   return (

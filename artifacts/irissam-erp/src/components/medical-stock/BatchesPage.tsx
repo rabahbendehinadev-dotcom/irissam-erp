@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@/hooks/useQuery";
 import { stockApi } from "@/services/api/medical-stock";
+import { toast } from "@/hooks/use-toast";
 import { Search, Plus, AlertTriangle, RefreshCw, Layers } from "lucide-react";
 
 const BATCH_STATUS: Record<string, string> = {
@@ -39,7 +40,7 @@ export default function BatchesPage() {
     try {
       await stockApi.createBatch(form);
       setShowCreate(false); setForm({}); refetch();
-    } catch (e: any) { alert(e?.message ?? "Erreur"); }
+    } catch (e: any) { toast({ variant: "destructive", title: "Erreur", description: e?.message ?? "Opération impossible" }); }
     finally { setSaving(false); }
   };
 

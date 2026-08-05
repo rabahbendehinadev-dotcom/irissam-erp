@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getInspections, createInspection, getEquipment } from "@/services/api/biomedical";
 
@@ -36,7 +37,7 @@ export default function InspectionsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createInspection(form); setShowCreate(false); setForm({ result: "conforme" }); refetch(); }
-    catch { alert("Erreur création inspection"); }
+    catch { toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer l'inspection" }); }
   };
 
   return (
