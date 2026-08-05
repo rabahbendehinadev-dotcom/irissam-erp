@@ -1,0 +1,111 @@
+بما أن الهدف الآن هو **إكمال النظام وليس بناء نظام جديد**، فهذا هو البرومبت الذي أنصحك بإرساله إلى Replit AI. هو يوجهه مباشرة للعمل على المرحلة الحالية بدون أن يضيع الوقت في إعادة البناء.
+
+نحن الآن في مرحلة **Production Hardening** وليس مرحلة تطوير Modules جديدة.
+
+لا تبدأ أي Module جديد، ولا تعيد بناء أي جزء موجود.
+
+اعتمد فقط على الكود الحالي داخل المشروع.
+
+أولاً قم بمراجعة التقرير الأخير للمشروع، ثم نفذ العمل حسب الأولوية التالية:
+
+## المرحلة الأولى (أعلى أولوية)
+
+نفذ Audit شامل لإزالة كل ما يظهر للمستخدم من:
+
+* Coming Soon
+* soon
+* Placeholder
+* Cette page est en cours de développement
+* Under Development
+* Disabled Tabs
+* White Screens
+* Broken Routes
+
+خصوصًا داخل:
+
+* Patient Detail
+* Employee Detail
+* Sidebar
+* جميع Routes
+
+إذا كانت الـ API موجودة:
+
+* اربط الواجهة بها.
+
+إذا كانت الـ Feature غير مكتملة:
+
+* أخفِ الـ Tab أو Menu مؤقتًا.
+* لا تعرض أي Placeholder للمستخدم.
+
+ممنوع ترك أي صفحة تعرض رسالة تطوير.
+
+---
+
+## المرحلة الثانية
+
+راجع جميع Routes الموجودة داخل المشروع.
+
+لكل Route تأكد من:
+
+* Loading State
+* Empty State
+* Error State
+* Retry
+* Permission
+* Not Found
+* Responsive
+* Mobile
+* Tablet
+* Desktop
+
+ولا تسمح بأي White Screen أو Runtime Error.
+
+---
+
+## المرحلة الثالثة
+
+راجع جميع الـ Components الموجودة بالفعل.
+
+إذا وجدت:
+
+* Hooks موجودة
+* Services موجودة
+* APIs موجودة
+* Components موجودة
+* Permissions موجودة
+
+فاستعملها.
+
+لا تنشئ نسخًا جديدة.
+
+---
+
+## المرحلة الرابعة
+
+بعد انتهاء الـ Audit أعطني تقريرًا يحتوي على:
+
+* عدد الـ Placeholders التي تمت إزالتها.
+* عدد الـ Tabs التي تم ربطها.
+* عدد الـ Routes التي تم إصلاحها.
+* عدد الـ Components التي أصبحت تستعمل الـ API الحقيقي.
+* عدد الـ Features التي تم إخفاؤها مؤقتًا.
+
+ثم أخبرني هل وصلنا إلى:
+
+* 0 Placeholder
+* 0 Soon Badge
+* 0 White Screen
+* 0 Runtime Errors
+
+إذا كانت الإجابة نعم، أخبرني أن النظام أصبح جاهزًا للانتقال إلى المرحلة التالية:
+
+**PORTAIL INFIRMIER (Nurse Station)**
+
+**مهم جدًا:**
+
+* لا تعدل الـ Architecture.
+* لا تعدل Migrations القديمة.
+* لا تنشئ Mock Data.
+* لا تنشئ APIs جديدة إذا كانت موجودة.
+* لا تعيد بناء أي Module مكتمل.
+* الهدف هو الوصول إلى نسخة Production مستقرة ونظيفة بنسبة 100%.
