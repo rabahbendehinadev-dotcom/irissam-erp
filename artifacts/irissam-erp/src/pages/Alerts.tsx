@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PageWrapper } from "@/components/shared/PageWrapper";
 import { PatientDrawer } from "@/components/shared/PatientDrawer";
 import { useLanguage } from "@/i18n";
-import { MOCK_ALERTS } from "@/mock";
 import { formatRelativeTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import {
@@ -61,7 +60,7 @@ export default function Alerts() {
   // Map API data to MedicalAlert type, fall back to mocks
   const rawAlerts = useMemo((): MedicalAlert[] => {
     if (isLoading) return [];
-    if (isError) return MOCK_ALERTS;
+    if (isError) return [];
     return (apiAlerts ?? []).map((a) => ({
       id: a.id,
       title: a.title,

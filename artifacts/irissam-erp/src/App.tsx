@@ -240,11 +240,11 @@ function Router() {
       <Route path="/hospitalization" component={() => <ProtectedRoute component={HospitalizationPage} />} />
       <Route path="/operating-room" component={() => <ProtectedRoute component={OperatingRoomPage} />} />
       <Route path="/resuscitation" component={() => <ProtectedRoute component={ResuscitationPage} />} />
-      <Route path="/maternity" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/maternity" component={() => <Redirect to="/" />} />
       <Route path="/laboratory" component={() => <ProtectedRoute component={LaboratoryPage} />} />
       <Route path="/imaging" component={() => <ProtectedRoute component={ImagingPage} />} />
       <Route path="/pharmacy" component={() => <ProtectedRoute component={PharmacyPage} />} />
-      <Route path="/blood-bank" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/blood-bank" component={() => <Redirect to="/" />} />
       <Route path="/medical-stock" component={() => <ProtectedRoute component={MedicalStockPage} />} />
       <Route path="/biomedical" component={() => <ProtectedRoute component={BiomedicalPage} />} />
       <Route path="/quality" component={() => <ProtectedRoute component={QualityPage} />} />
@@ -261,8 +261,8 @@ function Router() {
       <Route path="/insurance" component={() => <ProtectedRoute component={InsurancePage} />} />
       <Route path="/ambulances" component={() => <ProtectedRoute component={AmbulancesPage} />} />
       <Route path="/dev/tests" component={() => <ProtectedRoute component={DevTestRunnerPage} />} />
-      <Route path="/archives" component={() => <ProtectedRoute component={PlaceholderPage} />} />
-      <Route path="/reports" component={() => <ProtectedRoute component={PlaceholderPage} />} />
+      <Route path="/archives" component={() => <Redirect to="/" />} />
+      <Route path="/reports" component={() => <Redirect to="/" />} />
       <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
 
       {/* Doctor Portal routes */}

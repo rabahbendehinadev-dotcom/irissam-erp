@@ -6,7 +6,6 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { PatientFilters, type PatientFiltersState } from '@/components/patients/PatientFilters';
 import { PatientTable } from '@/components/patients/PatientTable';
 import { PatientForm } from '@/components/patients/PatientForm';
-import { MOCK_PATIENTS } from '@/mock';
 import type { Patient } from '@/types';
 import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
@@ -51,7 +50,7 @@ export default function PatientsPage() {
   // Fall back to mock data if API is unavailable
   const rawPatients = useMemo((): Patient[] => {
     if (isLoading) return [];
-    if (isError) return MOCK_PATIENTS;
+    if (isError) return [];
     // Filter out any null/undefined elements that a malformed API response might include
     const list = Array.isArray(apiPatients) ? (apiPatients as unknown as Patient[]) : [];
     return list.filter((p): p is Patient => p != null && typeof p === 'object');

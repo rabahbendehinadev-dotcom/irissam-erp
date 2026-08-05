@@ -1,6 +1,7 @@
-import { useState, useMemo, useRef } from 'react';
-import { Upload, Eye, Download, Trash2, FileText, Image, FileSpreadsheet,
-  File, Plus, Search, X, Printer, ArrowUpDown } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Eye, Download, Trash2, FileText, Image, FileSpreadsheet,
+  File, Search, X, Printer, ArrowUpDown, ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/utils/format';
 
@@ -49,14 +50,10 @@ function getFileIcon(mimeType: string) {
   return File;
 }
 
-const MOCK_DOCS: PatientDocument[] = [
-  { id: 'd-1', type: 'cni',          name: 'CNI_recto_verso.pdf',         uploadedAt: '2024-01-10T08:30:00', sizeKb: 420,  mimeType: 'application/pdf', uploadedBy: 'Réception Amira', version: 1 },
-  { id: 'd-2', type: 'assurance',    name: 'Attestation_CNAS_2025.pdf',   uploadedAt: '2024-01-12T10:00:00', sizeKb: 215,  mimeType: 'application/pdf', uploadedBy: 'Réception Amira', version: 2 },
-  { id: 'd-3', type: 'ordonnance',   name: 'Ordonnance_20260115.pdf',     uploadedAt: '2026-01-15T16:20:00', sizeKb: 88,   mimeType: 'application/pdf', uploadedBy: 'Dr Karim Benamara', version: 1 },
-  { id: 'd-4', type: 'analyse',      name: 'NFS_CRP_résultats.pdf',       uploadedAt: '2026-07-25T11:08:00', sizeKb: 152,  mimeType: 'application/pdf', uploadedBy: 'Lab. Bensouna', version: 3 },
-  { id: 'd-5', type: 'radiologie',   name: 'Radio_thorax_face.jpg',       uploadedAt: '2026-06-20T13:55:00', sizeKb: 1840, mimeType: 'image/jpeg',      uploadedBy: 'Imagerie Kadri', version: 1 },
-  { id: 'd-6', type: 'compte_rendu', name: 'CR_consultation_0801.pdf',    uploadedAt: '2026-08-01T09:14:00', sizeKb: 96,   mimeType: 'application/pdf', uploadedBy: 'Dr Karim Benamara', version: 1 },
-];
+const VALID_DOC_TYPES = new Set<DocType>(['cni','passeport','assurance','ordonnance','compte_rendu','scanner','radiologie','analyse','photo','autre']);
+function mapCategory(cat: string | null | undefined): DocType {
+  return VALID_DOC_TYPES.has(cat as DocType) ? (cat as DocType) : 'autre';
+}
 
 function formatSize(kb: number) {
   if (kb >= 1024) return `${(kb / 1024).toFixed(1)} Mo`;
@@ -183,57 +180,45 @@ function DocCard({ doc, onDelete, onPreview }: { doc: PatientDocument; onDelete:
   );
 }
 
-const ADD_DOC_TYPES: DocType[] = ['cni','passeport','assurance','ordonnance','compte_rendu','scanner','radiologie','analyse','photo','autre'];
 
 interface Props { patientId: string; }
 
-export function PatientDocumentsV2({ patientId: _ }: Props) {
-  const [docs,        setDocs]        = useState<PatientDocument[]>(MOCK_DOCS);
-  const [showAdd,     setShowAdd]     = useState(false);
-  const [selectedType, setSelectedType] = useState<DocType>('autre');
+export function PatientDocumentsV2({ patientId }: Props) {
+  const [docs,        setDocs]        = useState<PatientDocument[]>([]);
+  const [isLoading,   setIsLoading]   = useState(true);
+  const [apiError,    setApiError]    = useState(false);
   const [search,      setSearch]      = useState('');
   const [filter,      setFilter]      = useState<FilterKey>('all');
   const [sortAsc,     setSortAsc]     = useState(false);
   const [previewDoc,  setPreviewDoc]  = useState<PatientDocument | null>(null);
-  const [dragOver,    setDragOver]    = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchDocs = () => {
+    if (!patientId) return;
+    setIsLoading(true);
+    setApiError(false);
+    apiClient
+      .get<{ documents: Record<string, unknown>[] }>(`/documents/records?patientId=${encodeURIComponent(patientId)}&limit=100`)
+      .then(res => {
+        const list = Array.isArray(res?.documents) ? res.documents : [];
+        setDocs(list.map(r => ({
+          id:         String(r.id ?? ''),
+          type:       mapCategory(r.category as string),
+          name:       String(r.title ?? r.document_number ?? 'Document'),
+          uploadedAt: String(r.created_at ?? r.createdAt ?? new Date().toISOString()),
+          sizeKb:     Math.round((Number(r.file_size ?? 0)) / 1024),
+          mimeType:   String(r.mime_type ?? r.mimeType ?? 'application/pdf'),
+          uploadedBy: String(r.created_by_name ?? r.createdByName ?? ''),
+          version:    Number(r.version ?? 1),
+        })));
+        setIsLoading(false);
+      })
+      .catch(() => { setApiError(true); setIsLoading(false); });
+  };
+
+  useEffect(() => { fetchDocs(); }, [patientId]);
 
   const handleDelete = (id: string) => {
     if (confirm('Supprimer ce document ?')) setDocs(prev => prev.filter(d => d.id !== id));
-  };
-
-  const handleAdd = () => {
-    setDocs(prev => [{
-      id: `d-${Date.now()}`,
-      type: selectedType,
-      name: `Nouveau_${DOC_TYPE_LABELS[selectedType].replace(/\s/g, '_')}.pdf`,
-      uploadedAt: new Date().toISOString(),
-      sizeKb: 0,
-      mimeType: 'application/pdf',
-      uploadedBy: 'Utilisateur courant',
-      version: 1,
-    }, ...prev]);
-    setShowAdd(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-      const type: DocType = ext === 'pdf' ? 'compte_rendu' : ext.match(/jpe?g|png|webp/) ? 'photo' : 'autre';
-      setDocs(prev => [{
-        id: `d-drop-${Date.now()}`,
-        type,
-        name: file.name,
-        uploadedAt: new Date().toISOString(),
-        sizeKb: Math.round(file.size / 1024),
-        mimeType: file.type || 'application/octet-stream',
-        uploadedBy: 'Utilisateur courant',
-        version: 1,
-      }, ...prev]);
-    }
   };
 
   const filtered = useMemo(() => {
@@ -252,19 +237,14 @@ export function PatientDocumentsV2({ patientId: _ }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h3 className="font-semibold text-gray-800">Documents du patient</h3>
-          <p className="text-xs text-gray-500 mt-0.5">{docs.length} document{docs.length > 1 ? 's' : ''}</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {isLoading ? 'Chargement…' : `${docs.length} document${docs.length > 1 ? 's' : ''}`}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            <Upload size={13} /> Téléverser
-          </button>
-          <button onClick={() => setShowAdd(v => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
-            <Plus size={13} /> Ajouter (mock)
-          </button>
-          <input ref={fileInputRef} type="file" className="hidden" onChange={() => alert('Upload réel disponible avec le backend')} />
-        </div>
+        <a href="/documents" target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <ExternalLink size={13} /> Gérer les documents (GED)
+        </a>
       </div>
 
       {/* Search + filters */}
@@ -299,54 +279,32 @@ export function PatientDocumentsV2({ patientId: _ }: Props) {
         </button>
       </div>
 
-      {/* Add form */}
-      {showAdd && (
-        <div className="border border-blue-200 bg-blue-50 rounded-xl p-4 space-y-3">
-          <p className="text-sm font-medium text-blue-800">Type de document</p>
-          <div className="flex flex-wrap gap-2">
-            {ADD_DOC_TYPES.map(t => (
-              <button key={t} onClick={() => setSelectedType(t)}
-                className={cn('text-xs px-3 py-1.5 rounded-full border transition-colors',
-                  selectedType === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300')}>
-                {DOC_TYPE_LABELS[t]}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2 pt-1">
-            <button onClick={handleAdd}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-              <Plus size={13} /> Ajouter
-            </button>
-            <button onClick={() => setShowAdd(false)}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
-              Annuler
-            </button>
-          </div>
+      {/* Loading */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-16 text-gray-400 gap-2">
+          <RefreshCw size={16} className="animate-spin" />
+          <span className="text-sm">Chargement des documents…</span>
         </div>
       )}
 
-      {/* Drag-drop zone */}
-      <div
-        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        className={cn(
-          'border-2 border-dashed rounded-xl flex items-center justify-center gap-3 py-4 transition-colors cursor-pointer',
-          dragOver
-            ? 'border-blue-400 bg-blue-50 text-blue-700'
-            : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:bg-gray-50/50'
-        )}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <Upload size={16} />
-        <span className="text-sm font-medium">Glisser-déposer un fichier ici, ou cliquer pour sélectionner</span>
-      </div>
+      {/* Error */}
+      {apiError && !isLoading && (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+          <AlertTriangle size={36} className="text-amber-400" />
+          <p className="text-sm font-medium text-gray-700">Impossible de charger les documents</p>
+          <button onClick={fetchDocs}
+            className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
+            Réessayer
+          </button>
+        </div>
+      )}
 
       {/* Grid */}
-      {filtered.length === 0 ? (
+      {!isLoading && !apiError && (filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400 bg-white border border-dashed border-gray-200 rounded-xl">
           <FileText size={40} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm font-medium">Aucun document{search ? ' pour cette recherche' : ''}</p>
+          <p className="text-xs mt-1">Utilisez le module GED pour ajouter des documents à ce patient.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
@@ -354,7 +312,7 @@ export function PatientDocumentsV2({ patientId: _ }: Props) {
             <DocCard key={doc.id} doc={doc} onDelete={handleDelete} onPreview={setPreviewDoc} />
           ))}
         </div>
-      )}
+      ))}
 
       {/* Preview modal */}
       {previewDoc && <PreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}

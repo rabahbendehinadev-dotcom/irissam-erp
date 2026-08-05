@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { X, ChevronRight, ChevronLeft, Check, Loader2, AlertTriangle } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Check, Loader2, AlertTriangle, FileText } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import type { Patient, BloodType, PatientGender, MaritalStatus, IdDocumentType, InsuranceType } from '@/types';
 import { MOCK_PATIENTS } from '@/mock';
@@ -463,23 +463,18 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
 
             {/* Step 6 — Documents */}
             {step === 6 && (
-              <div className="space-y-3">
-                {[
-                  { key: 'docs.cni', label: t('pat.form.docs.cni') },
-                  { key: 'docs.ss', label: t('pat.form.docs.ss') },
-                  { key: 'docs.insurance', label: t('pat.form.docs.insurance') },
-                  { key: 'docs.prescriptions', label: t('pat.form.docs.prescriptions') },
-                  { key: 'docs.admin', label: t('pat.form.docs.admin') },
-                  { key: 'docs.other', label: t('pat.form.docs.other') },
-                ].map(doc => (
-                  <div key={doc.key} className="border border-dashed border-gray-200 rounded-xl p-4 flex items-center justify-between bg-gray-50/50">
-                    <span className="text-sm text-gray-600">{doc.label}</span>
-                    <span className="text-xs text-gray-400 border border-gray-200 rounded px-2 py-0.5">{t('pat.docs.soon')}</span>
+              <div className="space-y-4">
+                <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
+                  <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center">
+                    <FileText size={24} className="text-blue-500" />
                   </div>
-                ))}
-                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg p-3">
-                  {t('pat.form.docs.hint')}
-                </p>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Documents à ajouter après la création</p>
+                    <p className="text-xs text-gray-400 mt-1 max-w-xs">
+                      Une fois le dossier patient enregistré, vous pourrez joindre les documents depuis l'onglet&nbsp;<strong>Documents</strong> du dossier ou via le module&nbsp;<strong>GED</strong>.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

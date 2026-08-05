@@ -10,7 +10,7 @@ import { ConsultationFilters, DEFAULT_FILTERS, type ConsultationFiltersState } f
 import { ConsultationTable } from '@/components/consultations/ConsultationTable';
 import { ConsultationForm } from '@/components/consultations/ConsultationForm';
 import { VitalsEntryModal } from '@/components/consultations/VitalsEntryModal';
-import { MOCK_CONSULTATIONS, setNurseVitals } from '@/mock/consultations';
+import { setNurseVitals } from '@/mock/consultations';
 import type { Consultation, ConsultationStatus, VitalSigns } from '@/types/consultation';
 
 // Module-level vitals overlay: survives refetch() calls (lives outside React state
@@ -50,7 +50,7 @@ export default function ConsultationsPage() {
   const consultations = useMemo((): Consultation[] => {
     let base: Consultation[];
     if (isLoading) return [];
-    if (isError) base = MOCK_CONSULTATIONS as Consultation[];
+    if (isError) base = [];
     else base = Array.isArray(apiConsultations) ? (apiConsultations as unknown as Consultation[]) : [];
 
     // Merge nurse-entered vitals: overlay takes precedence over API/mock value
@@ -243,7 +243,7 @@ export default function ConsultationsPage() {
         {isError && !isLoading && (
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-3 text-amber-700 text-sm">
             <AlertTriangle size={16} className="shrink-0" />
-            <span>Connexion API impossible. Affichage des données de démonstration.</span>
+            <span>Connexion au serveur impossible. Vérifiez votre réseau et réessayez.</span>
             <button onClick={handleRefresh} className="ml-auto text-xs border border-amber-300 px-2.5 py-1 rounded-lg hover:bg-amber-100">
               Réessayer
             </button>
