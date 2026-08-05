@@ -1,0 +1,266 @@
+PRODUCTION HARDENING — SPRINT 1
+MODULE: PARAMÈTRES (SYSTEM SETTINGS)
+
+IMPORTANT:
+Do NOT redesign the application.
+Do NOT change the existing architecture.
+Do NOT create placeholders.
+Do NOT use mock data.
+Do NOT break existing APIs.
+Do NOT modify existing database migrations.
+Respect the current React + Node.js + PostgreSQL architecture.
+
+Goal:
+Transform the current Settings page into a real Hospital ERP Administration Center suitable for production.
+
+==================================================
+SECTION 1 — Hospital Configuration
+==================================================
+
+Create complete hospital configuration:
+
+- Hospital Name
+- Logo upload
+- Hospital Code
+- Address
+- City
+- Country
+- Phone
+- Email
+- Website
+- Tax Number
+- RC
+- NIF
+- AI
+- Default Language
+- Timezone
+- Currency
+- Date Format
+- Number Format
+
+==================================================
+SECTION 2 — Authentication
+==================================================
+
+Implement production authentication settings:
+
+- Password Policy
+- Password Length
+- Complexity
+- Password Expiration
+- Login Attempts
+- Session Timeout
+- Remember Me
+- Force Logout
+- MFA
+- OTP Settings
+- JWT Expiration
+- Refresh Token Duration
+
+==================================================
+SECTION 3 — Roles & Permissions
+==================================================
+
+Create administration pages for:
+
+Roles
+
+Permissions
+
+Departments
+
+Access Matrix
+
+Default Roles
+
+==================================================
+SECTION 4 — Notifications
+==================================================
+
+SMTP
+
+SMS
+
+Push Notifications
+
+WhatsApp
+
+Telegram
+
+Email Templates
+
+Test Connection
+
+==================================================
+SECTION 5 — Printing
+==================================================
+
+Prescription Printer
+
+Invoice Printer
+
+Label Printer
+
+Barcode
+
+QR Code
+
+Paper Size
+
+Margins
+
+Header
+
+Footer
+
+==================================================
+SECTION 6 — Backup
+==================================================
+
+Backup Dashboard
+
+Manual Backup
+
+Automatic Backup
+
+Retention Policy
+
+Restore Backup
+
+Download Backup
+
+Upload Backup
+
+Backup History
+
+==================================================
+SECTION 7 — Storage
+==================================================
+
+Storage Health
+
+Database Size
+
+Attachments Size
+
+Available Space
+
+MinIO
+
+Google Drive
+
+Local Storage
+
+==================================================
+SECTION 8 — Integrations
+==================================================
+
+FHIR
+
+HL7
+
+DICOM
+
+PACS
+
+Webhook
+
+REST API
+
+API Keys
+
+==================================================
+SECTION 9 — Audit
+==================================================
+
+Audit Logs
+
+Security Logs
+
+User Activity
+
+Failed Login Attempts
+
+System Events
+
+==================================================
+SECTION 10 — System Health
+==================================================
+
+CPU
+
+RAM
+
+Storage
+
+Database
+
+Redis
+
+Queue
+
+Background Jobs
+
+API Status
+
+==================================================
+SECTION 11 — Remove Demo Code
+==================================================
+
+Remove every demo component:
+
+- Demo data
+- Reset demo
+- Local storage demo
+- Any development-only UI
+
+==================================================
+SECTION 12 — UI
+==================================================
+
+Keep exactly the same design system.
+
+Only improve:
+
+Spacing
+
+Cards
+
+Responsive
+
+Dark Mode compatibility
+
+Loading states
+
+Error handling
+
+Empty states
+
+Success messages
+
+==================================================
+FINAL REQUIREMENTS
+
+Production Ready only.
+
+No placeholders.
+
+No "Coming Soon".
+
+No TODO.
+
+No Mock Data.
+
+Everything connected to real backend APIs.
+
+No runtime errors.
+
+No TypeScript errors.
+
+No console warnings.
+
+No white screens.
+
+No broken routes.
+
+The Settings module must become a complete enterprise-grade administration center comparable to Oracle Health, Epic, Cerner, SAP Healthcare, or Odoo Enterprise.
