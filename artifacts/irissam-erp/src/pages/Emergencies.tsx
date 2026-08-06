@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { cn } from '@/lib/utils';
-import { useMockRepository } from '@/store/MockRepository';
 import { useAuth } from '@/store/AuthContext';
 import { EmergencyPriorityBadge, PRIORITY_CFG } from '@/components/emergencies/EmergencyPriorityBadge';
 import { EmergencyAlertStrip } from '@/components/emergencies/EmergencyAlertStrip';
@@ -202,7 +201,6 @@ function PatientExpandedCard({ patient, isDark, onClose }: {
   const bloodType = patient.bloodType ?? '?';
   const allergies = patient.allergies ?? [];
   const v = patient.vitals;
-  const { startCare: repoStartCare } = useMockRepository();
   const { user } = useAuth();
 
   return (
@@ -369,16 +367,10 @@ function PatientExpandedCard({ patient, isDark, onClose }: {
       {/* Start care button */}
       <button
         onClick={() => {
-          // Only call mock startCare for mock-backed patients (no real patientId)
-          if (!patient.patientId) {
-            repoStartCare(patient.id, {
-              userId: user?.id ?? '',
-              userName: user ? `${user.firstName} ${user.lastName}` : 'Personnel',
-              userRole: user?.role ?? 'medecin',
-            });
-          }
-          // Navigate using the real patient UUID for DB patients, or visit id for mock
-          setLocation(`/emergencies/${patient.patientId ?? patient.id}`);
+          // Navigate to the real encounter dossier (patientId for DB patients)
+          // Patients without a real DB record are no longer supported
+          if (!patient.patientId) return;
+          setLocation(`/emergencies/${patient.patientId}`);
         }}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
       >
@@ -399,7 +391,6 @@ function PatientRow({ patient, tick, isDark }: { patient: EmergencyPatient; tick
   const statusCfg = STATUS_CFG[patient.status];
   const elapsed = elapsedMs(patient.arrivalTime);
   const target = cfg.targetMin;
-  const { startCare: repoStartCare } = useMockRepository();
   const { user } = useAuth();
 
   // Timer size: big for P1 (immédiat), normal for others
@@ -512,17 +503,9 @@ function PatientRow({ patient, tick, isDark }: { patient: EmergencyPatient; tick
         <div className="flex-shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
           <button
             onClick={() => {
-              const canStartCareLocally = patient.status === 'attente_soins' || patient.status === 'attente_triage';
-              // Only call mock startCare for mock-backed patients (no real patientId)
-              if (canStartCareLocally && !patient.patientId) {
-                repoStartCare(patient.id, {
-                  userId: user?.id ?? '',
-                  userName: user ? `${user.firstName} ${user.lastName}` : 'Personnel',
-                  userRole: user?.role ?? 'medecin',
-                });
-              }
-              // Navigate using the real patient UUID for DB patients, or visit id for mock
-              setLocation(`/emergencies/${patient.patientId ?? patient.id}`);
+              // Navigate to the real encounter dossier — only DB-backed patients are supported
+              if (!patient.patientId) return;
+              setLocation(`/emergencies/${patient.patientId}`);
             }}
             className={cn(
               'flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors whitespace-nowrap',
@@ -881,8 +864,7 @@ export default function EmergenciesPage() {
     todayStats, loading: emLoading, error: emError, refresh: emRefresh,
   } = useEmergencyData();
 
-  // Staff data still served from in-memory store pending a staff API
-  const { erDoctors: doctors, erNurses: nurses } = useMockRepository();
+  // Staff workload data not yet available via API — widget hidden until staffing module is built
 
   const patients   = Array.isArray(rawPatients)   ? rawPatients   : [];
   const rooms      = Array.isArray(rawRooms)      ? rawRooms      : [];
@@ -1057,7 +1039,18 @@ export default function EmergenciesPage() {
           </div>
           <div className="xl:col-span-5 flex flex-col gap-4">
             <RoomsBoard rooms={rooms} isDark={isDark} />
-            <StaffBoard doctors={doctors} nurses={nurses} isDark={isDark} />
+            <div className={cn(
+              'border rounded-xl p-4 flex flex-col items-center justify-center gap-2 min-h-[120px]',
+              dk(isDark, 'bg-gray-800 border-gray-700', 'bg-white border-gray-200'),
+            )}>
+              <UserCheck size={20} className={dk(isDark, 'text-gray-600', 'text-gray-300')} />
+              <p className={cn('text-sm font-medium', dk(isDark, 'text-gray-400', 'text-gray-500'))}>
+                Personnel de garde
+              </p>
+              <p className={cn('text-xs text-center', dk(isDark, 'text-gray-600', 'text-gray-400'))}>
+                Données disponibles via le module RH — synchronisation en cours de configuration
+              </p>
+            </div>
           </div>
         </div>
 

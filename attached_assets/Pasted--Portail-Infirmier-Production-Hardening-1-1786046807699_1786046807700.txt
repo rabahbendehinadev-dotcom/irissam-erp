@@ -1,0 +1,116 @@
+ممتاز. لا تبدأ Portail Infirmier بعد.
+
+بقيت نقطتان فقط لإغلاق Production Hardening رسميًا:
+
+## 1. إزالة آخر Mock Runtime من Emergencies
+
+مازال يوجد داخل `Emergencies.tsx`:
+
+* `startCare(patient.id)` لمسار المرضى الوهميين.
+* `erDoctors / erNurses` لعرض طاقم الطوارئ.
+
+لا أريد أي Mock Data داخل Production Runtime، حتى لو كان المسار نادر الاستعمال.
+
+### المطلوب
+
+#### startCare
+
+تحقق من المرضى الذين لا يملكون `real patientId` أو `encounterId`.
+
+* إذا كانت البيانات الوهمية لم تعد ضرورية، احذف مسار Mock نهائيًا.
+* لا تسمح باستدعاء `MockRepository.startCare`.
+* إذا لم يكن للمريض سجل حقيقي، عطّل الإجراء مع Empty/Error State واضح.
+* لا تستعمل بيانات وهمية كـfallback.
+
+#### طاقم الطوارئ
+
+لا تنشئ Endpoint `/emergency/staff` جديدًا إذا كان بإمكانك إعادة استعمال بيانات HR.
+
+استعمل:
+
+`GET /hr/employees`
+
+ثم قم بفلترة الموظفين الحقيقيين حسب:
+
+* Department = Urgences
+* أو Service = Emergency
+* أو Role / Position طبيب أو ممرض أو مسعف
+
+إذا لم توجد طريقة موثوقة لتحديد طاقم الطوارئ من بيانات HR الحالية:
+
+* أخفِ تبويب طاقم الطوارئ مؤقتًا.
+* لا تعرض `erDoctors` أو `erNurses` وهميين.
+
+بعد التعديل، ابحث داخل كامل Runtime Production عن:
+
+* `MockRepository`
+* `erDoctors`
+* `erNurses`
+* `mockPatients`
+* `mockData`
+* `fakeData`
+
+يمكن أن تبقى فقط داخل Tests أو Development Fixtures غير المستوردة في Production Bundle.
+
+النتيجة المطلوبة:
+
+* `0 MockRepository` في Production Runtime.
+* `0 Mock Data` ظاهرة للمستخدم.
+* `0 Mock fallback`.
+
+---
+
+## 2. تحضير تحقق Production بعد Dokploy Deploy
+
+لا يمكنك الوصول إلى Dokploy من Replit، لذلك لا تدّعي أن Production تم التحقق منها.
+
+قم فقط بما يلي:
+
+* تأكد أن آخر Commit موجود على `origin/main`.
+* أعطني Hash آخر Commit يحتوي على إزالة Mock Runtime.
+* أعطني قائمة الصفحات التي يجب أن أختبرها بعد الضغط على Deploy في Dokploy.
+* أعطني خطوات Smoke Test مختصرة بعد النشر.
+
+يجب أن تشمل الاختبارات:
+
+* Login admin.
+* Dashboard.
+* Patient Detail.
+* Employee Detail.
+* Urgences.
+* Hospitalization.
+* Personnel.
+* Payroll.
+* Executive Dashboard.
+* Super Admin.
+* GED/Documents.
+* Pharmacy.
+* Settings.
+* إخفاء Ambulances.
+* عدم ظهور أي بيانات Mock داخل Emergencies.
+
+نفذ أيضًا قبل التقرير:
+
+* TypeScript check.
+* Backend build.
+* Frontend build.
+* البحث النهائي عن Mock Runtime.
+* البحث النهائي عن Placeholder.
+* البحث النهائي عن White Screen patterns.
+
+## التقرير المطلوب
+
+أعطني فقط:
+
+1. آخر Commit Hash.
+2. الملفات المعدلة.
+3. ماذا حدث لمسار `startCare`.
+4. ماذا حدث لقائمة أطباء وممرضي الطوارئ.
+5. نتيجة البحث عن Mock Runtime.
+6. نتيجة TypeScript.
+7. نتيجة Backend Build.
+8. نتيجة Frontend Build.
+9. قائمة Smoke Tests التي أنفذها بعد Deploy.
+10. هل وصلنا فعليًا إلى `0 Mock Data in Production Runtime`؟
+
+لا تبدأ Portail Infirmier داخل هذه المهمة.
