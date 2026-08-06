@@ -32,7 +32,7 @@ export default function ContractsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createContract(form); setShowCreate(false); setForm({}); refetch(); }
-    catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.response?.data?.error ?? "Création de contrat impossible" }); }
+    catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.data?.error ?? err?.message ?? "Création de contrat impossible" }); }
   };
 
   const handleStatusChange = async (c: any, status: string) => {

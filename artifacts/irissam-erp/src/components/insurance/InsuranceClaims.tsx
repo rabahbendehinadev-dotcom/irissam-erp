@@ -143,12 +143,13 @@ function MarkPaidModal({ claim, onClose }: ActionModalProps & { claim: Insurance
       await markPaid.mutateAsync({ id: claim.id, amountPaid: amt });
       onClose();
     } catch (e: unknown) {
-      const body = e as { response?: { data?: { error?: string; code?: string; remainingAmount?: number } }; message?: string };
-      if (body?.response?.data?.code === "OVERPAYMENT") {
-        const serverRemaining = body.response.data.remainingAmount ?? remaining;
+      // apiClient throws: Object.assign(new Error(...), { status, data: errorBody })
+      const body = e as { data?: { error?: string; code?: string; remainingAmount?: number }; message?: string };
+      if (body?.data?.code === "OVERPAYMENT") {
+        const serverRemaining = body.data.remainingAmount ?? remaining;
         setErr(`Trop-perçu détecté. Reste approuvé : ${fmt(serverRemaining)} DZD`);
       } else {
-        setErr(body?.response?.data?.error ?? body?.message ?? "Erreur lors de l'enregistrement");
+        setErr(body?.data?.error ?? body?.message ?? "Erreur lors de l'enregistrement");
       }
     }
   }

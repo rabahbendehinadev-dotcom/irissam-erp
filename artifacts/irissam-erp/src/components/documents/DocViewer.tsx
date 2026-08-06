@@ -30,7 +30,7 @@ export function DocViewer({ documentId, onClose, onRefresh }: Props) {
     setError("");
     docsApi.get(documentId)
       .then(d => { setDoc(d); setLoading(false); })
-      .catch(e => { setError(e?.response?.data?.error ?? "Erreur de chargement"); setLoading(false); });
+      .catch(e => { setError(e?.data?.error ?? e?.message ?? "Erreur de chargement"); setLoading(false); });
   }, [documentId]);
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export function DocViewer({ documentId, onClose, onRefresh }: Props) {
       setDoc(updated);
       onRefresh();
     } catch (e: any) {
-      setError(e?.response?.data?.error ?? "Erreur");
+      setError(e?.data?.error ?? e?.message ?? "Erreur");
     } finally {
       setActionLoading("");
     }

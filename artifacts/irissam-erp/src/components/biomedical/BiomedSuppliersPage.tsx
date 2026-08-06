@@ -20,7 +20,7 @@ export default function BiomedSuppliersPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await createBiomedSupplier(form); setShowCreate(false); setForm({}); refetch(); }
-    catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.response?.data?.error ?? "Opération impossible" }); }
+    catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.data?.error ?? err?.message ?? "Opération impossible" }); }
   };
 
   return (

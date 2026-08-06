@@ -40,7 +40,7 @@ export default function CatalogPage() {
       if (tab === "models")        { await createBiomedModel(form);        setModTick(t=>t+1); }
       if (tab === "locations")     { await createBiomedLocation(form);     setLocTick(t=>t+1); }
       setShowCreate(false); setForm({});
-    } catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.response?.data?.error ?? "Opération impossible" }); }
+    } catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.data?.error ?? err?.message ?? "Opération impossible" }); }
   };
 
   return (

@@ -3,107 +3,107 @@ import { apiClient } from "@/lib/api-client";
 const BASE = "/system";
 
 // ─── Step-up Auth ─────────────────────────────────────────────────────────────
-export const stepUpAuth = (password: string) =>
-  apiClient.post(`${BASE}/step-up-auth`, { password }).then((r: any) => r.data) as Promise<{ token: string; expiresAt: string }>;
+export const stepUpAuth = (password: string): Promise<{ token: string; expiresAt: string }> =>
+  apiClient.post<any>(`${BASE}/step-up-auth`, { password });
 
 // ─── Overview & Health ────────────────────────────────────────────────────────
 export const getSystemOverview = () =>
-  apiClient.get(`${BASE}/health/overview`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/health/overview`);
 
 export const getHealthCheck = () =>
-  apiClient.get(`${BASE}/health`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/health`);
 
 export const getHealthDatabase = () =>
-  apiClient.get(`${BASE}/health/database`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/health/database`);
 
 export const getHealthStorage = () =>
-  apiClient.get(`${BASE}/health/storage`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/health/storage`);
 
 export const getHealthNotifications = () =>
-  apiClient.get(`${BASE}/health/notifications`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/health/notifications`);
 
 export const getHealthEmail = () =>
-  apiClient.get(`${BASE}/health/email`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/health/email`);
 
 export const getHealthJobs = () =>
-  apiClient.get(`${BASE}/health/background-jobs`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/health/background-jobs`);
 
 // ─── Database ─────────────────────────────────────────────────────────────────
 export const getDatabaseStats = () =>
-  apiClient.get(`${BASE}/database`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/database`);
 
 export const getSlowQueries = () =>
-  apiClient.get(`${BASE}/database/slow-queries`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/database/slow-queries`);
 
 export const getDatabaseLocks = () =>
-  apiClient.get(`${BASE}/database/locks`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/database/locks`);
 
 export const cancelDatabaseQuery = (pid: number, stepUpToken: string) =>
-  apiClient.post(`${BASE}/database/cancel-query`, { pid }, { headers: { "x-step-up-token": stepUpToken } }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/database/cancel-query`, { pid }, { headers: { "x-step-up-token": stepUpToken } });
 
 export const runDatabaseAnalyze = () =>
-  apiClient.post(`${BASE}/database/analyze`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/database/analyze`, {});
 
 export const exportDatabaseReport = () =>
-  apiClient.get(`${BASE}/database/export`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/database/export`);
 
 // ─── Migrations ───────────────────────────────────────────────────────────────
 export const getMigrationsList = () =>
-  apiClient.get(`${BASE}/migrations`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/migrations`);
 
 export const verifyMigrations = () =>
-  apiClient.post(`${BASE}/migrations/verify`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/migrations/verify`, {});
 
 export const applyMigrations = (stepUpToken: string) =>
-  apiClient.post(`${BASE}/migrations/apply`, {}, { headers: { "x-step-up-token": stepUpToken } }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/migrations/apply`, {}, { headers: { "x-step-up-token": stepUpToken } });
 
 export const getMigrationSqlPreview = (name: string) =>
-  apiClient.get(`${BASE}/migrations/${encodeURIComponent(name)}/sql-preview`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/migrations/${encodeURIComponent(name)}/sql-preview`);
 
 // ─── Backups ──────────────────────────────────────────────────────────────────
 export const getBackups = () =>
-  apiClient.get(`${BASE}/backups`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/backups`);
 
 export const createBackup = (data: { type?: string; notes?: string }) =>
-  apiClient.post(`${BASE}/backups`, data).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/backups`, data);
 
 export const getBackup = (id: string) =>
-  apiClient.get(`${BASE}/backups/${id}`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/backups/${id}`);
 
 export const verifyBackup = (id: string) =>
-  apiClient.post(`${BASE}/backups/${id}/verify`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/backups/${id}/verify`, {});
 
 export const getRestorePlan = (id: string, stepUpToken: string) =>
-  apiClient.post(`${BASE}/backups/${id}/restore-plan`, {}, { headers: { "x-step-up-token": stepUpToken } }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/backups/${id}/restore-plan`, {}, { headers: { "x-step-up-token": stepUpToken } });
 
 export const protectBackup = (id: string) =>
-  apiClient.patch(`${BASE}/backups/${id}/protect`, {}).then((r: any) => r.data);
+  apiClient.patch<any>(`${BASE}/backups/${id}/protect`, {});
 
 export const deleteBackup = (id: string, confirmPhrase: string) =>
-  apiClient.request(`${BASE}/backups/${id}`, { method: 'DELETE', body: { confirmPhrase } }).then((r: any) => r);
+  apiClient.request<any>(`${BASE}/backups/${id}`, { method: 'DELETE', body: { confirmPhrase } });
 
 // ─── Jobs ─────────────────────────────────────────────────────────────────────
 export const getJobs = (params?: Record<string, string>) => {
   const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
-  return apiClient.get(`${BASE}/jobs${qs}`);
+  return apiClient.get<any>(`${BASE}/jobs${qs}`);
 };
 
 export const retryJob = (id: string) =>
-  apiClient.post(`${BASE}/jobs/${id}/retry`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/jobs/${id}/retry`, {});
 
 export const cancelJob = (id: string) =>
-  apiClient.post(`${BASE}/jobs/${id}/cancel`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/jobs/${id}/cancel`, {});
 
 export const pauseQueue = () =>
-  apiClient.post(`${BASE}/jobs/queue/pause`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/jobs/queue/pause`, {});
 
 export const resumeQueue = () =>
-  apiClient.post(`${BASE}/jobs/queue/resume`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/jobs/queue/resume`, {});
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
 export const getSystemLogs = (params?: Record<string, string>) => {
   const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
-  return apiClient.get(`${BASE}/logs${qs}`);
+  return apiClient.get<any>(`${BASE}/logs${qs}`);
 };
 
 export const exportSystemLogs = (params?: Record<string, string>) => {
@@ -114,7 +114,7 @@ export const exportSystemLogs = (params?: Record<string, string>) => {
 // ─── Audit ────────────────────────────────────────────────────────────────────
 export const getAuditLogs = (params?: Record<string, string>) => {
   const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
-  return apiClient.get(`${BASE}/audit${qs}`);
+  return apiClient.get<any>(`${BASE}/audit${qs}`);
 };
 
 export const exportAuditLogs = (params?: Record<string, string>) => {
@@ -124,125 +124,125 @@ export const exportAuditLogs = (params?: Record<string, string>) => {
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 export const getSessions = () =>
-  apiClient.get(`${BASE}/sessions`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/sessions`);
 
 export const revokeSession = (id: string) =>
-  apiClient.post(`${BASE}/sessions/${id}/revoke`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/sessions/${id}/revoke`, {});
 
 export const revokeAllUserSessions = (userId: string, stepUpToken: string) =>
-  apiClient.post(`${BASE}/sessions/revoke-all-for-user`, { userId }, { headers: { "x-step-up-token": stepUpToken } }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/sessions/revoke-all-for-user`, { userId }, { headers: { "x-step-up-token": stepUpToken } });
 
 export const blockAccount = (userId: string, stepUpToken: string) =>
-  apiClient.post(`${BASE}/sessions/block-account`, { userId }, { headers: { "x-step-up-token": stepUpToken } }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/sessions/block-account`, { userId }, { headers: { "x-step-up-token": stepUpToken } });
 
 export const requirePasswordReset = (userId: string) =>
-  apiClient.post(`${BASE}/sessions/require-password-reset`, { userId }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/sessions/require-password-reset`, { userId });
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 export const getSecurityDashboard = () =>
-  apiClient.get(`${BASE}/security`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/security`);
 
 export const unlockAccount = (userId: string) =>
-  apiClient.post(`${BASE}/security/unlock-account`, { userId }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/security/unlock-account`, { userId });
 
 export const suspendAccount = (userId: string, stepUpToken: string) =>
-  apiClient.post(`${BASE}/security/suspend-account`, { userId }, { headers: { "x-step-up-token": stepUpToken } }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/security/suspend-account`, { userId }, { headers: { "x-step-up-token": stepUpToken } });
 
 export const blockIp = (ip: string, reason: string) =>
-  apiClient.post(`${BASE}/security/block-ip`, { ip, reason }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/security/block-ip`, { ip, reason });
 
 export const addAllowlistIp = (ip: string) =>
-  apiClient.post(`${BASE}/security/add-allowlist-ip`, { ip }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/security/add-allowlist-ip`, { ip });
 
 export const requirePasswordChange = (userId: string) =>
-  apiClient.post(`${BASE}/security/require-password-change`, { userId }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/security/require-password-change`, { userId });
 
 // ─── API Keys ─────────────────────────────────────────────────────────────────
 export const getApiKeys = () =>
-  apiClient.get(`${BASE}/api-keys`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/api-keys`);
 
 export const createApiKey = (data: { name: string; scopes: string[]; expiresAt?: string; siteId?: string }, stepUpToken: string) =>
-  apiClient.post(`${BASE}/api-keys`, data, { headers: { "x-step-up-token": stepUpToken } }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/api-keys`, data, { headers: { "x-step-up-token": stepUpToken } });
 
 export const revokeApiKey = (id: string) =>
-  apiClient.post(`${BASE}/api-keys/${id}/revoke`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/api-keys/${id}/revoke`, {});
 
 // ─── Webhooks ─────────────────────────────────────────────────────────────────
 export const getWebhooks = () =>
-  apiClient.get(`${BASE}/webhooks`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/webhooks`);
 
 export const createWebhook = (data: Record<string, unknown>) =>
-  apiClient.post(`${BASE}/webhooks`, data).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/webhooks`, data);
 
 export const updateWebhook = (id: string, data: Record<string, unknown>) =>
-  apiClient.patch(`${BASE}/webhooks/${id}`, data).then((r: any) => r.data);
+  apiClient.patch<any>(`${BASE}/webhooks/${id}`, data);
 
 export const deleteWebhook = (id: string) =>
-  apiClient.delete(`${BASE}/webhooks/${id}`).then((r: any) => r.data);
+  apiClient.delete<any>(`${BASE}/webhooks/${id}`);
 
 export const testWebhook = (id: string) =>
-  apiClient.post(`${BASE}/webhooks/${id}/test`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/webhooks/${id}/test`, {});
 
 export const getWebhookDeliveries = (id: string) =>
-  apiClient.get(`${BASE}/webhooks/${id}/deliveries`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/webhooks/${id}/deliveries`);
 
 export const retryWebhookDelivery = (webhookId: string, deliveryId: string) =>
-  apiClient.post(`${BASE}/webhooks/${webhookId}/retry/${deliveryId}`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/webhooks/${webhookId}/retry/${deliveryId}`, {});
 
 // ─── Integrations ─────────────────────────────────────────────────────────────
 export const getIntegrations = () =>
-  apiClient.get(`${BASE}/integrations`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/integrations`);
 
 export const seedIntegrations = () =>
-  apiClient.post(`${BASE}/integrations/seed`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/integrations/seed`, {});
 
 export const testIntegration = (id: string) =>
-  apiClient.post(`${BASE}/integrations/${id}/test`, {}).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/integrations/${id}/test`, {});
 
 export const updateIntegration = (id: string, data: Record<string, unknown>) =>
-  apiClient.patch(`${BASE}/integrations/${id}`, data).then((r: any) => r.data);
+  apiClient.patch<any>(`${BASE}/integrations/${id}`, data);
 
 // ─── Feature Flags ────────────────────────────────────────────────────────────
 export const getFeatureFlags = () =>
-  apiClient.get(`${BASE}/feature-flags`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/feature-flags`);
 
 export const updateFeatureFlag = (id: string, data: Record<string, unknown>) =>
-  apiClient.patch(`${BASE}/feature-flags/${id}`, data).then((r: any) => r.data);
+  apiClient.patch<any>(`${BASE}/feature-flags/${id}`, data);
 
 export const createFeatureFlag = (data: Record<string, unknown>) =>
-  apiClient.post(`${BASE}/feature-flags`, data).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/feature-flags`, data);
 
 // ─── Maintenance ──────────────────────────────────────────────────────────────
 export const getMaintenanceModeConfig = () =>
-  apiClient.get(`${BASE}/maintenance`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/maintenance`);
 
 export const updateMaintenanceMode = (data: Record<string, unknown>, stepUpToken: string) =>
-  apiClient.patch(`${BASE}/maintenance`, data, { headers: { "x-step-up-token": stepUpToken } }).then((r: any) => r.data);
+  apiClient.patch<any>(`${BASE}/maintenance`, data, { headers: { "x-step-up-token": stepUpToken } });
 
 // ─── Version ──────────────────────────────────────────────────────────────────
 export const getSystemVersion = () =>
-  apiClient.get(`${BASE}/version`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/version`);
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 export const getSystemSettings = () =>
-  apiClient.get(`${BASE}/settings`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/settings`);
 
 export const updateSystemSettings = (data: Record<string, unknown>) =>
-  apiClient.patch(`${BASE}/settings`, data).then((r: any) => r.data);
+  apiClient.patch<any>(`${BASE}/settings`, data);
 
 export const resetPasswordPolicy = (stepUpToken: string) =>
-  apiClient.post(`${BASE}/settings/reset`, {}, { headers: { "x-step-up-token": stepUpToken } }).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/settings/reset`, {}, { headers: { "x-step-up-token": stepUpToken } });
 
 // ─── Release Notes ────────────────────────────────────────────────────────────
 export const getReleaseNotes = () =>
-  apiClient.get(`${BASE}/release-notes`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/release-notes`);
 
 export const createReleaseNote = (data: { version: string; title: string; body: string; publishedAt?: string }) =>
-  apiClient.post(`${BASE}/release-notes`, data).then((r: any) => r.data);
+  apiClient.post<any>(`${BASE}/release-notes`, data);
 
 // ─── Rate Limits ──────────────────────────────────────────────────────────────
 export const getRateLimits = () =>
-  apiClient.get(`${BASE}/rate-limits`).then((r: any) => r.data);
+  apiClient.get<any>(`${BASE}/rate-limits`);
 
 export const updateRateLimit = (id: string, data: Record<string, unknown>) =>
-  apiClient.patch(`${BASE}/rate-limits/${id}`, data).then((r: any) => r.data);
+  apiClient.patch<any>(`${BASE}/rate-limits/${id}`, data);

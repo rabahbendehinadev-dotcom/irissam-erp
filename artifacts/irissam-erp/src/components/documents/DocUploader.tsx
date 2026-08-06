@@ -92,7 +92,7 @@ export function DocUploader({ folders, defaultFolderId, defaultCategory, entityT
       setSuccess(true);
       setTimeout(() => { onSuccess(); onClose(); }, 1200);
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? err.message ?? "Erreur lors du téléversement");
+      setError(err?.data?.error ?? err?.message ?? "Erreur lors du téléversement");
     } finally {
       setUploading(false);
     }

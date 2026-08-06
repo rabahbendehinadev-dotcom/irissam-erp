@@ -36,7 +36,7 @@ export default function SparePartsPage() {
     try {
       await sparePartMovement(movementTarget.id, mvtForm);
       setMovementTarget(null); setMvtForm({ movement_type: "entree", quantity: "" }); refetch();
-    } catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.response?.data?.error ?? "Mouvement impossible" }); }
+    } catch(err: any) { toast({ variant: "destructive", title: "Erreur", description: err?.data?.error ?? err?.message ?? "Mouvement impossible" }); }
   };
 
   return (

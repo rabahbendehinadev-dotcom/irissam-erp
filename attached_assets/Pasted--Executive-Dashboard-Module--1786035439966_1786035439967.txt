@@ -1,0 +1,94 @@
+ممتاز. اعتبر إصلاح Executive Dashboard منتهيًا.
+
+لا تبدأ أي Module جديد.
+
+الآن قبل مواصلة تدقيق الصفحات واحدة بواحدة، قم بعمل Audit شامل داخل كامل المشروع على طريقة استعمال `apiClient`.
+
+المشكلة التي تم اكتشافها:
+
+`apiClient.get()` و`apiClient.post()` و`apiClient.put()` و`apiClient.patch()` و`apiClient.delete()` ترجع البيانات مباشرة، وليست داخل `response.data`.
+
+ابحث داخل كامل Frontend عن جميع الحالات المشابهة لـ:
+
+```ts
+apiClient.get(...).then((r) => r.data)
+apiClient.get(...).then((r) => setData(r.data))
+const response = await apiClient.get(...)
+response.data
+result.data
+res.data
+```
+
+راجع أيضًا:
+
+* Hooks
+* Services
+* React Query queryFn
+* Mutations
+* Pages
+* Tabs
+* Drawers
+* Modals
+* Portals
+* Export functions
+* Dashboard widgets
+
+لكل نتيجة:
+
+1. تحقق أولًا من النوع الحقيقي للقيمة التي ترجعها `apiClient`.
+2. لا تحذف `.data` بشكل أعمى إذا كان الكود يتعامل مع Axios مباشر أو API مختلفة.
+3. صحح فقط الحالات التي تستعمل `apiClient` الخاص بالمشروع والذي يرجع البيانات مباشرة.
+4. لا تغير شكل الـAPI ولا تعدل Backend بدون ضرورة.
+5. لا تنشئ Wrapper جديدًا ولا تكرر الـAPI client.
+6. لا تعيد كتابة أي Component يعمل.
+
+بعد ذلك اختبر الصفحات المتأثرة وتأكد من:
+
+* البيانات الحقيقية تظهر.
+* البيانات الفارغة تعرض Empty State.
+* أخطاء API تعرض Error State مع Retry.
+* لا يوجد `return null` يؤدي إلى White Screen.
+* لا توجد أخطاء Runtime.
+* لا توجد أخطاء Console.
+* لا توجد أخطاء TypeScript.
+
+راجع خصوصًا:
+
+* Dashboard
+* Patient Detail
+* Employee Detail
+* Admissions
+* Urgences
+* Consultations
+* Hospitalisation
+* Laboratoire
+* Imagerie
+* Pharmacie
+* Facturation
+* Assurance
+* RH
+* Payroll
+* Stock médical
+* Biomédical
+* Qualité
+* GED
+* Super Administration
+* Patient Portal
+* Doctor Portal
+
+في نهاية المهمة أعطني تقريرًا يحتوي على:
+
+* عدد الملفات التي تم فحصها.
+* عدد استعمالات `apiClient` التي تم العثور عليها.
+* عدد استعمالات `.data` الصحيحة.
+* عدد استعمالات `.data` الخاطئة التي تم إصلاحها.
+* قائمة الملفات المعدلة.
+* الصفحات التي كانت معرضة لظهور White Screen.
+* نتيجة TypeScript.
+* نتيجة Build.
+* نتيجة Runtime.
+* نتيجة Console Errors.
+
+لا تبدأ Portail Infirmier.
+
+الهدف الحالي هو منع تكرار نفس عطل Executive Dashboard في أي صفحة أخرى داخل Production.
