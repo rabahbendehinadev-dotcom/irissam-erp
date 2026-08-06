@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, Calendar, ClipboardList, AlertTriangle,
   Stethoscope, Bed, Scissors, HeartPulse, FlaskConical, Scan,
   Pill, Package, Microscope, UserCheck, Users2, DollarSign,
-  Truck, Settings, ChevronLeft, Bell, Shield,
+  Settings, ChevronLeft, Bell, Shield,
   ShieldCheck, BarChart2, FolderArchive, Wallet, Globe
 } from "lucide-react";
 
@@ -150,7 +150,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen = false, onMobileC
         { path: "/hr",        icon: Users2,    label: "nav.hr" },
         { path: "/patient-portal-admin", icon: Globe, label: "Portail Patient" },
         { path: "/finance",   icon: DollarSign,label: "nav.finance" },
-        { path: "/ambulances",icon: Truck,    label: "nav.ambulances" },
+        // ambulances — no real dispatch API yet; hidden until ambulances module is built
         { path: "/settings",  icon: Settings, label: "nav.settings" },
         { path: "/super-admin", icon: Shield, label: "nav.superAdmin", roleRequired: ["super_admin","system_administrator"] },
       ]

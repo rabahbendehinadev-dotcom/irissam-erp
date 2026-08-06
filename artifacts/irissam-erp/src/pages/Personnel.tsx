@@ -1,79 +1,134 @@
 /**
- * Personnel — Live doctor/nurse workload from MockRepository.
- * No local mock data.
+ * Personnel — Medical staff directory from HR PostgreSQL.
+ * Replaces MockRepository (erDoctors/erNurses) with real /hr/employees data.
  */
-import { useState } from 'react';
-import { User, Users, Activity, Stethoscope } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { User, Users, Stethoscope, Activity, AlertCircle, RefreshCw } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { useMockRepository } from '@/store/MockRepository';
+import { useQuery } from '@/hooks/useQuery';
 
-type RoleFilter = 'all' | 'doctors' | 'nurses';
+type CategoryFilter = 'all' | 'medical' | 'paramedical';
 
-const STATUS_COLOR: Record<string, string> = {
-  disponible:   'bg-green-100 text-green-700',
-  occupe:       'bg-red-100 text-red-700',
-  pause:        'bg-amber-100 text-amber-700',
-  repos:        'bg-gray-100 text-gray-500',
-  indisponible: 'bg-gray-200 text-gray-500',
+const TODAY_STATUS_LABEL: Record<string, string> = {
+  present:      'Présent',
+  absent:       'Absent',
+  retard:       'Retard',
+  sorti:        'Parti',
+  en_pause:     'Pause',
+  en_mission:   'Mission',
+  en_garde:     'Garde',
+  non_pointe:   'Non pointé',
+};
+const TODAY_STATUS_COLOR: Record<string, string> = {
+  present:    'bg-green-100 text-green-700',
+  absent:     'bg-red-100 text-red-700',
+  retard:     'bg-amber-100 text-amber-700',
+  sorti:      'bg-gray-100 text-gray-600',
+  en_pause:   'bg-sky-100 text-sky-700',
+  en_mission: 'bg-purple-100 text-purple-700',
+  en_garde:   'bg-indigo-100 text-indigo-700',
+  non_pointe: 'bg-gray-100 text-gray-400',
+};
+const EMP_STATUS_COLOR: Record<string, string> = {
+  actif:    'bg-green-100 text-green-700',
+  absent:   'bg-red-100 text-red-700',
+  en_conge: 'bg-sky-100 text-sky-700',
+  suspendu: 'bg-orange-100 text-orange-700',
+  archive:  'bg-gray-200 text-gray-500',
 };
 
 export default function Personnel() {
-  const { erDoctors, erNurses, patients } = useMockRepository();
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [search, setSearch] = useState('');
 
-  const docStats = {
-    total:  erDoctors.length,
-    actif:  erDoctors.filter(d => d.status === 'actif').length,
-    pause:  erDoctors.filter(d => d.status === 'pause').length,
-  };
-  const nurseStats = {
-    total:  erNurses.length,
-    actif:  erNurses.filter(n => n.status === 'actif').length,
-    pause:  erNurses.filter(n => n.status === 'pause').length,
-  };
+  // Fetch medical + paramedical staff (two queries, merge client-side)
+  const { data: medRes,    loading: medLoading,  error: medError,    refetch: refetchMed }  =
+    useQuery<any>('/hr/employees?category=medical&limit=200&status=actif');
+  const { data: paraRes,   loading: paraLoading, error: paraError,   refetch: refetchPara } =
+    useQuery<any>('/hr/employees?category=paramedical&limit=200&status=actif');
 
-  const filteredDoctors = erDoctors.filter(d => {
-    if (roleFilter === 'nurses') return false;
-    if (search && !d.name.toLowerCase().includes(search.toLowerCase()) &&
-        !d.specialty.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-  const filteredNurses = erNurses.filter(n => {
-    if (roleFilter === 'doctors') return false;
-    if (search && !n.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const loading = medLoading || paraLoading;
+  const error   = medError ?? paraError;
 
-  // Count patients per staff member
-  const patientsByDoctor = patients.reduce<Record<string, number>>((acc, p) => {
-    if (p.assignedDoctor) acc[p.assignedDoctor] = (acc[p.assignedDoctor] ?? 0) + 1;
-    return acc;
-  }, {});
-  const patientsByNurse = patients.reduce<Record<string, number>>((acc, p) => {
-    if (p.assignedNurse) acc[p.assignedNurse] = (acc[p.assignedNurse] ?? 0) + 1;
-    return acc;
-  }, {});
+  function refetch() { refetchMed(); refetchPara(); }
+
+  const medical    = Array.isArray(medRes?.data)  ? medRes.data  : [];
+  const paramedical = Array.isArray(paraRes?.data) ? paraRes.data : [];
+
+  // Merge and filter
+  const allStaff: any[] = useMemo(() => {
+    if (categoryFilter === 'medical')    return medical;
+    if (categoryFilter === 'paramedical') return paramedical;
+    return [...medical, ...paramedical];
+  }, [medical, paramedical, categoryFilter]);
+
+  const filtered = useMemo(() => {
+    if (!search) return allStaff;
+    const q = search.toLowerCase();
+    return allStaff.filter(e =>
+      (e.last_name  + ' ' + e.first_name).toLowerCase().includes(q) ||
+      (e.position_name   ?? '').toLowerCase().includes(q) ||
+      (e.department_name ?? '').toLowerCase().includes(q)
+    );
+  }, [allStaff, search]);
+
+  const doctors   = useMemo(() => filtered.filter(e => e.category === 'medical'),    [filtered]);
+  const nurses    = useMemo(() => filtered.filter(e => e.category === 'paramedical'), [filtered]);
+
+  if (loading) return (
+    <DashboardLayout>
+      <div className="p-6 space-y-4 animate-pulse">
+        <div className="h-8 bg-white/10 rounded-lg w-1/3"/>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 bg-white/10 rounded-xl"/>)}
+        </div>
+        <div className="h-64 bg-white/10 rounded-xl"/>
+      </div>
+    </DashboardLayout>
+  );
+
+  if (error) return (
+    <DashboardLayout>
+      <div className="p-6 max-w-md mx-auto text-center mt-20">
+        <AlertCircle className="w-10 h-10 mx-auto mb-3 text-red-400"/>
+        <p className="text-white font-semibold mb-1">Impossible de charger le personnel</p>
+        <p className="text-white/50 text-sm mb-4">{error}</p>
+        <button onClick={refetch}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 text-sm">
+          <RefreshCw className="w-4 h-4"/> Réessayer
+        </button>
+      </div>
+    </DashboardLayout>
+  );
 
   return (
     <DashboardLayout>
       <div className="p-6 space-y-5">
-        <PageHeader title="Personnel" subtitle="Charge de travail en temps réel — Médecins & Infirmiers" />
+        <PageHeader
+          title="Personnel médical"
+          subtitle="Annuaire du personnel médical et paramédical actif"
+          actions={
+            <button onClick={refetch}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white/10 text-white rounded-lg hover:bg-white/20">
+              <RefreshCw className="w-4 h-4"/> Actualiser
+            </button>
+          }
+        />
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Médecins',        value: docStats.total,   icon: Stethoscope, color: 'text-blue-600',  bg: 'bg-blue-50' },
-            { label: 'Médecins actifs',  value: docStats.actif,   icon: User,        color: 'text-green-600', bg: 'bg-green-50' },
-            { label: 'Infirmiers',       value: nurseStats.total, icon: Users,       color: 'text-purple-600',bg: 'bg-purple-50' },
-            { label: 'Infirmiers actifs',value: nurseStats.actif, icon: Activity,    color: 'text-green-600', bg: 'bg-green-50' },
+            { label: 'Médecins',             value: medical.length,     icon: Stethoscope, color: 'text-blue-400',   bg: 'bg-blue-500/10   border-blue-500/20' },
+            { label: 'Médecins présents',     value: medical.filter((e: any) => e.today_status === 'present' || e.today_status === 'en_garde').length, icon: User, color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' },
+            { label: 'Paramédicaux',          value: paramedical.length, icon: Users,       color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
+            { label: 'Paramédicaux présents', value: paramedical.filter((e: any) => e.today_status === 'present' || e.today_status === 'en_garde').length, icon: Activity, color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' },
           ].map(s => (
-            <div key={s.label} className={`${s.bg} border border-gray-100 rounded-xl p-4 flex items-center gap-3`}>
+            <div key={s.label} className={`border rounded-xl p-4 flex items-center gap-3 ${s.bg}`}>
               <s.icon size={20} className={s.color} />
               <div>
-                <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                <p className="text-xs text-gray-500">{s.label}</p>
+                <p className="text-2xl font-bold text-white">{s.value}</p>
+                <p className="text-xs text-white/60">{s.label}</p>
               </div>
             </div>
           ))}
@@ -81,107 +136,94 @@ export default function Personnel() {
 
         {/* Filters */}
         <div className="flex gap-3 flex-wrap">
-          {(['all', 'doctors', 'nurses'] as RoleFilter[]).map(r => (
-            <button key={r} onClick={() => setRoleFilter(r)}
-              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${roleFilter === r ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-              {r === 'all' ? 'Tous' : r === 'doctors' ? 'Médecins' : 'Infirmiers'}
+          {([['all','Tous'], ['medical','Médecins'], ['paramedical','Paramédicaux']] as [CategoryFilter, string][]).map(([v, l]) => (
+            <button key={v} onClick={() => setCategoryFilter(v)}
+              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                categoryFilter === v ? 'bg-blue-600 text-white border-blue-600' : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20'
+              }`}>
+              {l}
             </button>
           ))}
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nom ou spécialité…"
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Nom, poste ou département…"
+            className="text-sm border border-white/20 rounded-lg px-3 py-1.5 bg-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/40"/>
         </div>
 
         {/* Doctors table */}
-        {roleFilter !== 'nurses' && filteredDoctors.length > 0 && (
-          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-              <Stethoscope size={16} className="text-blue-600" />
-              <h2 className="font-bold text-gray-800">Médecins</h2>
-              <span className="text-xs text-gray-500 ml-auto">{filteredDoctors.length} au total</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Nom</th>
-                    <th className="px-4 py-3 text-left">Spécialité</th>
-                    <th className="px-4 py-3 text-center">Patients</th>
-                    <th className="px-4 py-3 text-center">Salle</th>
-                    <th className="px-4 py-3 text-center">Disponibilité</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredDoctors.map(d => (
-                    <tr key={d.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-900">{d.name}</td>
-                      <td className="px-4 py-3 text-gray-500">{d.specialty ?? '—'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-bold text-gray-800">{d.patientCount}</span>
-                        <span className="text-gray-400"> / {d.maxPatients}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-500">—</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[d.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {d.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        {(categoryFilter !== 'paramedical') && doctors.length > 0 && (
+          <StaffTable title="Médecins" icon={<Stethoscope size={16} className="text-blue-400"/>} staff={doctors}/>
+        )}
+
+        {/* Paramedical table */}
+        {(categoryFilter !== 'medical') && nurses.length > 0 && (
+          <StaffTable title="Personnel paramédical" icon={<Users size={16} className="text-purple-400"/>} staff={nurses}/>
         )}
 
         {/* Empty state */}
-        {filteredDoctors.length === 0 && filteredNurses.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
+        {filtered.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-white/40 gap-3">
             <Users size={40} className="opacity-30" />
             <p className="text-sm font-medium">Aucun personnel trouvé</p>
-            {search && <p className="text-xs">Essayez un autre terme de recherche.</p>}
-          </div>
-        )}
-
-        {/* Nurses table */}
-        {roleFilter !== 'doctors' && filteredNurses.length > 0 && (
-          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-              <Users size={16} className="text-purple-600" />
-              <h2 className="font-bold text-gray-800">Infirmiers</h2>
-              <span className="text-xs text-gray-500 ml-auto">{filteredNurses.length} au total</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Nom</th>
-                    <th className="px-4 py-3 text-center">Patients</th>
-                    <th className="px-4 py-3 text-center">Salle</th>
-                    <th className="px-4 py-3 text-center">Disponibilité</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredNurses.map(n => (
-                    <tr key={n.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-900">{n.name}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-bold text-gray-800">{n.patientCount}</span>
-                        <span className="text-gray-400"> / {n.maxPatients}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-500">—</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[n.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {n.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {search && <p className="text-xs text-white/30">Essayez un autre terme de recherche.</p>}
           </div>
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function StaffTable({ title, icon, staff }: {
+  title: string;
+  icon: React.ReactNode;
+  staff: any[];
+}) {
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2">
+        {icon}
+        <h2 className="font-bold text-white">{title}</h2>
+        <span className="text-xs text-white/40 ml-auto">{staff.length} employé{staff.length > 1 ? 's' : ''}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-xs text-white/40 uppercase tracking-wide border-b border-white/10">
+            <tr>
+              <th className="px-4 py-3 text-left">Nom</th>
+              <th className="px-4 py-3 text-left hidden sm:table-cell">Poste</th>
+              <th className="px-4 py-3 text-left hidden md:table-cell">Département</th>
+              <th className="px-4 py-3 text-center">Statut emploi</th>
+              <th className="px-4 py-3 text-center">Présence aujourd'hui</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {staff.map((e: any) => (
+              <tr key={e.id} className="hover:bg-white/5 transition-colors">
+                <td className="px-4 py-3 font-medium text-white">
+                  {e.last_name} {e.first_name}
+                  <span className="block text-xs text-white/40 sm:hidden">{e.position_name ?? '—'}</span>
+                </td>
+                <td className="px-4 py-3 text-white/60 hidden sm:table-cell">{e.position_name ?? '—'}</td>
+                <td className="px-4 py-3 text-white/60 hidden md:table-cell">{e.department_name ?? '—'}</td>
+                <td className="px-4 py-3 text-center">
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${EMP_STATUS_COLOR[e.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {e.status ?? '—'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {e.today_status
+                    ? <span className={`px-2 py-0.5 text-xs rounded-full ${TODAY_STATUS_COLOR[e.today_status] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {TODAY_STATUS_LABEL[e.today_status] ?? e.today_status}
+                      </span>
+                    : <span className="text-xs text-white/30">—</span>
+                  }
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

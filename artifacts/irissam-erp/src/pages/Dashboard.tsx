@@ -27,7 +27,7 @@ import { MOCK_DASHBOARD_STATS } from "@/mock";
 import { formatNumber } from "@/utils/format";
 import { useGetDashboardStats } from "@workspace/api-client-react";
 import { useAdmissions } from "@/store/AdmissionsContext";
-import { useMockRepository } from "@/store/MockRepository";
+import { useQuery } from "@/hooks/useQuery";
 
 import { Users, Calendar, Bed, ClipboardList, AlertTriangle, Stethoscope, FlaskConical, Scan, Receipt, TrendingUp } from "lucide-react";
 
@@ -91,14 +91,9 @@ export default function Dashboard() {
     [admissions, today],
   );
 
-  // ── Live bed occupancy from MockRepository ────────────────────────────────
-  const repo = useMockRepository();
-  const bedOccupancyPercent = useMemo(() => {
-    const beds = repo.beds;
-    if (beds.length === 0) return 0;
-    const occupied = beds.filter(b => b.status === 'occupe').length;
-    return Math.round((occupied / beds.length) * 100);
-  }, [repo.beds]);
+  // ── Live bed occupancy from real API ─────────────────────────────────────
+  const { data: bedSummary } = useQuery<{ occupancyPercent: number }>('/beds/summary');
+  const bedOccupancyPercent = bedSummary?.occupancyPercent ?? 0;
 
   return (
     <DashboardLayout>

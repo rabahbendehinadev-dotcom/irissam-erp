@@ -1,0 +1,151 @@
+ممتاز. اعتبر Audit الخاص بـEmployee Detail والـSidebar منتهيًا من ناحية الـPlaceholders والـWhite Screens.
+
+لكن لا تبدأ Portail Infirmier بعد.
+
+مازال عندنا آخر Blocker قبل إغلاق مرحلة Production Hardening:
+
+هناك 3 Routes تستعمل `MockRepository`:
+
+* Hospitalization
+* Ambulances
+* Médecins
+
+وهذا غير مسموح في Production.
+
+## المطلوب الآن
+
+قم بتحليل هذه الـRoutes الثلاثة واحدة واحدة.
+
+لكل Route:
+
+1. ابحث أولًا عن:
+
+   * Backend routes موجودة.
+   * Services موجودة.
+   * Hooks موجودة.
+   * PostgreSQL tables موجودة.
+   * APIs موجودة.
+   * Components قابلة لإعادة الاستعمال.
+
+2. إذا كانت الـAPI والـBackend موجودة:
+
+   * اربط الواجهة مباشرة بـPostgreSQL الحقيقي.
+   * احذف استعمال `MockRepository` من هذا المسار.
+   * لا تنشئ API جديدة إذا كانت موجودة.
+
+3. إذا كان جزء من الـFeature موجودًا بنسبة كبيرة:
+
+   * أكمله بدل إعادة بنائه.
+
+4. إذا لم يوجد Backend حقيقي أصلًا:
+
+   * لا تبنِ Module جديدًا الآن.
+   * أخفِ Route من الـSidebar.
+   * امنع الوصول المباشر إليها عبر Route Guard أو Not Found.
+   * لا تتركها تعمل بـMock Data.
+
+5. لا تستبدل الـMock ببيانات ثابتة داخل Component.
+
+## Route Hospitalization
+
+تحقق هل يمكن إعادة استعمال:
+
+* Admissions
+* Beds
+* Discharge
+* Transfers
+* Occupancy
+* Patient encounters
+
+لا تنشئ نظام Hospitalization جديدًا إذا كانت هذه الوظائف موجودة داخل Admissions أو Bed Management.
+
+## Route Médecins
+
+تحقق هل الأطباء موجودون أصلًا داخل:
+
+* HR Employees
+* Users
+* Roles
+* Departments
+* Specialties
+* Doctor Portal accounts
+
+إذا كانوا موجودين:
+
+* استعمل نفس البيانات.
+* لا تنشئ جدول Doctors مكررًا.
+* اعرض فقط الموظفين الذين لديهم Role أو وظيفة طبيب.
+
+## Route Ambulances
+
+تحقق هل يوجد:
+
+* Backend حقيقي.
+* Database tables.
+* Fleet أو transport entities.
+* Emergency integration.
+
+إذا لم يوجد نظام حقيقي:
+
+* أخفِ Route مؤقتًا.
+* لا تبدأ بناء Module Ambulances الآن.
+
+## Settings
+
+راجع أيضًا صفحة Settings المحدودة.
+
+إذا كانت تعرض فقط Reset Demo Data:
+
+* لا تعرض أي وظيفة Demo في Production.
+* أخفِ Reset Demo Data أو اجعلها متاحة فقط في بيئة Development.
+* لا تسمح بحذف بيانات Production.
+* أبقِ فقط الإعدادات الحقيقية المرتبطة بالـBackend.
+
+## البحث العام
+
+بعد الإصلاح، ابحث داخل كامل المشروع عن:
+
+* `MockRepository`
+* `mockData`
+* `mockPatients`
+* `mockEmployees`
+* `demoData`
+* `fakeData`
+* `seedData` المستعملة في Runtime
+* بيانات ثابتة تحاكي API
+
+لا تحذف Seed Scripts الخاصة بالاختبارات أو التطوير إذا لم تكن تُستعمل في Runtime Production.
+
+## شروط الإغلاق
+
+لا تعتبر المهمة منتهية حتى تؤكد:
+
+* 0 MockRepository في Runtime Production.
+* 0 Mock Data ظاهرة للمستخدم.
+* Hospitalization تعمل ببيانات حقيقية أو مخفية.
+* Médecins تعمل ببيانات حقيقية أو مخفية.
+* Ambulances تعمل ببيانات حقيقية أو مخفية.
+* Reset Demo Data غير متاح في Production.
+* 0 TypeScript Errors.
+* 0 Runtime Errors.
+* 0 White Screens.
+* 0 Console Errors.
+
+## التقرير النهائي
+
+أعطني تقريرًا يحتوي على:
+
+1. حالة كل Route قبل وبعد.
+2. الـAPIs والـTables التي تم إعادة استعمالها.
+3. عدد استعمالات `MockRepository` التي تم حذفها.
+4. Routes التي تم ربطها بـPostgreSQL.
+5. Routes التي تم إخفاؤها.
+6. حالة Settings في Production.
+7. نتيجة البحث العام عن Mock Data.
+8. نتيجة TypeScript.
+9. نتيجة Build.
+10. نتيجة Runtime.
+
+لا تبدأ Portail Infirmier قبل الوصول إلى:
+
+`0 Mock Data in Production Runtime`

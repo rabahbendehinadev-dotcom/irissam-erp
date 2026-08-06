@@ -29,7 +29,7 @@ const HospitalizationPage = lazy(() => import('@/pages/Hospitalization'));
 const ResuscitationPage = lazy(() => import('@/pages/Resuscitation'));
 const OperatingRoomPage = lazy(() => import('@/pages/OperatingRoom'));
 const PersonnelPage = lazy(() => import('@/pages/Personnel'));
-const AmbulancesPage = lazy(() => import('@/pages/Ambulances'));
+
 const DevTestRunnerPage = lazy(() => import('@/pages/DevTestRunner'));
 const ChangePasswordPage = lazy(() => import('@/pages/ChangePassword'));
 const FacturationPage = lazy(() => import('@/pages/Facturation'));
@@ -245,7 +245,7 @@ function Router() {
       <Route path="/hr" component={() => <ProtectedRoute component={HRPage} />} />
       <Route path="/finance" component={() => <ProtectedRoute component={FacturationPage} />} />
       <Route path="/insurance" component={() => <ProtectedRoute component={InsurancePage} />} />
-      <Route path="/ambulances" component={() => <ProtectedRoute component={AmbulancesPage} />} />
+      <Route path="/ambulances" component={() => <Redirect to="/" />} />
       <Route path="/dev/tests" component={() => <ProtectedRoute component={DevTestRunnerPage} />} />
       <Route path="/archives" component={() => <Redirect to="/" />} />
       <Route path="/reports" component={() => <Redirect to="/" />} />

@@ -8,7 +8,7 @@ import {
   useGetVehiclesStatus,
   useGetMedicationsLowStock,
 } from "@workspace/api-client-react";
-import { useMockRepository } from "@/store/MockRepository";
+import { useQuery } from "@/hooks/useQuery";
 
 function WidgetCard({ title, children }: { title: string, children: React.ReactNode }) {
   return (
@@ -44,30 +44,34 @@ function SkeletonRow() {
 
 export function MiniWidgets() {
   const { t } = useLanguage();
-  const repo = useMockRepository();
 
-  // ── Ward bed stats derived from MockRepository (reflects live discharge/transfer) ──
-  const wardBeds = repo.beds;
-  const bedOccupied    = wardBeds.filter(b => b.status === 'occupe').length;
-  const bedFree        = wardBeds.filter(b => b.status === 'disponible').length;
-  const bedCleaning    = wardBeds.filter(b => b.status === 'nettoyage').length;
-  const bedOOS         = wardBeds.filter(b => b.status === 'hors_service' || b.status === 'maintenance').length;
-  const bedTotal       = wardBeds.length;
-  const bedOccupancy   = bedTotal > 0 ? Math.round((bedOccupied / bedTotal) * 100) : 0;
+  // ── Ward bed summary from real API ──
+  const { data: bedSummary } = useQuery<{
+    occupied: number; free: number; cleaning: number; outOfService: number; total: number; occupancyPercent: number;
+  }>('/beds/summary');
+  const bedOccupied  = bedSummary?.occupied       ?? 0;
+  const bedFree      = bedSummary?.free            ?? 0;
+  const bedCleaning  = bedSummary?.cleaning        ?? 0;
+  const bedOOS       = bedSummary?.outOfService    ?? 0;
+  const bedTotal     = bedSummary?.total           ?? 0;
+  const bedOccupancy = bedSummary?.occupancyPercent ?? 0;
 
-  // ── Reanimation stats from ICU beds (unitName includes "Réanimation") ──
-  const reaBeds    = repo.icuBeds.filter(b => b.unitName.includes('Réanimation'));
+  // ── ICU / Réanimation beds from real API ──
+  const { data: icuBedData } = useQuery<any[]>('/icu/beds');
+  const icuBedArr = Array.isArray(icuBedData) ? icuBedData : [];
+  const reaBeds   = icuBedArr.filter((b: any) => (b.unitName ?? '').includes('Réanimation'));
   const reaTotal   = reaBeds.length;
-  const reaOccuped = reaBeds.filter(b => b.status === 'occupe').length;
-  const reaFree    = reaBeds.filter(b => b.status === 'disponible').length;
+  const reaOccuped = reaBeds.filter((b: any) => b.status === 'occupe').length;
+  const reaFree    = reaBeds.filter((b: any) => b.status === 'disponible').length;
   const reaPercent = reaTotal > 0 ? Math.round((reaOccuped / reaTotal) * 100) : 0;
 
-  // ── OR stats from MockRepository ──
-  const rooms         = repo.operatingRooms;
-  const orTotal       = rooms.length;
-  const orAvailable   = rooms.filter(r => r.status === 'libre').length;
-  const orOccupied    = rooms.filter(r => r.status === 'en_intervention').length;
-  const orPrep        = rooms.filter(r => r.status === 'en_preparation' || r.status === 'reserve').length;
+  // ── Operating rooms from real API ──
+  const { data: orData } = useQuery<any[]>('/operating-rooms');
+  const rooms      = Array.isArray(orData) ? orData : [];
+  const orTotal    = rooms.length;
+  const orAvailable = rooms.filter((r: any) => r.status === 'libre').length;
+  const orOccupied  = rooms.filter((r: any) => r.status === 'en_intervention').length;
+  const orPrep      = rooms.filter((r: any) => r.status === 'en_preparation' || r.status === 'reserve').length;
 
   // ── API hooks for non-admission-related widgets ──
   const { data: blood }    = useGetBloodBankSummary({ query: { refetchInterval: 60_000 } });
@@ -83,7 +87,7 @@ export function MiniWidgets() {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-      {/* Widget 1: Beds — live from MockRepository */}
+      {/* Widget 1: Beds — live from /beds/summary API */}
       <WidgetCard title={t("widget.beds.title")}>
         <div className="flex h-full items-center">
           <div className="w-[45%] h-[70px] relative">
@@ -110,7 +114,7 @@ export function MiniWidgets() {
         </div>
       </WidgetCard>
 
-      {/* Widget 2: Resuscitation — live from MockRepository ICU beds */}
+      {/* Widget 2: Resuscitation — live from /icu/beds API */}
       <WidgetCard title={t("widget.resuscitation.title")}>
         <div className="flex items-start gap-3 h-full">
           <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center shrink-0 mt-1">
@@ -125,7 +129,7 @@ export function MiniWidgets() {
         </div>
       </WidgetCard>
 
-      {/* Widget 3: OR — live from MockRepository operating rooms */}
+      {/* Widget 3: OR — live from /operating-rooms API */}
       <WidgetCard title={t("widget.or.title")}>
         <div className="flex items-start gap-3 h-full">
           <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center shrink-0 mt-1">
