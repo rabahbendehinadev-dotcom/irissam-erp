@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { X, ChevronRight, ChevronLeft, Check, Loader2, AlertTriangle, FileText, RefreshCw } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import type { Patient, BloodType, PatientGender, MaritalStatus, IdDocumentType, InsuranceType } from '@/types';
@@ -41,10 +41,17 @@ type FormData = {
  * date of birth already exists.  Returns an array of matching candidates.
  * Throws on network/API error so the caller can surface it to the user.
  */
-async function fetchDuplicateCandidates(
-  lastName: string, firstName: string, dateOfBirth: string,
-): Promise<DuplicateCandidate[]> {
-  const params = new URLSearchParams({ lastName, firstName, dateOfBirth });
+async function fetchDuplicateCandidates(opts: {
+  lastName: string;
+  firstName: string;
+  dateOfBirth?: string;
+  phone?: string;
+  idDocumentNumber?: string;
+}): Promise<DuplicateCandidate[]> {
+  const params = new URLSearchParams({ lastName: opts.lastName, firstName: opts.firstName });
+  if (opts.dateOfBirth) params.set('dateOfBirth', opts.dateOfBirth);
+  if (opts.phone) params.set('phone', opts.phone);
+  if (opts.idDocumentNumber) params.set('idDocumentNumber', opts.idDocumentNumber);
   const result = await apiClient.get<{ duplicates: DuplicateCandidate[] }>(
     `/patients/check-duplicates?${params.toString()}`
   );
@@ -93,6 +100,10 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
   const [showDup, setShowDup] = useState(false);
   const [checkingDup, setCheckingDup] = useState(false);
   const [dupCheckError, setDupCheckError] = useState<string | null>(null);
+  /** Candidate ids the user has already acknowledged via the modal ("continue anyway"). */
+  const [ackIds, setAckIds] = useState<Set<string>>(() => new Set());
+  /** True when the duplicate modal was triggered by Save (not by step navigation). */
+  const pendingSaveRef = useRef(false);
 
   const [form, setForm] = useState<FormData>(() => ({
     lastName: patient?.lastName ?? '', firstName: patient?.firstName ?? '',
@@ -162,7 +173,9 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
         setCheckingDup(true);
         setDupCheckError(null);
         try {
-          const candidates = await fetchDuplicateCandidates(lastName.trim(), firstName.trim(), dateOfBirth);
+          const candidates = await fetchDuplicateCandidates({
+            lastName: lastName.trim(), firstName: firstName.trim(), dateOfBirth,
+          });
           if (candidates.length > 0) {
             setDuplicates(candidates);
             setShowDup(true);
@@ -216,8 +229,7 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
     } : undefined,
   });
 
-  const handleSave = async () => {
-    if (!validate()) return;
+  const doSave = async () => {
     setSaving(true);
     setSaveError(null);
     try {
@@ -241,6 +253,46 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (!validate()) return;
+
+    // Final duplicate check for NEW patients, now that phone and ID document
+    // number are available (they are filled on later steps).  Only strong /
+    // very_strong matches block the save — a name-only match never does.
+    if (!patient) {
+      setCheckingDup(true);
+      setSaveError(null);
+      try {
+        const candidates = await fetchDuplicateCandidates({
+          lastName:         form.lastName.trim(),
+          firstName:        form.firstName.trim(),
+          dateOfBirth:      form.dateOfBirth || undefined,
+          phone:            form.phone.trim() || undefined,
+          idDocumentNumber: form.idDocumentNumber.trim() || undefined,
+        });
+        const blocking = candidates.filter(c =>
+          (c.matchStrength === 'very_strong' || c.matchStrength === 'strong')
+          && !ackIds.has(c.patient.id)
+        );
+        if (blocking.length > 0) {
+          setDuplicates(blocking);
+          pendingSaveRef.current = true;
+          setShowDup(true);
+          setCheckingDup(false);
+          return; // user must explicitly confirm before creating
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Erreur lors de la vérification des doublons';
+        setSaveError(`Vérification des doublons impossible : ${msg}. Réessayez.`);
+        setCheckingDup(false);
+        return; // block save — never create silently without the check
+      }
+      setCheckingDup(false);
+    }
+
+    await doSave();
   };
 
   const STEPS = [
@@ -554,8 +606,12 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
                 }
               </button>
             ) : (
-              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors">
-                {saving ? <><Loader2 size={14} className="animate-spin" />{t('pat.form.saving')}</> : <><Check size={14} />{t('pat.form.save')}</>}
+              <button onClick={handleSave} disabled={saving || checkingDup} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors">
+                {saving
+                  ? <><Loader2 size={14} className="animate-spin" />{t('pat.form.saving')}</>
+                  : checkingDup
+                    ? <><Loader2 size={14} className="animate-spin" /> Vérification…</>
+                    : <><Check size={14} />{t('pat.form.save')}</>}
               </button>
             )}
           </div>
@@ -565,9 +621,25 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
       <DuplicatePatientModal
         open={showDup}
         candidates={duplicates}
-        onContinue={reason => { log('override_duplicate', 'patient', undefined, reason); setShowDup(false); setStep(1); }}
+        onContinue={reason => {
+          log('override_duplicate', 'patient', undefined, reason);
+          // Remember which candidates were explicitly acknowledged so the
+          // pre-save check does not re-block on the same patients.
+          setAckIds(prev => {
+            const next = new Set(prev);
+            duplicates.forEach(d => next.add(d.patient.id));
+            return next;
+          });
+          setShowDup(false);
+          if (pendingSaveRef.current) {
+            pendingSaveRef.current = false;
+            void doSave();
+          } else {
+            setStep(1);
+          }
+        }}
         onOpenExisting={p => { setShowDup(false); onCancel(); window.location.href = `/patients/${p.id}`; }}
-        onCancel={() => setShowDup(false)}
+        onCancel={() => { pendingSaveRef.current = false; setShowDup(false); }}
       />
     </>
   );

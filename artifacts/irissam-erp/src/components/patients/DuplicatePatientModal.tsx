@@ -9,6 +9,8 @@ export interface DuplicateCandidate {
   patient: Patient;
   similarity: number;
   matchOn: string[];
+  /** Server-computed tier: very_strong (ID doc) | strong (phone / name+DOB) | possible (name only). */
+  matchStrength?: 'very_strong' | 'strong' | 'possible';
 }
 
 interface Props {

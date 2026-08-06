@@ -150,19 +150,48 @@ router.get("/", async (req, res, next) => {
 });
 
 /**
- * GET /patients/check-duplicates?lastName=&firstName=&dateOfBirth=
- * Returns patients matching exact lastName + firstName + dateOfBirth.
- * Used by the frontend before creating a new patient.
+ * GET /patients/check-duplicates?lastName=&firstName=[&dateOfBirth=&phone=&idDocumentNumber=]
+ *
+ * Tiered duplicate search with normalized comparison (trim/lower/collapse spaces):
+ *   very_strong — same ID document number
+ *   strong      — same phone (digits-only) or same normalized name + date of birth
+ *   possible    — same normalized name only (must not auto-block saving)
+ *
+ * Response candidates match the frontend DuplicatePatientModal contract:
+ *   { patient, matchStrength, similarity, matchOn[] }
  */
 router.get("/check-duplicates", requirePermission("patients.view"), async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { lastName, firstName, dateOfBirth } = req.query as Record<string, string | undefined>;
-    if (!lastName?.trim() || !firstName?.trim() || !dateOfBirth?.trim()) {
-      res.status(400).json({ message: "lastName, firstName and dateOfBirth are required" });
+    const { lastName, firstName, dateOfBirth, phone, idDocumentNumber } =
+      req.query as Record<string, string | undefined>;
+    if (!lastName?.trim() || !firstName?.trim()) {
+      res.status(400).json({ message: "lastName and firstName are required" });
       return;
     }
-    const dupes = await patientService.findDuplicates(lastName.trim(), firstName.trim(), dateOfBirth.trim());
-    res.json({ duplicates: dupes.map(mapPatient) });
+
+    const candidates = await patientService.findDuplicateCandidates({
+      lastName:         lastName.trim(),
+      firstName:        firstName.trim(),
+      dateOfBirth:      dateOfBirth?.trim() || undefined,
+      phone:            phone?.trim() || undefined,
+      idDocumentNumber: idDocumentNumber?.trim() || undefined,
+    });
+
+    const TIER_META: Record<string, { strength: string; similarity: number; matchOn: string[] }> = {
+      very_strong:     { strength: "very_strong", similarity: 98, matchOn: ["Pièce d'identité"] },
+      strong_phone:    { strength: "strong",      similarity: 90, matchOn: ["Téléphone"] },
+      strong_name_dob: { strength: "strong",      similarity: 85, matchOn: ["Nom", "Prénom", "Date de naissance"] },
+      possible_name:   { strength: "possible",    similarity: 60, matchOn: ["Nom", "Prénom"] },
+    };
+
+    res.json({
+      duplicates: candidates.map(({ patient, tier }) => ({
+        patient:       mapPatient(patient),
+        matchStrength: TIER_META[tier].strength,
+        similarity:    TIER_META[tier].similarity,
+        matchOn:       TIER_META[tier].matchOn,
+      })),
+    });
   } catch (err) {
     next(err);
   }

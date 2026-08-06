@@ -3,57 +3,79 @@
  *
  * MRN format: MRN-YYYY-NNNNN  (e.g. MRN-2026-00042)
  *   - YYYY = current year
- *   - NNNNN = zero-padded sequential number (total patients + 1)
+ *   - NNNNN = zero-padded per-year sequence from the patient_mrn_counters table
  *   - MRNs are permanent and never recycled.
  *
- * Duplicate detection: same lastName + firstName + dateOfBirth.
- * When duplicates are found the new patient is created with potentialDuplicate=true
- * and existing matches are also flagged.
+ * Atomicity: the sequence number is acquired with
+ *   INSERT ... ON CONFLICT (year) DO UPDATE SET last_value = last_value + 1 RETURNING
+ * inside the same transaction as the patient INSERT.  The row-level lock
+ * serializes concurrent creates — two simultaneous requests can never read
+ * the same value.  Gaps appear if a transaction rolls back; that is accepted.
+ * COUNT(*)+1 / MAX()+1 / Math.random() / timestamps are all forbidden here.
+ *
+ * Duplicate detection: tiered, with normalized (trim/lower/collapse-spaces)
+ * comparison — see PatientRepository.findDuplicateCandidates.
  */
 import type { InsertPatient } from "@workspace/db";
 import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 import { repos } from "../repositories";
 import { auditService } from "./audit";
 import type { TxContext, ActorCtx } from "../repositories/types";
-import type { DbPatient } from "../repositories/patient";
+import type { DbPatient, DuplicateCandidateRow } from "../repositories/patient";
 
 export type CreatePatientInput = Omit<InsertPatient, "mrn" | "createdBy" | "updatedBy">;
 export type UpdatePatientInput = Partial<Omit<InsertPatient, "mrn" | "id" | "createdBy" | "updatedBy">>;
 
 export class PatientService {
 
-  // ── MRN generation ──────────────────────────────────────────────────────────
-
-  async generateMrn(): Promise<string> {
-    const year  = new Date().getFullYear();
-    const total = await repos.patient.countAll();
-    const seq   = String(total + 1).padStart(5, "0");
-    return `MRN-${year}-${seq}`;
-  }
-
   // ── Create ──────────────────────────────────────────────────────────────────
 
   async create(input: CreatePatientInput, actor: ActorCtx): Promise<DbPatient> {
+    // 1. Duplicate detection (normalized name + date of birth).
+    //    MUST run BEFORE the transaction: repository reads use their own pool
+    //    connection, and acquiring a second connection while the transaction
+    //    below already holds one deadlocks the pool under parallel load
+    //    (N transactions hold N connections, each waiting for one more).
+    const dupes = await repos.patient.findPotentialDuplicates(
+      input.lastName, input.firstName, input.dateOfBirth,
+    );
+    const hasDuplicates = dupes.length > 0;
+
     return db.transaction(async (tx) => {
       const ctx: TxContext = { ...actor, tx };
 
-      // 1. Duplicate detection
-      const dupes = await repos.patient.findPotentialDuplicates(
-        input.lastName, input.firstName, input.dateOfBirth,
-      );
-      const hasDuplicates = dupes.length > 0;
-
-      // 2. Generate MRN — format MRN-YYYY-NNNNN, seq is transaction-local
-      const mrn = await this.generateMrn();
+      // 2. Atomically acquire the next per-year sequence number.
+      //    INSERT ... ON CONFLICT DO UPDATE takes a row-level lock on the year
+      //    row: concurrent transactions queue behind it, so each caller gets a
+      //    distinct value.  This runs inside the same transaction as the
+      //    patient INSERT below — a rollback releases the lock (leaving a gap,
+      //    which is acceptable and expected).
       const year = new Date().getFullYear();
-      const seq  = mrn.split("-")[2]; // e.g. "00042"
+      const counterResult = await tx.execute(sql`
+        INSERT INTO patient_mrn_counters (year, last_value)
+        VALUES (${year}, 1)
+        ON CONFLICT (year) DO UPDATE
+          SET last_value = patient_mrn_counters.last_value + 1,
+              updated_at = now()
+        RETURNING last_value
+      `);
+      const counterRows =
+        (counterResult as unknown as { rows?: Array<{ last_value: number | string }> }).rows
+        ?? (counterResult as unknown as Array<{ last_value: number | string }>);
+      const nextVal = Number(counterRows[0]?.last_value);
+      if (!Number.isInteger(nextVal) || nextVal < 1) {
+        throw new Error("patient_mrn_counters returned an invalid sequence value");
+      }
+      const seq = String(nextVal).padStart(5, "0");
 
-      // 3. Derive collision-free mpiId and fileNumber from the same seq as MRN.
-      //    Never use random values or client-supplied placeholders for new patients.
+      // 3. All three identifiers derive from the SAME nextval — one counter
+      //    read per patient, never reused, never random.
+      const mrn        = `MRN-${year}-${seq}`;
       const mpiId      = `MPI-${year}-${seq}`;
       const fileNumber = `${year}-${seq}`;
 
-      // 3. Insert patient
+      // 4. Insert patient
       const patient = await repos.patient.create(
         { ...input, mrn, mpiId, fileNumber, potentialDuplicate: hasDuplicates },
         ctx,
@@ -143,6 +165,17 @@ export class PatientService {
 
   async findDuplicates(lastName: string, firstName: string, dateOfBirth: string) {
     return repos.patient.findPotentialDuplicates(lastName, firstName, dateOfBirth);
+  }
+
+  /** Tiered duplicate search — see PatientRepository.findDuplicateCandidates. */
+  async findDuplicateCandidates(opts: {
+    lastName: string;
+    firstName: string;
+    dateOfBirth?: string;
+    phone?: string;
+    idDocumentNumber?: string;
+  }): Promise<DuplicateCandidateRow[]> {
+    return repos.patient.findDuplicateCandidates(opts);
   }
 }
 
