@@ -43,12 +43,19 @@ export class PatientService {
       );
       const hasDuplicates = dupes.length > 0;
 
-      // 2. Generate MRN
+      // 2. Generate MRN — format MRN-YYYY-NNNNN, seq is transaction-local
       const mrn = await this.generateMrn();
+      const year = new Date().getFullYear();
+      const seq  = mrn.split("-")[2]; // e.g. "00042"
+
+      // 3. Derive collision-free mpiId and fileNumber from the same seq as MRN.
+      //    Never use random values or client-supplied placeholders for new patients.
+      const mpiId      = `MPI-${year}-${seq}`;
+      const fileNumber = `${year}-${seq}`;
 
       // 3. Insert patient
       const patient = await repos.patient.create(
-        { ...input, mrn, potentialDuplicate: hasDuplicates },
+        { ...input, mrn, mpiId, fileNumber, potentialDuplicate: hasDuplicates },
         ctx,
       );
 

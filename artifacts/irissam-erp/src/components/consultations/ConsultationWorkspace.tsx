@@ -510,7 +510,7 @@ export function ConsultationWorkspace({ consultation, onChange, onStatusChange }
     if (!consultation.patientId) return;
     apiClient.get<Record<string, unknown>>(`/patients/${consultation.patientId}`)
       .then(r => setPatientAllergies((r?.medical as any)?.allergies ?? []))
-      .catch(() => {}); // conflict detection degrades gracefully if fetch fails
+      .catch((err) => console.warn('[ConsultationWorkspace] Patient allergies fetch failed — PrescriptionBuilder conflict detection degraded:', err));
   }, [consultation.patientId]);
 
   const readOnly = consultation.status === 'terminee' || consultation.status === 'annulee' || consultation.status === 'patient_absent';

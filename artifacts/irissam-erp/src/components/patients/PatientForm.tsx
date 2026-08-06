@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { X, ChevronRight, ChevronLeft, Check, Loader2, AlertTriangle, FileText } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Check, Loader2, AlertTriangle, FileText, RefreshCw } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import type { Patient, BloodType, PatientGender, MaritalStatus, IdDocumentType, InsuranceType } from '@/types';
 import { useAuditLog } from '@/hooks/useAuditLog';
@@ -33,23 +33,22 @@ type FormData = {
   insuranceType: InsuranceType | ''; insuranceOrg: string; memberNumber: string; validUntil: string;
 };
 
-// Placeholder IDs — the backend assigns the authoritative values on save
-function generateMpiId() {
-  const n = Math.floor(Math.random() * 999998) + 1;
-  return `MPI-${new Date().getFullYear()}-${String(n).padStart(6, '0')}`;
-}
-function generateFileNumber() {
-  return `${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`;
-}
-function generateInternalNumber() {
-  const n = Math.floor(Math.random() * 998) + 1;
-  return `INT-${String(n).padStart(3, '0')}`;
-}
+// IDs (mpiId, fileNumber, internalNumber) are generated server-side — never in the browser.
+// The service assigns them atomically from the same sequential counter as the MRN.
 
-// Duplicate detection is handled server-side (real DB query).
-// This client-side check returns empty — no mock data used.
-function checkDuplicates(_data: FormData): DuplicateCandidate[] {
-  return [];
+/**
+ * Ask the backend whether a patient with the given last name, first name, and
+ * date of birth already exists.  Returns an array of matching candidates.
+ * Throws on network/API error so the caller can surface it to the user.
+ */
+async function fetchDuplicateCandidates(
+  lastName: string, firstName: string, dateOfBirth: string,
+): Promise<DuplicateCandidate[]> {
+  const params = new URLSearchParams({ lastName, firstName, dateOfBirth });
+  const result = await apiClient.get<{ duplicates: DuplicateCandidate[] }>(
+    `/patients/check-duplicates?${params.toString()}`
+  );
+  return result.duplicates ?? [];
 }
 
 const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white';
@@ -92,6 +91,8 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
   const [showDup, setShowDup] = useState(false);
+  const [checkingDup, setCheckingDup] = useState(false);
+  const [dupCheckError, setDupCheckError] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormData>(() => ({
     lastName: patient?.lastName ?? '', firstName: patient?.firstName ?? '',
@@ -103,9 +104,11 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
     idDocumentType: (patient?.idDocumentType ?? '') as IdDocumentType | '',
     idDocumentNumber: patient?.idDocumentNumber ?? '',
     socialSecurityNumber: patient?.socialSecurityNumber ?? '',
-    fileNumber: patient?.fileNumber ?? generateFileNumber(),
-    mpiId: patient?.mpiId ?? generateMpiId(),
-    internalNumber: patient?.internalNumber ?? generateInternalNumber(),
+    // IDs are server-generated — never set random values in the browser.
+    // For new patients these are empty; the backend assigns the real values.
+    fileNumber: patient?.fileNumber ?? '',
+    mpiId: patient?.mpiId ?? '',
+    internalNumber: patient?.internalNumber ?? '',
     phone: patient?.phone ?? '', phoneSecondary: patient?.phoneSecondary ?? '',
     email: patient?.email ?? '',
     address: patient?.address ?? '', commune: patient?.commune ?? '',
@@ -149,12 +152,33 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
     return Object.keys(errs).length === 0;
   }, [step, form, t]);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!validate()) return;
+
+    // On step 0 for new patients, run a real server-side duplicate check before advancing.
     if (step === 0 && !patient) {
-      const dups = checkDuplicates(form);
-      if (dups.length > 0) { setDuplicates(dups); setShowDup(true); return; }
+      const { lastName, firstName, dateOfBirth } = form;
+      if (lastName.trim() && firstName.trim() && dateOfBirth) {
+        setCheckingDup(true);
+        setDupCheckError(null);
+        try {
+          const candidates = await fetchDuplicateCandidates(lastName.trim(), firstName.trim(), dateOfBirth);
+          if (candidates.length > 0) {
+            setDuplicates(candidates);
+            setShowDup(true);
+            setCheckingDup(false);
+            return; // user must acknowledge the modal before advancing
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Erreur lors de la vérification des doublons';
+          setDupCheckError(msg);
+          setCheckingDup(false);
+          return; // block advance — do not silently skip the check
+        }
+        setCheckingDup(false);
+      }
     }
+
     setStep(s => s + 1);
   };
 
@@ -165,7 +189,9 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
     idDocumentType: (form.idDocumentType || undefined) as IdDocumentType | undefined,
     idDocumentNumber: form.idDocumentNumber || undefined,
     socialSecurityNumber: form.socialSecurityNumber || undefined,
-    fileNumber: form.fileNumber, mpiId: form.mpiId, internalNumber: form.internalNumber,
+    // Only include IDs when editing an existing patient (they were server-assigned).
+    // For new patients, omit them so the backend generates collision-free values.
+    ...(patient ? { fileNumber: form.fileNumber, mpiId: form.mpiId, internalNumber: form.internalNumber } : {}),
     phone: form.phone, phoneSecondary: form.phoneSecondary || undefined,
     email: form.email || undefined,
     address: form.address || undefined, commune: form.commune || undefined,
@@ -310,21 +336,31 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
                 <input value={form.socialSecurityNumber} onChange={set('socialSecurityNumber')} className={inputCls} />
               </Field>
               <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-3">
-                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Identifiants générés</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelCls}>{t('pat.form.mpiId')}</label>
-                    <input value={form.mpiId} readOnly className={autoCls} />
+                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">
+                  Identifiants {patient ? 'assignés' : '— attribués automatiquement à la création'}
+                </p>
+                {!patient && (
+                  <p className="text-xs text-blue-600 italic">
+                    Le MPI, le numéro de dossier et le numéro interne sont générés côté serveur
+                    après validation du formulaire. Aucune valeur provisoire n'est utilisée.
+                  </p>
+                )}
+                {patient && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>{t('pat.form.mpiId')}</label>
+                      <input value={form.mpiId} readOnly className={autoCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>{t('pat.form.internalNumber')}</label>
+                      <input value={form.internalNumber || '—'} readOnly className={autoCls} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className={labelCls}>{t('pat.form.fileNumber')}</label>
+                      <input value={form.fileNumber} readOnly className={autoCls} />
+                    </div>
                   </div>
-                  <div>
-                    <label className={labelCls}>{t('pat.form.internalNumber')}</label>
-                    <input value={form.internalNumber} readOnly className={autoCls} />
-                  </div>
-                </div>
-                <div>
-                  <label className={labelCls}>{t('pat.form.fileNumber')}</label>
-                  <input value={form.fileNumber} readOnly className={autoCls} />
-                </div>
+                )}
               </div>
             </>}
 
@@ -471,6 +507,23 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
             )}
           </div>
 
+          {/* Duplicate check error banner */}
+          {dupCheckError && (
+            <div className="mx-6 mb-2 flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-800 text-xs">
+              <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium">Impossible de vérifier les doublons</p>
+                <p className="mt-0.5 text-orange-600">{dupCheckError}</p>
+              </div>
+              <button
+                onClick={() => { setDupCheckError(null); void handleNext(); }}
+                className="flex-shrink-0 flex items-center gap-1 px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 rounded border border-orange-300 transition-colors"
+              >
+                <RefreshCw size={10} /> Réessayer
+              </button>
+            </div>
+          )}
+
           {/* Save error banner */}
           {saveError && (
             <div className="mx-6 mb-2 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
@@ -490,9 +543,15 @@ export function PatientForm({ patient, onSave, onCancel }: Props) {
             </button>
 
             {step < STEPS.length - 1 ? (
-              <button onClick={handleNext} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                {t('pat.form.next')}
-                <ChevronRight size={14} />
+              <button
+                onClick={handleNext}
+                disabled={checkingDup}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors"
+              >
+                {checkingDup
+                  ? <><Loader2 size={14} className="animate-spin" /> Vérification…</>
+                  : <>{t('pat.form.next')}<ChevronRight size={14} /></>
+                }
               </button>
             ) : (
               <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors">

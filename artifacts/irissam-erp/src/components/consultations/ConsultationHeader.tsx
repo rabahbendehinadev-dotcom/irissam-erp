@@ -126,7 +126,7 @@ export function ConsultationHeader({ consultation: c, saving = false, onStatusCh
     if (!c.patientId) return;
     apiClient.get<Record<string, unknown>>(`/patients/${c.patientId}`)
       .then(r => setApiPatient(r))
-      .catch(() => {}); // enrichment only — silent failure is acceptable
+      .catch((err) => console.warn('[ConsultationHeader] Patient enrichment fetch failed — non-critical:', err));
   }, [c.patientId]);
 
   const nameParts = c.patientName.split(' ');

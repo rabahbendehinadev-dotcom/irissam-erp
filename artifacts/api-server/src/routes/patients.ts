@@ -149,6 +149,25 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+/**
+ * GET /patients/check-duplicates?lastName=&firstName=&dateOfBirth=
+ * Returns patients matching exact lastName + firstName + dateOfBirth.
+ * Used by the frontend before creating a new patient.
+ */
+router.get("/check-duplicates", requirePermission("patients.view"), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { lastName, firstName, dateOfBirth } = req.query as Record<string, string | undefined>;
+    if (!lastName?.trim() || !firstName?.trim() || !dateOfBirth?.trim()) {
+      res.status(400).json({ message: "lastName, firstName and dateOfBirth are required" });
+      return;
+    }
+    const dupes = await patientService.findDuplicates(lastName.trim(), firstName.trim(), dateOfBirth.trim());
+    res.json({ duplicates: dupes.map(mapPatient) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** GET /patients/:id — fetch one patient by UUID */
 router.get("/:id", async (req, res, next) => {
   try {
@@ -185,11 +204,14 @@ router.post("/", requirePermission("patients.create"), async (req: Authenticated
 
     const firstName = body.firstName || "";
     const lastName  = body.lastName  || "Inconnu";
-    const timestamp = Date.now().toString().slice(-6);
 
+    // mpiId and fileNumber are intentionally NOT derived here.
+    // PatientService.create() generates them from the same sequential counter
+    // as the MRN (inside the transaction), so they are collision-free.
+    // Passing placeholder values from the route is no longer needed.
     const patient = await patientService.create({
-      mpiId:          body.mpiId        || `MPI-${timestamp}`,
-      fileNumber:     body.fileNumber   || `${new Date().getFullYear()}-${timestamp}`,
+      mpiId:          body.mpiId        || "",   // overridden by service
+      fileNumber:     body.fileNumber   || "",   // overridden by service
       internalNumber: body.internalNumber || null,
       firstName,
       lastName,

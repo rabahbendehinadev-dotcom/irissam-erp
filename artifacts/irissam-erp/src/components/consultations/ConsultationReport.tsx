@@ -282,7 +282,7 @@ export function ConsultationReport({ consultation: c }: Props) {
     if (!c.patientId) return;
     apiClient.get<Record<string, unknown>>(`/patients/${c.patientId}`)
       .then(r => setApiPatient(r))
-      .catch(() => {}); // enrichment only — silent failure is acceptable
+      .catch((err) => console.warn('[ConsultationReport] Patient enrichment fetch failed — non-critical:', err));
   }, [c.patientId]);
 
   const dob        = apiPatient?.dateOfBirth as string | undefined;
