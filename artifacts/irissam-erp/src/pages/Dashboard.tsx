@@ -23,7 +23,7 @@ const ChartServices = lazy(() =>
 const MiniWidgets = lazy(() =>
   import("@/components/dashboard/MiniWidgets").then(m => ({ default: m.MiniWidgets }))
 );
-import { MOCK_DASHBOARD_STATS } from "@/mock";
+
 import { formatNumber } from "@/utils/format";
 import { useGetDashboardStats } from "@workspace/api-client-react";
 import { useAdmissions } from "@/store/AdmissionsContext";
@@ -109,23 +109,23 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           <StatsCard 
             icon={<Users className="w-5 h-5" />} iconBgColor="bg-blue-100" iconColor="text-blue-600"
-            title={t("stat.patients.total")} value={fmtN(apiStats?.totalPatients)} trend={MOCK_DASHBOARD_STATS.totalPatientsTrend} trendText={t("stat.patients.trend")}
+            title={t("stat.patients.total")} value={fmtN(apiStats?.totalPatients)} trend={0} trendText={t("stat.patients.trend")}
           />
           <StatsCard 
             icon={<Calendar className="w-5 h-5" />} iconBgColor="bg-purple-100" iconColor="text-purple-600"
-            title={t("stat.appointments.today")} value={fmtN(apiStats?.appointmentsToday)} trend={MOCK_DASHBOARD_STATS.appointmentsTodayTrend} trendText={t("stat.appointments.trend")}
+            title={t("stat.appointments.today")} value={fmtN(apiStats?.appointmentsToday)} trend={0} trendText={t("stat.appointments.trend")}
           />
           <StatsCard 
             icon={<Bed className="w-5 h-5" />} iconBgColor="bg-teal-100" iconColor="text-teal-600"
-            title={t("stat.hospitalized")} value={fmtN(hospitalized)} trend={MOCK_DASHBOARD_STATS.hospitalizedPatientsTrend} trendText={t("stat.hospitalized.trend")}
+            title={t("stat.hospitalized")} value={fmtN(hospitalized)} trend={0} trendText={t("stat.hospitalized.trend")}
           />
           <StatsCard 
             icon={<ClipboardList className="w-5 h-5" />} iconBgColor="bg-orange-100" iconColor="text-orange-500"
-            title={t("stat.admissions.today")} value={fmtN(admissionsToday)} trend={MOCK_DASHBOARD_STATS.admissionsTodayTrend} trendText={t("stat.admissions.trend")}
+            title={t("stat.admissions.today")} value={fmtN(admissionsToday)} trend={0} trendText={t("stat.admissions.trend")}
           />
           <StatsCard 
             icon={<AlertTriangle className="w-5 h-5" />} iconBgColor="bg-red-100" iconColor="text-red-500"
-            title={t("stat.emergencies.waiting")} value={fmtN(apiStats?.emergenciesWaiting)} trend={MOCK_DASHBOARD_STATS.emergenciesWaitingTrend} trendText={t("stat.emergencies.trend")}
+            title={t("stat.emergencies.waiting")} value={fmtN(apiStats?.emergenciesWaiting)} trend={0} trendText={t("stat.emergencies.trend")}
           />
         </div>
 
@@ -133,27 +133,27 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatsCard 
             icon={<Stethoscope className="w-5 h-5" />} iconBgColor="bg-blue-100" iconColor="text-blue-600"
-            title={t("stat.consultations.today")} value={fmtN(apiStats?.consultationsToday)} trend={MOCK_DASHBOARD_STATS.consultationsTodayTrend} trendText={t("stat.consultations.trend")}
+            title={t("stat.consultations.today")} value={fmtN(apiStats?.consultationsToday)} trend={0} trendText={t("stat.consultations.trend")}
           />
           <StatsCard 
             icon={<FlaskConical className="w-5 h-5" />} iconBgColor="bg-green-100" iconColor="text-green-600"
-            title={t("stat.analyses.today")} value={fmtN(apiStats?.analysesToday)} trend={MOCK_DASHBOARD_STATS.analysesTodayTrend} trendText={t("stat.analyses.trend")}
+            title={t("stat.analyses.today")} value={fmtN(apiStats?.analysesToday)} trend={0} trendText={t("stat.analyses.trend")}
           />
           <StatsCard 
             icon={<Scan className="w-5 h-5" />} iconBgColor="bg-purple-100" iconColor="text-purple-600"
-            title={t("stat.imaging.today")} value={fmtN(apiStats?.imagingToday)} trend={MOCK_DASHBOARD_STATS.imagingTodayTrend} trendText={t("stat.imaging.trend")}
+            title={t("stat.imaging.today")} value={fmtN(apiStats?.imagingToday)} trend={0} trendText={t("stat.imaging.trend")}
           />
           <StatsCard 
             icon={<Receipt className="w-5 h-5" />} iconBgColor="bg-orange-100" iconColor="text-orange-500"
-            title={t("stat.invoices.today")} value={fmtN(apiStats?.invoicesToday)} trend={MOCK_DASHBOARD_STATS.invoicesTodayTrend} trendText={t("stat.invoices.trend")}
+            title={t("stat.invoices.today")} value={fmtN(apiStats?.invoicesToday)} trend={0} trendText={t("stat.invoices.trend")}
           />
           <StatsCard 
             icon={<TrendingUp className="w-5 h-5" />} iconBgColor="bg-green-100" iconColor="text-green-600"
-            title={t("stat.revenue.today")} value={fmtN(apiStats?.revenueToday)} trend={MOCK_DASHBOARD_STATS.revenueTodayTrend} trendText={t("stat.revenue.trend")}
+            title={t("stat.revenue.today")} value={fmtN(apiStats?.revenueToday)} trend={0} trendText={t("stat.revenue.trend")}
           />
           <StatsCard 
             icon={<Bed className="w-5 h-5" />} iconBgColor="bg-teal-100" iconColor="text-teal-600"
-            title={t("stat.bed_occupancy")} value={`${bedOccupancyPercent}%`} trend={MOCK_DASHBOARD_STATS.bedOccupancyTrend} trendText={t("stat.bed_occupancy.trend")}
+            title={t("stat.bed_occupancy")} value={`${bedOccupancyPercent}%`} trend={0} trendText={t("stat.bed_occupancy.trend")}
           />
         </div>
 

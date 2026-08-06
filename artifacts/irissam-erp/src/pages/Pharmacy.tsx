@@ -16,7 +16,8 @@ import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageWrapper } from '@/components/shared/PageWrapper';
-import { useMockRepository } from '@/store/MockRepository';
+import { useQuery } from '@/hooks/useQuery';
+import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/store/AuthContext';
 import { usePermission } from '@/hooks/usePermission';
 import { useToast } from '@/hooks/use-toast';
@@ -27,7 +28,7 @@ import {
   Plus, Pencil, Trash2, Loader2, ChevronLeft, ChevronRight as ChevronRightIcon,
   Download,
 } from 'lucide-react';
-import type { RepoPrescription, AuditCtx } from '@/types/repository';
+import type { RepoPrescription } from '@/types/repository';
 import { PublishToPortalButton } from '@/components/portal/PublishToPortalButton';
 import {
   useGetMedications,
@@ -708,33 +709,56 @@ function StockTab() {
 
 // ─── Prescriptions tab ────────────────────────────────────────────────────────
 
+// Adapter: maps real API prescription shape → display fields
+function normalizePrescription(p: Record<string, unknown>): RepoPrescription {
+  return {
+    id:           String(p.id ?? ''),
+    encounterId:  p.encounterId ? String(p.encounterId) : undefined,
+    patientId:    String(p.patientId ?? ''),
+    patientName:  String(p.patientName ?? ''),
+    drug:         String(p.drug ?? ''),
+    dosage:       String(p.dosage ?? ''),
+    route:        String(p.route ?? ''),
+    frequency:    String(p.frequency ?? ''),
+    duration:     p.duration ? String(p.duration) : undefined,
+    notes:        p.notes ? String(p.notes) : undefined,
+    prescribedBy: String(p.prescribedByName ?? p.prescribedBy ?? '—'),
+    prescribedAt: String(p.prescribedAt ?? new Date().toISOString()),
+    status:       (p.status ?? 'prescrit') as RepoPrescription['status'],
+    sourceModule: (p.sourceModule ?? 'pharmacie') as RepoPrescription['sourceModule'],
+    dispensedBy:  p.dispensedByName ? String(p.dispensedByName) : undefined,
+    preparedBy:   p.preparedByName  ? String(p.preparedByName)  : undefined,
+    dispenserComment: p.dispenserComment ? String(p.dispenserComment) : undefined,
+    updatedAt:    String(p.updatedAt ?? new Date().toISOString()),
+  } as unknown as RepoPrescription;
+}
+
 function PrescriptionsTab() {
   const { user } = useAuth();
   const { can } = usePermission();
   const { toast } = useToast();
-  const repo = useMockRepository();
 
   const [statusFilter, setStatusFilter] = useState<RepoPrescription['status'] | 'all'>('all');
   const [search, setSearch] = useState('');
   const [delivering, setDelivering] = useState<RepoPrescription | null>(null);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
   const pharmacistName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'Pharmacien';
 
-  const ctx: AuditCtx = {
-    userId:   user?.id ?? 'unknown',
-    userName: pharmacistName,
-    userRole: user?.role ?? 'unknown',
-  };
+  // Fetch all prescriptions from PostgreSQL
+  const { data: rawData, loading, error, refetch } = useQuery<unknown[]>('/prescriptions?limit=200');
+  const allRaw = Array.isArray(rawData) ? rawData : [];
+  const allRx: RepoPrescription[] = allRaw.map(p => normalizePrescription(p as Record<string, unknown>));
 
   const prescriptions = useMemo(() => {
-    let list = repo.prescriptions;
+    let list = allRx;
     if (statusFilter !== 'all') list = list.filter(p => p.status === statusFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(p =>
         p.patientName.toLowerCase().includes(q) ||
         p.drug.toLowerCase().includes(q) ||
-        p.prescribedBy.toLowerCase().includes(q),
+        (p.prescribedBy ?? '').toLowerCase().includes(q),
       );
     }
     return [...list].sort((a, b) => {
@@ -742,39 +766,78 @@ function PrescriptionsTab() {
       if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
       return new Date(b.prescribedAt).getTime() - new Date(a.prescribedAt).getTime();
     });
-  }, [repo.prescriptions, statusFilter, search]);
+  }, [allRx, statusFilter, search]);
 
   const counts = useMemo(() => {
-    const base = { all: repo.prescriptions.length, prescrit: 0, prepare: 0, delivre: 0, annule: 0 };
-    repo.prescriptions.forEach(p => { if (p.status in base) (base as Record<string, number>)[p.status]++; });
+    const base = { all: allRx.length, prescrit: 0, prepare: 0, delivre: 0, annule: 0 };
+    allRx.forEach(p => { if (p.status in base) (base as Record<string, number>)[p.status]++; });
     return base;
-  }, [repo.prescriptions]);
+  }, [allRx]);
 
-  const handleAdvance = (rx: RepoPrescription) => {
+  const handleAdvance = async (rx: RepoPrescription) => {
     const cfg = RX_STATUS[rx.status];
-    if (!cfg.next) return;
-    if (cfg.next === 'delivre') {
-      setDelivering(rx);
-      return;
+    if (!cfg?.next) return;
+    if (cfg.next === 'delivre') { setDelivering(rx); return; }
+    setActionInProgress(rx.id);
+    try {
+      await apiClient.patch(`/prescriptions/${rx.id}/status`, { status: cfg.next });
+      toast({ title: 'Statut mis à jour', description: `${rx.drug} → ${RX_STATUS[cfg.next].label}` });
+      refetch();
+    } catch (e: unknown) {
+      const msg = (e as { data?: { error?: string } })?.data?.error ?? 'Impossible de mettre à jour';
+      toast({ title: 'Erreur', description: msg, variant: 'destructive' });
+    } finally {
+      setActionInProgress(null);
     }
-    repo.updatePrescriptionStatus(rx.id, cfg.next, ctx);
-    toast({ title: 'Statut mis à jour', description: `${rx.drug} → ${RX_STATUS[cfg.next].label}` });
   };
 
-  const handleDeliver = (comment?: string) => {
+  const handleDeliver = async (comment?: string) => {
     if (!delivering) return;
-    const alerts = getAlerts(delivering);
-    repo.updatePrescriptionStatus(delivering.id, 'delivre', ctx, {
-      dispensedBy: pharmacistName,
-      comment,
-    });
-    if (alerts.length > 0) {
-      toast({ title: 'Délivré avec alerte', description: alerts.join(' · '), variant: 'destructive' });
-    } else {
-      toast({ title: 'Médicament délivré', description: `${delivering.drug} — ${delivering.patientName}` });
+    setActionInProgress(delivering.id);
+    try {
+      await apiClient.post(`/prescriptions/${delivering.id}/dispense`, {
+        dispensedByName: pharmacistName,
+        dispenserComment: comment ?? null,
+      });
+      const alerts = getAlerts(delivering);
+      if (alerts.length > 0) {
+        toast({ title: 'Délivré avec alerte', description: alerts.join(' · '), variant: 'destructive' });
+      } else {
+        toast({ title: 'Médicament délivré', description: `${delivering.drug} — ${delivering.patientName}` });
+      }
+      refetch();
+    } catch (e: unknown) {
+      const msg = (e as { data?: { error?: string } })?.data?.error ?? 'Impossible de délivrer';
+      toast({ title: 'Erreur', description: msg, variant: 'destructive' });
+    } finally {
+      setActionInProgress(null);
+      setDelivering(null);
     }
-    setDelivering(null);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-gray-400">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        <span>Chargement des prescriptions…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
+        <AlertTriangle className="w-10 h-10 text-red-400" />
+        <p className="font-medium text-gray-600">Impossible de charger les prescriptions</p>
+        <button
+          onClick={refetch}
+          className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+        >
+          Réessayer
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -847,6 +910,7 @@ function PrescriptionsTab() {
                   const st     = RX_STATUS[rx.status];
                   const alerts = rx.status !== 'delivre' && rx.status !== 'annule' ? getAlerts(rx) : [];
                   const canAct  = can('pharmacy.dispense') && rx.status !== 'delivre' && rx.status !== 'annule';
+                  const isActing = actionInProgress === rx.id;
 
                   return (
                     <tr
@@ -905,13 +969,14 @@ function PrescriptionsTab() {
                         {canAct && st.next && (
                           <button
                             onClick={() => handleAdvance(rx)}
+                            disabled={isActing}
                             className={cn(
                               'inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors',
-                              st.nextColor,
+                              isActing ? 'opacity-50 cursor-not-allowed' : st.nextColor,
                             )}
                           >
-                            {st.nextLabel}
-                            <ChevronRight className="w-3 h-3" />
+                            {isActing ? <Loader2 className="w-3 h-3 animate-spin" /> : st.nextLabel}
+                            {!isActing && <ChevronRight className="w-3 h-3" />}
                           </button>
                         )}
                         {rx.status === 'delivre' && <CheckCircle2 className="w-4 h-4 text-green-500 inline" />}

@@ -1,0 +1,175 @@
+ممتاز. اعتبر عملية إزالة MockRepository من الـRoutes والـWidgets منتهية.
+
+الآن قم بآخر مرحلة قبل بدء Portail Infirmier:
+
+# Final Production Validation
+
+لا تنشئ أي Module جديد، ولا تضف أي Feature جديدة.
+
+الهدف هو التحقق من أن النسخة الحالية جاهزة فعليًا للإنتاج.
+
+## 1. البحث النهائي داخل المشروع
+
+ابحث داخل كامل Frontend وBackend عن:
+
+* MockRepository
+* mockData
+* fakeData
+* demoData
+* Placeholder
+* PlaceholderPage
+* Coming Soon
+* SoonBadge
+* UnderDevelopment
+* Not Implemented
+* Cette page est en cours de développement
+* En cours de développement
+* alert(
+* return null الذي يمكن أن يسبب White Screen
+
+فرّق بين:
+
+* بيانات Mock مستعملة في Runtime Production.
+* Fixtures أو Seeds أو Tests غير مستعملة في Runtime.
+
+لا تحذف ملفات الاختبارات أو Seeds السليمة.
+
+## 2. اختبار جميع Routes الرئيسية
+
+اختبر عمليًا:
+
+* Dashboard
+* Patients
+* Patient Detail وكل Tabs
+* Rendez-vous
+* Admissions
+* Hospitalization
+* Urgences
+* Consultations
+* Bloc opératoire
+* Réanimation
+* Laboratoire
+* Imagerie
+* Pharmacie
+* Facturation
+* Paiements
+* Assurance
+* RH
+* Employee Detail وكل Tabs
+* Payroll
+* Doctors / Personnel
+* Stock médical
+* Biomédical
+* GED
+* Qualité
+* Executive Dashboard
+* Patient Portal Admin
+* Super Admin
+* Settings
+
+لكل Route تأكد من:
+
+* Route تفتح.
+* لا يوجد White Screen.
+* لا يوجد Runtime Error.
+* لا يوجد Console Error.
+* Loading يعمل.
+* Empty State يعمل.
+* Error State يعمل.
+* Retry يعمل.
+* الصلاحيات تعمل.
+* البيانات تأتي من PostgreSQL الحقيقي.
+* Mobile / Tablet / Desktop يعمل.
+
+## 3. اختبار الأخطاء والحالات الخاصة
+
+تحقق من:
+
+* 401 → إعادة توجيه صحيحة إلى Login.
+* 403 → Accès refusé.
+* 404 → Page introuvable.
+* API 500 → Error State مع Retry.
+* API يرجع قائمة فارغة → Empty State.
+* Network interruption → لا يحدث White Screen.
+* Refresh مباشر على Route داخلية → الصفحة تعمل.
+* Session منتهية → تعامل صحيح بدون Loop.
+* Permission ناقصة → لا يظهر محتوى غير مصرح به.
+
+## 4. التحقق من Production Build
+
+نفذ:
+
+* TypeScript check.
+* Frontend build.
+* Backend build.
+* Migration validation.
+* StartupGuard validation.
+* Health check.
+* Docker build.
+* Runtime smoke test.
+
+لا تعدل أي Migration قديمة.
+
+إذا احتاج Database تعديلًا ضروريًا، استعمل Migration جديدة فقط.
+
+## 5. التحقق من Deployment
+
+تحقق أن جميع التعديلات الأخيرة:
+
+* موجودة في Commit.
+* مرفوعة إلى GitHub.
+* تم بناؤها في Dokploy.
+* موجودة داخل Container الحالي.
+* تعمل على الدومين Production.
+
+تحقق خصوصًا من:
+
+* Payroll.
+* Executive Dashboard.
+* Super Admin.
+* Patient Detail Tabs.
+* Employee Detail Tabs.
+* Hospitalization.
+* Doctors.
+* Dashboard widgets.
+* Settings.
+* إخفاء Ambulances.
+
+## 6. شروط قبول المرحلة
+
+لا تعتبر Production Hardening منتهيًا إلا إذا كانت النتائج:
+
+* 0 Placeholder مرئي.
+* 0 Soon Badge.
+* 0 Mock Data في Production Runtime.
+* 0 Broken Route.
+* 0 White Screen.
+* 0 Runtime Error.
+* 0 Console Error.
+* 0 TypeScript Error.
+* جميع Patient Detail Tabs تعمل أو مخفية.
+* جميع Employee Detail Tabs تعمل أو مخفية.
+* جميع Sidebar Routes تعمل أو مخفية.
+* Production Docker يعمل بالإصدار الأخير.
+
+## التقرير النهائي المطلوب
+
+أعطني تقريرًا مختصرًا ودقيقًا يحتوي على:
+
+1. Commit الحالي.
+2. هل تم Push إلى GitHub؟
+3. هل تم Deploy على Dokploy؟
+4. نتيجة Docker build.
+5. نتيجة TypeScript.
+6. نتيجة Frontend وBackend build.
+7. عدد Routes المختبرة.
+8. عدد Tabs المختبرة.
+9. عدد الأخطاء التي تم اكتشافها وإصلاحها.
+10. هل بقي Mock Data في Runtime؟
+11. هل بقي Placeholder ظاهر؟
+12. هل بقي White Screen أو Broken Route؟
+13. هل النظام جاهز الآن لبدء Portail Infirmier؟
+
+لا تبدأ Portail Infirmier داخل هذه المهمة.
+
+أعطني فقط Final Production Validation Report، وبعد موافقتي نبدأ Portail Infirmier في مهمة مستقلة.
