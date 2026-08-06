@@ -67,3 +67,6 @@ Full DB-backed auth replacing the in-memory SEED_USERS in auth.ts.
 - `usePermission()` checks `user.permissions[]` first, falls back to static ROLE_PERMISSIONS map
 - `User` type gained `permissions: Permission[]` field
 - `authService.logout()` now calls POST /auth/logout (server-side session revocation)
+
+## RBAC negative testing
+Seeded E2E staff users exist with repo-known passwords (see scripts/test-doctor-portal-e2e.mjs and scripts/e2e-run.mjs): doctor.a/doctor.b@e2e.test (patients.view WITHOUT billing.view), no.access@e2e.test (receptionist, no patients.view), fintest@irissam.dz (finance), infirmier_rbac@irissam.dz. Use them to curl-test permission boundaries instead of creating users.

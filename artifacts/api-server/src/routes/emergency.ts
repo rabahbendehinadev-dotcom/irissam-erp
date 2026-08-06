@@ -236,7 +236,10 @@ router.get(
         .limit(1);
 
       if (!rows[0]) {
-        res.status(404).json({ error: "No active emergency visit found for this patient" });
+        // 200 + null : « pas de visite active » est un état normal, pas une erreur.
+        // Un 404 ici générait un "Failed to load resource: 404" dans la console
+        // du navigateur sur chaque fiche patient sans passage aux urgences.
+        res.json(null);
         return;
       }
 

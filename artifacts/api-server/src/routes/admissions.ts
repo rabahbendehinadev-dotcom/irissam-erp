@@ -89,58 +89,47 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       type?: string;
     };
 
-    let query = db
-      .select()
-      .from(admissionsTable)
-      .where(isNull(admissionsTable.deletedAt))
-      .orderBy(desc(admissionsTable.createdAt))
-      .$dynamic();
+    // All filters are accumulated then applied in ONE where(and(...)).
+    // With Drizzle's $dynamic(), each .where() call REPLACES the previous
+    // clause — chaining patientId + type used to silently DROP the patientId
+    // filter and leak other patients' hospitalisations onto the fiche.
+    const conditions = [isNull(admissionsTable.deletedAt)];
 
     if (patientId) {
-      query = query.where(
-        and(isNull(admissionsTable.deletedAt), eq(admissionsTable.patientId, patientId)),
-      );
+      conditions.push(eq(admissionsTable.patientId, patientId));
     }
 
     if (type) {
-      query = query.where(
-        and(isNull(admissionsTable.deletedAt), eq(admissionsTable.type, type as "hospitalisation" | "preadmission" | "transfert_interne" | "transfert_externe")),
+      conditions.push(
+        eq(admissionsTable.type, type as (typeof admissionsTable.type.enumValues)[number]),
       );
     }
 
     if (status && status !== "all") {
-      query = query.where(
-        and(
-          isNull(admissionsTable.deletedAt),
-          eq(admissionsTable.status, status as "active" | "discharged" | "transferred" | "cancelled"),
-        ),
+      conditions.push(
+        eq(admissionsTable.status, status as "active" | "discharged" | "transferred" | "cancelled"),
       );
     }
 
     if (date) {
-      query = query.where(
-        and(
-          isNull(admissionsTable.deletedAt),
-          eq(admissionsTable.admissionDate, date),
-        ),
-      );
+      conditions.push(eq(admissionsTable.admissionDate, date));
     }
 
     if (search) {
-      query = query.where(
-        and(
-          isNull(admissionsTable.deletedAt),
-          or(
-            ilike(admissionsTable.patientName, `%${search}%`),
-            ilike(admissionsTable.admissionNumber, `%${search}%`),
-            ilike(admissionsTable.doctorName, `%${search}%`),
-            ilike(admissionsTable.serviceName, `%${search}%`),
-          ),
-        ),
+      const searchCond = or(
+        ilike(admissionsTable.patientName, `%${search}%`),
+        ilike(admissionsTable.admissionNumber, `%${search}%`),
+        ilike(admissionsTable.doctorName, `%${search}%`),
+        ilike(admissionsTable.serviceName, `%${search}%`),
       );
+      if (searchCond) conditions.push(searchCond);
     }
 
-    const rows = await query;
+    const rows = await db
+      .select()
+      .from(admissionsTable)
+      .where(and(...conditions))
+      .orderBy(desc(admissionsTable.createdAt));
     res.json(rows.map(mapAdmission));
   } catch (err) {
     next(err);

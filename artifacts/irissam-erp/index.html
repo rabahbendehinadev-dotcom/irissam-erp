@@ -55,7 +55,7 @@
 
         window.addEventListener('load', function () {
           navigator.serviceWorker
-            .register('./sw.js?v=' + buildId, { scope: './' })
+            .register('%BASE_URL%sw.js?v=' + buildId, { scope: '%BASE_URL%' })
             .then(function (reg) {
               // ── Detect a new SW entering the "waiting" state ──────────────
               function onNewWorkerReady(newWorker) {

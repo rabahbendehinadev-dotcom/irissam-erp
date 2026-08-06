@@ -17,3 +17,6 @@ Access-token payload = `userId/role/permissions/siteId/iat/exp` only. `req.auth.
 
 ## Insurance key mismatch (pre-existing, NOT fixed)
 `PatientForm` sends `insurance.organizationName` but the backend reads `insurance.orgName` → insurer org name is nulled on every patient-form save. Reported to user 2026-08-06; fix belongs in PatientForm (rename key) or backend (accept both).
+
+## Financial aggregates boundary
+GET /patients/:id/stats returns billed/paid = null unless the JWT carries billing.view (super_admin bypasses). Financial sums must never ship under patients.view alone — same boundary as /patients/:id/financial-summary (architect flagged the initial version as an authorization bypass). The frontend hides the two money cards when null.

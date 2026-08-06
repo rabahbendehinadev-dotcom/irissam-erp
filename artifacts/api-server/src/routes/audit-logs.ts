@@ -49,9 +49,29 @@ router.post("/", async (req: AuthenticatedRequest, res, next) => {
     const userAgent = req.headers["user-agent"] ?? "";
     const a = actor(req);
 
+    // Normalise le module vers une valeur valide de l'enum source_module.
+    // Le frontend envoie le nom de sa ressource (ex. "patient") ; une valeur
+    // hors enum faisait échouer l'INSERT et l'événement était perdu
+    // silencieusement alors que la route répondait quand même 201.
+    const MODULE_ALIASES: Record<string, string> = {
+      patient: "system", patients: "system", user: "system", users: "system",
+      consultation: "consultations", urgence: "urgences", admission: "admissions",
+      hospitalizations: "hospitalisation", laboratory: "laboratoire",
+      imaging: "imagerie", pharmacy: "pharmacie",
+    };
+    const VALID_MODULES = new Set([
+      "urgences", "consultations", "hospitalisation", "bloc", "reanimation",
+      "pharmacie", "laboratoire", "imagerie", "admissions", "system",
+    ]);
+    let sourceModule = MODULE_ALIASES[body.module] ?? body.module;
+    if (!VALID_MODULES.has(sourceModule)) {
+      console.warn(`[audit-logs] module inconnu "${body.module}" — enregistré sous "system"`);
+      sourceModule = "system";
+    }
+
     // Log through the service (writes to DB audit_logs table)
-    await auditService.log({
-      module:       body.module as any,
+    const written = await auditService.log({
+      module:       sourceModule as any,
       action:       body.action,
       resourceType: "frontend_event",
       resourceId:   body.entityId ?? "unknown",
@@ -60,6 +80,12 @@ router.post("/", async (req: AuthenticatedRequest, res, next) => {
       patientId:    body.patientId,
       encounterId:  body.encounterId,
     }, a);
+
+    if (!written) {
+      // Échec explicite : ne jamais répondre 201 quand rien n'a été écrit.
+      res.status(500).json({ error: "Failed to persist audit log" });
+      return;
+    }
 
     // Write user activity log only when the action is a valid enum value
     const VALID_UA_ACTIONS = new Set([
@@ -73,7 +99,7 @@ router.post("/", async (req: AuthenticatedRequest, res, next) => {
           userName:  a.userName,
           userRole:  a.userRole,
           action:    body.action as any,
-          module:    body.module as any,
+          module:    sourceModule as any,
           ip,
           userAgent: userAgent.slice(0, 500),
         });
@@ -84,9 +110,8 @@ router.post("/", async (req: AuthenticatedRequest, res, next) => {
 
     res.status(201).json({ ok: true });
   } catch (err) {
-    // Audit failures must NEVER break the calling workflow
     console.error("[audit-logs] POST failed:", err);
-    res.status(201).json({ ok: true, warning: "Audit write failed silently" });
+    res.status(500).json({ error: "Failed to persist audit log" });
   }
 });
 

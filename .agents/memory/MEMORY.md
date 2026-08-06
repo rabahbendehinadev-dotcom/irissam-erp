@@ -31,3 +31,5 @@
 - [VPS Storage Architecture](vps-storage.md) — local filesystem replaces GCS; UUID keys; FormData upload; JWT-gated download; 4 Docker volumes; backup.sh; 14-test E2E suite
 - [Atomic MRN counter + pool deadlock rule](mrn-atomic-counter.md) — per-year counter table via INSERT..ON CONFLICT..RETURNING; NEVER do pool reads inside db.transaction (deadlock at 10+ parallel)
 - [Patient API contracts](patient-api-contracts.md) — PUT /patients/:id NULLs omitted fields (send full payload); JWT has no display name (JOIN users); insurance orgName≠organizationName bug
+- [Drizzle $dynamic .where() trap](drizzle-where-trap.md) — .where() REPLACES the previous clause; accumulate conditions + single and(...); caused a cross-patient leak
+- [Frontend audit events pipeline](audit-frontend-events.md) — module aliases→source_module enum, unknown→system, write failure→500 (never fake 201)

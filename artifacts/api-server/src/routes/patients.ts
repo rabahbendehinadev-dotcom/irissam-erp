@@ -450,6 +450,86 @@ router.get("/:id/payments", requirePermission("payments.view"), async (req: Auth
   } catch (err) { next(err); }
 });
 
+// GET /patients/:id/stats — compteurs réels pour les cartes d'en-tête de la fiche.
+// Toutes les valeurs viennent de PostgreSQL, scoping strict WHERE patient_id.
+router.get("/:id/stats", requirePermission("patients.view"), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const patientId = String(req.params["id"]);
+
+    const exists = await pool.query(`SELECT 1 FROM patients WHERE id = $1 AND deleted_at IS NULL`, [patientId]);
+    if (!exists.rows[0]) {
+      res.status(404).json({ message: "Patient not found" });
+      return;
+    }
+
+    // Les agrégats financiers exigent billing.view (même frontière d'autorisation
+    // que /patients/:id/financial-summary) — sinon billed/paid restent null et
+    // aucune requête sur invoices n'est exécutée.
+    const canViewBilling =
+      req.auth?.role === "super_admin" ||
+      (req.auth?.permissions ?? []).includes("billing.view");
+
+    const [cons, adm, emer, lab, img, rx, fin] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*)::int AS n, MAX(created_at) AS last
+           FROM consultations WHERE patient_id = $1 AND deleted_at IS NULL`,
+        [patientId],
+      ),
+      pool.query(
+        `SELECT COUNT(*)::int AS n,
+                COUNT(*) FILTER (WHERE type = 'hospitalisation')::int AS hosp,
+                MAX(admission_date) AS last
+           FROM admissions WHERE patient_id = $1 AND deleted_at IS NULL`,
+        [patientId],
+      ),
+      pool.query(
+        `SELECT COUNT(*)::int AS n, MAX(arrival_time) AS last
+           FROM emergency_visits WHERE patient_id = $1 AND deleted_at IS NULL`,
+        [patientId],
+      ),
+      pool.query(
+        `SELECT COUNT(*)::int AS n FROM lab_orders WHERE patient_id = $1 AND deleted_at IS NULL`,
+        [patientId],
+      ),
+      pool.query(
+        `SELECT COUNT(*)::int AS n FROM imaging_orders WHERE patient_id = $1 AND deleted_at IS NULL`,
+        [patientId],
+      ),
+      pool.query(
+        `SELECT COUNT(*)::int AS n FROM prescriptions WHERE patient_id = $1 AND deleted_at IS NULL`,
+        [patientId],
+      ),
+      canViewBilling
+        ? pool.query(
+            `SELECT COALESCE(SUM(total_amount), 0) AS billed, COALESCE(SUM(paid_amount), 0) AS paid
+               FROM invoices
+              WHERE patient_id = $1 AND deleted_at IS NULL AND status NOT IN ('cancelled','refunded')`,
+            [patientId],
+          )
+        : Promise.resolve(null),
+    ]);
+
+    const lastDates = [cons.rows[0].last, adm.rows[0].last, emer.rows[0].last]
+      .filter(Boolean)
+      .map((d: string | Date) => new Date(d).getTime());
+
+    res.json({
+      consultations:    cons.rows[0].n,
+      hospitalizations: adm.rows[0].hosp,
+      admissions:       adm.rows[0].n,
+      emergencies:      emer.rows[0].n,
+      analyses:         lab.rows[0].n,
+      imageries:        img.rows[0].n,
+      prescriptions:    rx.rows[0].n,
+      billed:           fin ? Number(fin.rows[0].billed) : null,
+      paid:             fin ? Number(fin.rows[0].paid) : null,
+      lastVisit:        lastDates.length ? new Date(Math.max(...lastDates)).toISOString() : null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /patients/:id/financial-summary
 router.get("/:id/financial-summary", requirePermission("billing.view"), async (req: AuthenticatedRequest, res, next) => {
   try {

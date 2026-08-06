@@ -51,7 +51,7 @@ export class AuditService {
    * Fire-and-forget safe — errors are swallowed so they never crash a request.
    * Pass ctx.tx to include the log in the same transaction as the mutation.
    */
-  async log(entry: AuditEntry, actor: ActorCtx, ctx?: Pick<TxContext, "tx">): Promise<void> {
+  async log(entry: AuditEntry, actor: ActorCtx, ctx?: Pick<TxContext, "tx">): Promise<boolean> {
     try {
       await repos.auditLog.append({
         module:       entry.module,
@@ -69,9 +69,11 @@ export class AuditService {
         siteId:       entry.siteId ?? actor.siteId ?? null,
         ip:           null,
       }, ctx);
+      return true;
     } catch (err) {
       // Never crash on audit failure — log to console for observability
       console.error("[AuditService] Failed to write audit log", err);
+      return false;
     }
   }
 

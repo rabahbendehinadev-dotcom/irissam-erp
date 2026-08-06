@@ -40,3 +40,6 @@ if (!UUID_RE.test(payload.userId ?? "")) {
 ## Rule to remember
 
 Any call to an auth endpoint that returns 401 must use `_skipRefresh: true` to prevent the 401 interceptor from triggering a recursive refresh chain.
+
+## Console 401 after token expiry = designed rotation (Aug 2026)
+One "Failed to load resource: 401" on /auth/me after a page reload past the 15-min access-token TTL is EXPECTED: boot calls /auth/me with the stale JWT → 401 → POST /auth/refresh (HttpOnly cookie) → 200 → retry /auth/me → 200. Browsers always print the 401 line; JS cannot suppress it. Do not "fix" it — reworking the bootstrap for proactive refresh is high-risk (two prior production bugs in exactly this flow).
