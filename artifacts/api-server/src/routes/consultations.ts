@@ -81,10 +81,10 @@ function mapConsultation(c: DbConsultation) {
 /** GET /consultations */
 router.get("/", async (req, res, next) => {
   try {
-    const { search, status, type, origin, doctor, specialty, dateFrom, dateTo } =
+    const { search, status, type, origin, doctor, specialty, dateFrom, dateTo, patientId } =
       req.query as Record<string, string | undefined>;
 
-    const result = await consultationService.list({ limit: 300 });
+    const result = await consultationService.list({ patientId: patientId || undefined, limit: 300 });
     let rows = result.data;
 
     if (search) {

@@ -38,3 +38,6 @@ All 13 pre-existing TypeScript errors in MockRepository.tsx fixed:
 ## api-client-react rebuild rule
 **Why:** After editing `lib/api-client-react/src/generated/api.ts`, run `cd lib/api-client-react && pnpm tsc -p tsconfig.json` to update the dist declarations used by TypeScript project references.
 **How to apply:** Any time the generated api.ts changes (new hooks, schema changes), rebuild dist before running frontend tsc check.
+
+## Prod build env requirement
+`vite.config.ts` (irissam-erp) throws at config-load unless `PORT` **and** `BASE_PATH` are set (workflow/Docker provide them). Manual sanity build: `PORT=3000 BASE_PATH=/ npx vite build --config vite.config.ts`.

@@ -47,7 +47,7 @@ const STATUS_CFG = {
   en_suivi:   { label: 'En suivi', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
 };
 
-// ─── Seeded mock data based on patient history ─────────────────────────────────
+// ─── Records derived from REAL patient data only (no fabricated entries) ──────
 
 function buildHistory(patient: Patient): HistoryRecord[] {
   const records: HistoryRecord[] = [];
@@ -69,48 +69,22 @@ function buildHistory(patient: Patient): HistoryRecord[] {
       category: isSurgery ? 'surgeries' : 'diseases',
       label: label || h,
       date,
-      status: 'résolu',
     });
   });
 
-  // Chronic diseases
+  // Chronic diseases (real data — a listed chronic disease is ongoing by definition)
   (patient.medical?.chronicDiseases ?? []).forEach((d, i) => {
     records.push({
       id: `h-chronic-${i}`,
       category: 'chronic',
       label: d,
       status: 'actif',
-      severity: 'modérée',
     });
   });
 
-  // Hereditary (mock based on existing diseases)
-  const diseases = patient.medical?.chronicDiseases ?? [];
-  if (diseases.some(d => d.toLowerCase().includes('diabète'))) {
-    records.push({ id: 'h-hered-1', category: 'hereditary', label: 'Diabète type 2 — antécédent familial', notes: 'Père diabétique', status: 'en_suivi' });
-  }
-  if (diseases.some(d => d.toLowerCase().includes('hypertension') || d.toLowerCase().includes('hta'))) {
-    records.push({ id: 'h-hered-2', category: 'hereditary', label: 'Hypertension artérielle — antécédent familial', notes: 'Mère hypertendue depuis 60 ans', status: 'en_suivi' });
-  }
-  if (records.filter(r => r.category === 'hereditary').length === 0) {
-    records.push({ id: 'h-hered-none', category: 'hereditary', label: 'Aucun antécédent héréditaire documenté', status: 'résolu' });
-  }
-
-  // Psychiatric (mock)
-  records.push({
-    id: 'h-psych-1', category: 'psychiatric',
-    label: 'Aucun antécédent psychiatrique documenté',
-    notes: 'Pas d\'épisode dépressif, anxieux ou psychotique signalé',
-    status: 'résolu',
-  });
-
-  // Lifestyle (fixed mock)
-  records.push(
-    { id: 'h-life-1', category: 'lifestyle', label: 'Tabagisme',     notes: 'Non fumeur', status: 'résolu' },
-    { id: 'h-life-2', category: 'lifestyle', label: 'Alcool',         notes: 'Consommation occasionnelle', status: 'résolu' },
-    { id: 'h-life-3', category: 'lifestyle', label: 'Activité physique', notes: 'Sédentaire — recommandation en cours', status: 'en_suivi' },
-    { id: 'h-life-4', category: 'lifestyle', label: 'Alimentation',   notes: 'Régime méditerranéen conseillé', status: 'en_suivi' },
-  );
+  // Hérédité / santé mentale / mode de vie : aucune donnée fabriquée.
+  // Ces catégories restent vides ("Aucun antécédent enregistré") tant qu'aucune
+  // donnée réelle n'est documentée pour ce patient.
 
   return records;
 }

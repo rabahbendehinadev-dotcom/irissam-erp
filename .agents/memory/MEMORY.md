@@ -30,3 +30,4 @@
 - [Doctor Portal](doctor-portal.md) — migrations 033+034; same JWT auth; doctor_portal.access permission gate; 15 backend routes; 13 frontend pages + DoctorPortalLayout; column name gotchas; JwtPayload firstName/lastName fix
 - [VPS Storage Architecture](vps-storage.md) — local filesystem replaces GCS; UUID keys; FormData upload; JWT-gated download; 4 Docker volumes; backup.sh; 14-test E2E suite
 - [Atomic MRN counter + pool deadlock rule](mrn-atomic-counter.md) — per-year counter table via INSERT..ON CONFLICT..RETURNING; NEVER do pool reads inside db.transaction (deadlock at 10+ parallel)
+- [Patient API contracts](patient-api-contracts.md) — PUT /patients/:id NULLs omitted fields (send full payload); JWT has no display name (JOIN users); insurance orgName≠organizationName bug

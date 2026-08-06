@@ -7,6 +7,7 @@ import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
 import { addSessionConsultation } from '@/mock';
+import { apiClient } from '@/services/api/client';
 import { useGetPatientsList } from '@workspace/api-client-react';
 import type { Patient } from '@/types';
 import type {
@@ -762,45 +763,81 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
     setSubmitError(null);
     setIsSubmitting(true);
 
-    const now = new Date().toISOString();
-    const id  = `c-new-${Date.now()}`;
-    const num = `CON-2026-${String(Math.floor(Math.random() * 900) + 100).padStart(4, '0')}`;
+    // Valeurs du wizard → enums PostgreSQL (consultations.type / .origin)
+    const API_TYPE: Record<string, string> = {
+      programmee: 'consultation_externe', sans_rdv: 'consultation_externe',
+      controle: 'consultation_externe', specialisee: 'consultation_externe',
+      ambulatoire: 'consultation_externe', teleconsultation: 'teleconsultation',
+      urgences: 'urgence', hospitalisation: 'hospitalier',
+    };
+    const API_ORIGIN: Record<string, string> = {
+      rdv: 'rdv', sans_rdv: 'walk_in', urgence: 'urgence',
+      hospitalisation: 'hospitalisation', admission: 'hospitalisation', controle: 'rdv',
+    };
 
-    const newConsultation = {
-      id, number: num,
-      patientId:   patient!.id,
-      patientName: `${patient!.lastName} ${patient!.firstName}`,
-      patientMpi:  patient!.mpiId,
-      doctorId:    ctx.doctorId,
-      doctorName:  selectedDoctor?.name ?? ctx.doctorId,
-      specialty:   selectedSpecialty?.label ?? ctx.specialtyId,
-      serviceId:   ctx.serviceId,
-      serviceName: selectedService?.label ?? ctx.serviceId,
-      siteId:      'site-main',
-      siteName:    'IRISSAM Hospital',
-      date:        ctx.date,
-      scheduledAt: `${ctx.date}T${ctx.time}:00`,
-      type:        ctx.type,
-      origin:      ctx.origin,
-      reason:      ctx.reason + (ctx.reasonDescription ? `\n${ctx.reasonDescription}` : ''),
-      companion:   ctx.companion || undefined,
-      priority:    ctx.priority,
-      status:      'en_attente' as const,
-      syncStatus:  'pending'    as const,
-      vitalSigns:  Object.keys(vitals).length > 0 ? (vitals as VitalSigns) : undefined,
-      createdAt:   now,
-      updatedAt:   now,
-      createdById: 'u-current',
-    } as Consultation;
+    const now    = new Date().toISOString();
+    const reason = ctx.reason + (ctx.reasonDescription ? `\n${ctx.reasonDescription}` : '');
 
-    addSessionConsultation(newConsultation);
-    const success = await onCreated(newConsultation);
-    setIsSubmitting(false);
+    try {
+      // Persistance réelle d'abord : la consultation existe en PostgreSQL
+      // avec un vrai UUID et un vrai numéro CONS-… (plus de `c-new-*` volatile).
+      const created = await apiClient.post<{ id: string; number: string }>('/consultations', {
+        patientId:   patient!.id,
+        patientName: `${patient!.lastName} ${patient!.firstName}`,
+        patientMpi:  patient!.mpiId || undefined,
+        // doctorId / serviceId volontairement omis : colonnes UUID côté DB,
+        // alors que l'arbre de services du wizard utilise des ids locaux.
+        doctorName:  selectedDoctor?.name ?? ctx.doctorId,
+        specialty:   selectedSpecialty?.label || undefined,
+        serviceName: selectedService?.label || undefined,
+        scheduledAt: `${ctx.date}T${ctx.time}:00`,
+        type:        API_TYPE[ctx.type] ?? 'consultation_externe',
+        origin:      API_ORIGIN[ctx.origin] ?? 'rdv',
+        motif:       reason,
+        status:      'en_attente',
+      });
 
-    if (success) {
-      setLocation(`/consultations/${id}`);
-    } else {
-      setSubmitError("Échec de l'enregistrement – veuillez réessayer");
+      const newConsultation = {
+        id:          created.id,
+        number:      created.number,
+        patientId:   patient!.id,
+        patientName: `${patient!.lastName} ${patient!.firstName}`,
+        patientMpi:  patient!.mpiId,
+        doctorId:    ctx.doctorId,
+        doctorName:  selectedDoctor?.name ?? ctx.doctorId,
+        specialty:   selectedSpecialty?.label ?? ctx.specialtyId,
+        serviceId:   ctx.serviceId,
+        serviceName: selectedService?.label ?? ctx.serviceId,
+        siteId:      'site-main',
+        siteName:    'IRISSAM Hospital',
+        date:        ctx.date,
+        scheduledAt: `${ctx.date}T${ctx.time}:00`,
+        type:        ctx.type,
+        origin:      ctx.origin,
+        reason,
+        companion:   ctx.companion || undefined,
+        priority:    ctx.priority,
+        status:      'en_attente' as const,
+        syncStatus:  'synced'     as const,
+        vitalSigns:  Object.keys(vitals).length > 0 ? (vitals as VitalSigns) : undefined,
+        createdAt:   now,
+        updatedAt:   now,
+        createdById: 'u-current',
+      } as Consultation;
+
+      // Copie de session pour l'espace de travail (vitals saisis au step 3, etc.)
+      addSessionConsultation(newConsultation);
+      const success = await onCreated(newConsultation);
+      setIsSubmitting(false);
+
+      if (success) {
+        setLocation(`/consultations/${created.id}`);
+      } else {
+        setSubmitError("Échec de l'enregistrement – veuillez réessayer");
+      }
+    } catch (e) {
+      setIsSubmitting(false);
+      setSubmitError(e instanceof Error ? e.message : "Échec de l'enregistrement – veuillez réessayer");
     }
   };
 

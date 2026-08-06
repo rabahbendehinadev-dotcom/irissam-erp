@@ -1,300 +1,245 @@
-import { useState, useMemo } from 'react';
-import { Shield, Eye, Pencil, Trash2, FilePlus, FileText, UserCheck, LogIn, LogOut, RefreshCw,
-  Search, Download, FileSpreadsheet, Printer, Filter, Calendar } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { FilePlus, Pencil, Trash2, Eye, FileText, Download, Search, History, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatDate, formatTime } from '@/utils/format';
+import { apiClient } from '@/services/api/client';
 
-type AuditAction =
-  | 'view' | 'create' | 'update' | 'delete'
-  | 'add_document' | 'view_sensitive' | 'view_audit'
-  | 'login' | 'logout' | 'archive' | 'add_consultation'
-  | 'validate_analysis' | 'prescription';
+// ─── Types (real API data only — /patients/:id/audit ← audit_logs) ───────────
 
 interface AuditEntry {
   id: string;
-  userId: string;
-  userName: string;
-  userRole: string;
-  action: AuditAction;
-  actionLabel: string;
+  timestamp: string;
   module: string;
-  target: string;
-  date: string;
-  ip: string;
-  device: string;
-  department: string;
-  oldValue?: string;
-  newValue?: string;
+  action: string;
+  oldValue?: Record<string, unknown> | null;
+  newValue?: Record<string, unknown> | null;
+  userId?: string | null;
+  userName?: string | null;
+  userRole?: string | null;
+  resourceId?: string | null;
+  resourceType?: string | null;
+  ip?: string | null;
+  severity?: 'info' | 'warning' | 'critical' | null;
 }
 
-const ACTION_CONFIG: Record<AuditAction, { icon: React.ElementType; color: string; bg: string }> = {
-  view:              { icon: Eye,       color: 'text-blue-600',   bg: 'bg-blue-50' },
-  create:            { icon: FilePlus,  color: 'text-green-600',  bg: 'bg-green-50' },
-  update:            { icon: Pencil,    color: 'text-yellow-600', bg: 'bg-yellow-50' },
-  delete:            { icon: Trash2,    color: 'text-red-600',    bg: 'bg-red-50' },
-  add_document:      { icon: FilePlus,  color: 'text-purple-600', bg: 'bg-purple-50' },
-  view_sensitive:    { icon: Shield,    color: 'text-orange-600', bg: 'bg-orange-50' },
-  view_audit:        { icon: FileText,  color: 'text-gray-600',   bg: 'bg-gray-100' },
-  login:             { icon: LogIn,     color: 'text-green-600',  bg: 'bg-green-50' },
-  logout:            { icon: LogOut,    color: 'text-gray-600',   bg: 'bg-gray-100' },
-  archive:           { icon: Trash2,    color: 'text-red-600',    bg: 'bg-red-50' },
-  add_consultation:  { icon: UserCheck, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  validate_analysis: { icon: RefreshCw, color: 'text-teal-600',   bg: 'bg-teal-50' },
-  prescription:      { icon: FileText,  color: 'text-blue-600',   bg: 'bg-blue-50' },
+function actionCfg(action: string): { icon: typeof FilePlus; cls: string } {
+  const a = action.toLowerCase();
+  if (a.includes('creat') || a === 'create')  return { icon: FilePlus, cls: 'text-green-600 bg-green-50 border-green-200' };
+  if (a.includes('updat') || a.includes('edit') || a.includes('modif')) return { icon: Pencil, cls: 'text-amber-600 bg-amber-50 border-amber-200' };
+  if (a.includes('delet') || a.includes('suppr')) return { icon: Trash2, cls: 'text-red-600 bg-red-50 border-red-200' };
+  if (a.includes('view') || a.includes('consult') || a.includes('read')) return { icon: Eye, cls: 'text-blue-600 bg-blue-50 border-blue-200' };
+  return { icon: FileText, cls: 'text-gray-500 bg-gray-50 border-gray-200' };
+}
+
+const SEVERITY_CLS: Record<string, string> = {
+  info:     'bg-gray-100 text-gray-500 border-gray-200',
+  warning:  'bg-amber-100 text-amber-700 border-amber-200',
+  critical: 'bg-red-100 text-red-700 border-red-200',
 };
 
-const MOCK_AUDIT: AuditEntry[] = [
-  { id:'a-1', userId:'u-1', userName:'Dr Karim Benamara', userRole:'Médecin', action:'add_consultation', actionLabel:'Ajout d\'une consultation', module:'Consultations', target:'Consultation CON-2026-0042', date:'2026-08-01T09:14:00', ip:'192.168.1.12', device:'Chrome / Windows', department:'Médecine interne', newValue:'Statut : En attente → En cours' },
-  { id:'a-2', userId:'u-3', userName:'Admin Hachichi', userRole:'Administrateur', action:'update', actionLabel:'Modification du dossier', module:'Dossier Patient', target:'Champ adresse', date:'2026-07-28T14:32:00', ip:'10.0.0.5', device:'Firefox / Ubuntu', department:'Administration', oldValue:'12 rue Didouche, Alger', newValue:'47 avenue Ben Boulaid, Alger' },
-  { id:'a-3', userId:'u-5', userName:'Lab. Bensouna', userRole:'Laborantin', action:'validate_analysis', actionLabel:'Validation d\'analyse', module:'Laboratoire', target:'NFS + CRP — Résultat LAB-2026-0188', date:'2026-07-25T11:08:00', ip:'192.168.1.30', device:'Chrome / Windows', department:'Laboratoire', oldValue:'Statut : En cours', newValue:'Statut : Validé — CRP : 28 mg/L' },
-  { id:'a-4', userId:'u-2', userName:'Inf. Meriem Saïdi', userRole:'Infirmière', action:'add_document', actionLabel:'Ajout d\'un document', module:'Documents', target:'Ordonnance PDF — ORD-2026-0441', date:'2026-07-22T10:45:00', ip:'192.168.1.18', device:'Safari / macOS', department:'Soins', newValue:'Document ajouté : Ordonnance Amlodipine 5mg' },
-  { id:'a-5', userId:'u-4', userName:'Réception Djamel', userRole:'Réceptionniste', action:'view', actionLabel:'Consultation du dossier', module:'Dossier Patient', target:'Onglet Vue d\'ensemble', date:'2026-07-20T08:30:00', ip:'192.168.1.8', device:'Edge / Windows', department:'Accueil' },
-  { id:'a-6', userId:'u-1', userName:'Dr Karim Benamara', userRole:'Médecin', action:'prescription', actionLabel:'Création d\'ordonnance', module:'Prescriptions', target:'Ordonnance #2026-0441', date:'2026-07-15T16:20:00', ip:'192.168.1.12', device:'Chrome / Windows', department:'Médecine interne', newValue:'Amlodipine 5mg + Perindopril 4mg — 30 jours' },
-  { id:'a-7', userId:'u-3', userName:'Admin Hachichi', userRole:'Administrateur', action:'view_sensitive', actionLabel:'Accès données sensibles', module:'Dossier Patient', target:'N° CNI / Sécurité sociale', date:'2026-06-30T09:05:00', ip:'10.0.0.5', device:'Firefox / Ubuntu', department:'Administration' },
-  { id:'a-8', userId:'u-6', userName:'Imagerie Kadri', userRole:'Radiologue', action:'add_document', actionLabel:'Ajout résultat imagerie', module:'Imagerie', target:'Écho-doppler — IMG-2026-0033', date:'2026-06-20T13:55:00', ip:'192.168.2.44', device:'Chrome / Windows', department:'Imagerie médicale', newValue:'Document PDF ajouté — athérosclérose légère' },
-  { id:'a-9', userId:'u-1', userName:'Dr Karim Benamara', userRole:'Médecin', action:'view', actionLabel:'Consultation du dossier', module:'Antécédents', target:'Onglet Antécédents médicaux', date:'2026-05-18T10:00:00', ip:'192.168.1.12', device:'Chrome / Windows', department:'Médecine interne' },
-  { id:'a-10', userId:'u-7', userName:'Réception Amira', userRole:'Réceptionniste', action:'create', actionLabel:'Création du dossier patient', module:'Dossier Patient', target:'Dossier MPI-001234', date:'2024-01-10T08:30:00', ip:'192.168.1.9', device:'Chrome / Windows', department:'Accueil', newValue:'Dossier créé — MPI attribué' },
-];
-
-const ALL_ACTIONS: AuditAction[] = ['view','create','update','delete','add_document','view_sensitive','view_audit','login','logout','archive','add_consultation','validate_analysis','prescription'];
-
-// ─── CSV export ───────────────────────────────────────────────────────────────
-
-function exportCSV(entries: AuditEntry[]) {
-  const headers = ['Utilisateur','Rôle','Module','Opération','Cible','Ancienne valeur','Nouvelle valeur','Date','Heure','IP','Appareil','Service'];
-  const rows = entries.map(e => [
-    e.userName, e.userRole, e.module, e.actionLabel, e.target,
-    e.oldValue ?? '', e.newValue ?? '',
-    formatDate(e.date), formatTime(e.date), e.ip, e.device, e.department,
-  ]);
-  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `audit_patient_${new Date().toISOString().split('T')[0]}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+function fmtDay(d: string): string {
+  const dt = new Date(d);
+  return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function fmtTime(d: string): string {
+  const dt = new Date(d);
+  return isNaN(dt.getTime()) ? '—' : dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+function valPreview(v: unknown): string {
+  if (v == null) return '—';
+  const s = typeof v === 'string' ? v : JSON.stringify(v);
+  return s.length > 64 ? `${s.slice(0, 61)}…` : s;
+}
+function valFull(v: unknown): string {
+  if (v == null) return '';
+  return typeof v === 'string' ? v : JSON.stringify(v, null, 1);
+}
 
-export function PatientAuditLog() {
-  const [search,     setSearch]     = useState('');
-  const [fromDate,   setFromDate]   = useState('');
-  const [toDate,     setToDate]     = useState('');
-  const [actionFilt, setActionFilt] = useState<'all' | AuditAction>('all');
-  const [showFilters, setShowFilters] = useState(false);
+// ─── Component ────────────────────────────────────────────────────────────────
 
-  const filtered = useMemo(() => {
-    return MOCK_AUDIT.filter(e => {
-      if (actionFilt !== 'all' && e.action !== actionFilt) return false;
+export function PatientAuditLog({ patientId }: { patientId: string }) {
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [tick, setTick] = useState(0);
 
-      if (fromDate) {
-        if (new Date(e.date) < new Date(fromDate)) return false;
-      }
-      if (toDate) {
-        const to = new Date(toDate);
-        to.setHours(23, 59, 59);
-        if (new Date(e.date) > to) return false;
-      }
+  const [query, setQuery] = useState('');
+  const [actionFilter, setActionFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
-      if (search) {
-        const q = search.toLowerCase();
-        return [e.userName, e.userRole, e.module, e.actionLabel, e.target, e.department]
-          .some(f => f.toLowerCase().includes(q));
-      }
-      return true;
-    });
-  }, [search, fromDate, toDate, actionFilt]);
+  useEffect(() => {
+    let aborted = false;
+    setLoading(true); setError(false);
+    apiClient.get<AuditEntry[]>(`/patients/${encodeURIComponent(patientId)}/audit`)
+      .then(rows => { if (!aborted) setEntries(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (!aborted) setError(true); })
+      .finally(() => { if (!aborted) setLoading(false); });
+    return () => { aborted = true; };
+  }, [patientId, tick]);
+
+  const actions = useMemo(
+    () => Array.from(new Set(entries.map(e => e.action))).sort(),
+    [entries],
+  );
+
+  const filtered = useMemo(() => entries.filter(e => {
+    if (actionFilter !== 'all' && e.action !== actionFilter) return false;
+    if (dateFrom && e.timestamp.slice(0, 10) < dateFrom) return false;
+    if (dateTo && e.timestamp.slice(0, 10) > dateTo) return false;
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      const hay = [e.userName, e.userRole, e.module, e.action, e.resourceType, e.resourceId, valFull(e.oldValue), valFull(e.newValue)]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  }), [entries, query, actionFilter, dateFrom, dateTo]);
+
+  const exportCsv = () => {
+    const esc = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const header = ['Utilisateur', 'Rôle', 'Module', 'Action', 'Ressource', 'Ancienne valeur', 'Nouvelle valeur', 'Date', 'Heure', 'IP', 'Sévérité'];
+    const lines = filtered.map(e => [
+      esc(e.userName ?? 'Système'), esc(e.userRole ?? ''), esc(e.module), esc(e.action),
+      esc([e.resourceType, e.resourceId].filter(Boolean).join(' ')),
+      esc(valFull(e.oldValue)), esc(valFull(e.newValue)),
+      esc(fmtDay(e.timestamp)), esc(fmtTime(e.timestamp)), esc(e.ip ?? ''), esc(e.severity ?? ''),
+    ].join(';'));
+    const blob = new Blob([`\uFEFF${[header.map(esc).join(';'), ...lines].join('\n')}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit_patient_${patientId.slice(0, 8)}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[240px]">
+        <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[240px] text-red-500 space-y-2">
+        <AlertTriangle size={32} className="opacity-50" />
+        <p className="text-sm font-medium">Impossible de charger l'historique d'audit de ce patient.</p>
+        <button onClick={() => setTick(t => t + 1)} className="text-xs text-blue-600 hover:underline">Réessayer</button>
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-gray-400 space-y-2 bg-white border border-gray-200 rounded-xl">
+        <History size={36} className="opacity-20" />
+        <p className="font-semibold text-sm">Aucune action enregistrée sur ce dossier</p>
+        <p className="text-xs">Chaque création, modification ou suppression liée à ce patient apparaîtra ici.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h3 className="font-semibold text-gray-800">Journal des actions</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Toutes les opérations effectuées sur ce dossier, avec les valeurs avant/après</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Export CSV */}
-          <button
-            onClick={() => exportCSV(filtered)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
-            title="Exporter CSV"
-          >
-            <Download size={13} /> CSV
-          </button>
-          {/* Toggle filters */}
-          <button
-            onClick={() => setShowFilters(v => !v)}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors',
-              showFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-            )}
-          >
-            <Filter size={13} /> Filtres
-          </button>
-          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">{filtered.length} / {MOCK_AUDIT.length}</span>
-        </div>
-      </div>
-
-      {/* Filter bar */}
-      <div className={cn('space-y-3 transition-all', showFilters ? 'block' : 'hidden')}>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-            {/* Search */}
-            <div className="md:col-span-2 relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Rechercher utilisateur, module, opération…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-            </div>
-
-            {/* Action type */}
-            <div>
-              <select
-                value={actionFilt}
-                onChange={e => setActionFilt(e.target.value as typeof actionFilt)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white"
-              >
-                <option value="all">Tous les types</option>
-                {ALL_ACTIONS.map(a => (
-                  <option key={a} value={a}>{MOCK_AUDIT.find(e => e.action === a)?.actionLabel ?? a}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date from */}
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Calendar size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                  className="w-full pl-8 pr-2 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  placeholder="Du" />
-              </div>
-              <div className="flex-1 relative">
-                <Calendar size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                  className="w-full pl-8 pr-2 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  placeholder="Au" />
-              </div>
-            </div>
-          </div>
-
-          {/* Active filters summary */}
-          {(search || fromDate || toDate || actionFilt !== 'all') && (
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
-              <span className="text-xs text-gray-500">Filtres actifs :</span>
-              {search && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">"{search}"</span>}
-              {actionFilt !== 'all' && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{actionFilt}</span>}
-              {fromDate && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Depuis {fromDate}</span>}
-              {toDate && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Jusqu'au {toDate}</span>}
-              <button
-                onClick={() => { setSearch(''); setFromDate(''); setToDate(''); setActionFilt('all'); }}
-                className="text-xs text-red-600 hover:underline"
-              >
-                Réinitialiser
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Quick search always visible */}
-      {!showFilters && (
-        <div className="relative max-w-xs">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+    <div className="space-y-3">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
           <input
-            type="text"
-            placeholder="Recherche rapide…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Rechercher (utilisateur, module, action…)"
+            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
         </div>
-      )}
+        <select value={actionFilter} onChange={e => setActionFilter(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <option value="all">Toutes les actions</option>
+          {actions.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
+        <span className="text-xs text-gray-400">→</span>
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
+        <button onClick={exportCsv}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors ml-auto">
+          <Download size={14} /> Exporter CSV
+        </button>
+      </div>
+
+      <p className="text-xs text-gray-400">
+        {filtered.length} entrée{filtered.length !== 1 ? 's' : ''} — journal d'audit réel du dossier (max 500 dernières actions)
+      </p>
 
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-            <Filter size={32} className="opacity-20 mb-2" />
-            <p className="text-sm">Aucun résultat pour ces filtres</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  {['Utilisateur','Rôle','Module','Opération','Ancienne valeur','Nouvelle valeur','Date','Heure','Adresse IP','Appareil','Service'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.map(entry => {
-                  const cfg = ACTION_CONFIG[entry.action];
-                  const Icon = cfg.icon;
-                  return (
-                    <tr key={entry.id} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className={cn('w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0', cfg.bg)}>
-                            <Icon size={13} className={cfg.color} />
-                          </div>
-                          <span className="font-medium text-gray-800 whitespace-nowrap">{entry.userName}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full whitespace-nowrap">{entry.userRole}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={cn('text-xs px-2 py-0.5 rounded-full border whitespace-nowrap', cfg.bg, cfg.color)}>
-                          {entry.module}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400 border-b border-gray-100 bg-gray-50/60">
+                <th className="px-4 py-2.5 font-medium">Utilisateur</th>
+                <th className="px-4 py-2.5 font-medium">Module</th>
+                <th className="px-4 py-2.5 font-medium">Opération</th>
+                <th className="px-4 py-2.5 font-medium">Ancienne valeur</th>
+                <th className="px-4 py-2.5 font-medium">Nouvelle valeur</th>
+                <th className="px-4 py-2.5 font-medium">Date</th>
+                <th className="px-4 py-2.5 font-medium">IP</th>
+                <th className="px-4 py-2.5 font-medium">Sévérité</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(e => {
+                const cfg = actionCfg(e.action);
+                const Icon = cfg.icon;
+                return (
+                  <tr key={e.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 align-top">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-800">{e.userName || 'Système'}</p>
+                      {e.userRole && <p className="text-[11px] text-gray-400">{e.userRole}</p>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{e.module}</td>
+                    <td className="px-4 py-3">
+                      <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium', cfg.cls)}>
+                        <Icon size={11} /> {e.action}
+                      </span>
+                      {(e.resourceType || e.resourceId) && (
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          {e.resourceType}{e.resourceId ? ` · ${String(e.resourceId).slice(0, 8)}` : ''}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 max-w-[180px]">
+                      <span className="block truncate" title={valFull(e.oldValue)}>{valPreview(e.oldValue)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 max-w-[180px]">
+                      <span className="block truncate" title={valFull(e.newValue)}>{valPreview(e.newValue)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <p className="text-gray-600">{fmtDay(e.timestamp)}</p>
+                      <p className="text-[11px] text-gray-400">{fmtTime(e.timestamp)}</p>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 font-mono whitespace-nowrap">{e.ip || '—'}</td>
+                    <td className="px-4 py-3">
+                      {e.severity ? (
+                        <span className={cn('inline-flex px-2 py-0.5 rounded-full border text-[11px] font-medium', SEVERITY_CLS[e.severity] ?? SEVERITY_CLS['info'])}>
+                          {e.severity}
                         </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-gray-700 whitespace-nowrap font-medium">{entry.actionLabel}</p>
-                        <p className="text-xs text-gray-400 mt-0.5 max-w-[180px] truncate">{entry.target}</p>
-                      </td>
-                      <td className="px-4 py-3 max-w-[160px]">
-                        {entry.oldValue
-                          ? <span className="text-xs text-red-600 bg-red-50 px-1.5 py-0.5 rounded line-through">{entry.oldValue}</span>
-                          : <span className="text-xs text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3 max-w-[160px]">
-                        {entry.newValue
-                          ? <span className="text-xs text-green-700 bg-green-50 px-1.5 py-0.5 rounded">{entry.newValue}</span>
-                          : <span className="text-xs text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-mono text-xs">{formatDate(entry.date)}</td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-mono text-xs">{formatTime(entry.date)}</td>
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap font-mono text-xs">{entry.ip}</td>
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">{entry.device}</td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full whitespace-nowrap">{entry.department}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      ) : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {filtered.length === 0 && (
+          <div className="py-10 text-center text-sm text-gray-400">Aucune entrée ne correspond aux filtres.</div>
         )}
       </div>
-
-      <p className="text-xs text-gray-400 text-center">
-        Export CSV
-      </p>
     </div>
   );
 }

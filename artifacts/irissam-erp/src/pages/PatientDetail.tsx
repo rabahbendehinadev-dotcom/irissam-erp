@@ -36,7 +36,7 @@ import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { formatDate } from '@/utils/format';
 import { cn } from '@/lib/utils';
-import type { Patient } from '@/types';
+import type { Patient, PatientTimelineEvent } from '@/types';
 import { apiClient } from '@/services/api/client';
 
 function InfoRow({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
@@ -214,10 +214,35 @@ export default function PatientDetailPage() {
     return () => { aborted = true; };
   }, [patientId, refetchTick]);
 
-  // No mock data — timeline will be populated by a dedicated API in a future task
-  const timeline: never[] = [];
-  // No mock consultations — real data fetched inside the Consultations tab
-  const patientConsultations: Consultation[] = [];
+  // ── Real patient-scoped consultations (Overview widget + Consultations tab) ──
+  const [patientConsultations, setPatientConsultations] = useState<Consultation[]>([]);
+  const [consultLoading, setConsultLoading] = useState(true);
+  const [consultError, setConsultError] = useState(false);
+  useEffect(() => {
+    if (!patientId) return;
+    let aborted = false;
+    setConsultLoading(true); setConsultError(false);
+    apiClient.get<Consultation[]>(`/consultations?patientId=${encodeURIComponent(patientId)}`)
+      .then(rows => { if (!aborted) setPatientConsultations(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (!aborted) setConsultError(true); })
+      .finally(() => { if (!aborted) setConsultLoading(false); });
+    return () => { aborted = true; };
+  }, [patientId, refetchTick]);
+
+  // ── Real patient-scoped timeline (GET /patients/:id/timeline) ──
+  const [timeline, setTimeline] = useState<PatientTimelineEvent[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(true);
+  const [timelineError, setTimelineError] = useState(false);
+  useEffect(() => {
+    if (!patientId) return;
+    let aborted = false;
+    setTimelineLoading(true); setTimelineError(false);
+    apiClient.get<PatientTimelineEvent[]>(`/patients/${encodeURIComponent(patientId)}/timeline`)
+      .then(rows => { if (!aborted) setTimeline(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (!aborted) setTimelineError(true); })
+      .finally(() => { if (!aborted) setTimelineLoading(false); });
+    return () => { aborted = true; };
+  }, [patientId, refetchTick]);
 
   // ── Permission guard (runs before load states to avoid waiting on patient data) ──
   if (!can('patients.view')) {
@@ -504,16 +529,16 @@ export default function PatientDetailPage() {
         {activeTab === 'history' && <PatientMedicalHistoryTab patient={patient} />}
 
         {/* ─── ALLERGIES (Feature 4: professional manager) ─── */}
-        {activeTab === 'allergies' && <PatientAllergyManager patient={patient} />}
+        {activeTab === 'allergies' && <PatientAllergyManager patient={patient} onChanged={refetch} />}
 
         {/* ─── EMERGENCY CONTACT ─── */}
         {activeTab === 'emergency_contact' && <PatientEmergencyContacts patient={patient} />}
 
         {/* ─── VACCINATIONS ─── */}
-        {activeTab === 'vaccinations' && <PatientVaccinationsTab />}
+        {activeTab === 'vaccinations' && <PatientVaccinationsTab patientId={patient.id} />}
 
         {/* ─── CONSENTEMENTS ─── */}
-        {activeTab === 'consents' && <PatientConsentsTab />}
+        {activeTab === 'consents' && <PatientConsentsTab patientId={patient.id} />}
 
         {/* ─── CONSULTATIONS ─── */}
         {activeTab === 'consultations' && (
@@ -530,7 +555,17 @@ export default function PatientDetailPage() {
                 <PlusCircle size={14} /> Nouvelle consultation
               </button>
             </div>
-            {patientConsultations.length === 0 ? (
+            {consultLoading ? (
+              <div className="flex items-center justify-center min-h-[300px]">
+                <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+              </div>
+            ) : consultError ? (
+              <div className="flex flex-col items-center justify-center min-h-[300px] text-red-500 space-y-2">
+                <AlertTriangle size={32} className="opacity-50" />
+                <p className="text-sm font-medium">Impossible de charger les consultations de ce patient.</p>
+                <button onClick={refetch} className="text-xs text-blue-600 hover:underline">Réessayer</button>
+              </div>
+            ) : patientConsultations.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[300px] text-gray-400 space-y-3">
                 <Stethoscope size={40} className="opacity-20" />
                 <p className="font-semibold">Aucune consultation enregistrée</p>
@@ -545,11 +580,23 @@ export default function PatientDetailPage() {
           </div>
         )}
 
-        {/* ─── TIMELINE ─── */}
-        {activeTab === 'timeline' && <PatientTimeline events={timeline} />}
+        {/* ─── TIMELINE (real per-patient events — GET /patients/:id/timeline) ─── */}
+        {activeTab === 'timeline' && (
+          timelineLoading ? (
+            <div className="flex items-center justify-center min-h-[240px]">
+              <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+            </div>
+          ) : timelineError ? (
+            <div className="flex flex-col items-center justify-center min-h-[240px] text-red-500 space-y-2">
+              <AlertTriangle size={32} className="opacity-50" />
+              <p className="text-sm font-medium">Impossible de charger l'historique de ce patient.</p>
+              <button onClick={refetch} className="text-xs text-blue-600 hover:underline">Réessayer</button>
+            </div>
+          ) : <PatientTimeline events={timeline} />
+        )}
 
         {/* ─── AUDIT (Feature 8: search + filter + export) ─── */}
-        {activeTab === 'audit' && <PatientAuditLog />}
+        {activeTab === 'audit' && <PatientAuditLog patientId={patient.id} />}
 
         {/* ─── PORTAL ─── */}
         {activeTab === 'portal' && <PatientPortalTab patientId={patient.id} patientEmail={patient.email} />}
@@ -587,6 +634,8 @@ export default function PatientDetailPage() {
           onClose={() => setShowNewConsultation(false)}
           onCreated={async () => {
             setShowNewConsultation(false);
+            // Refresh the consultations tab + timeline (the record now exists in PostgreSQL)
+            refetch();
             // Navigation to consultation workspace is handled by ConsultationForm on success
             return true;
           }}

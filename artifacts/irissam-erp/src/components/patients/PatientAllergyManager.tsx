@@ -1,326 +1,173 @@
 import { useState } from 'react';
-import { ShieldAlert, AlertTriangle, Plus, X, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Plus, X, Save, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatDate } from '@/utils/format';
+import { apiClient } from '@/services/api/client';
+import { usePermission } from '@/hooks/usePermission';
 import type { Patient } from '@/types';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type AllergyType     = 'médicament' | 'aliment' | 'environnemental' | 'chimique' | 'autre';
-type AllergySeverity = 'légère' | 'modérée' | 'sévère' | 'critique';
-type AllergyStatus   = 'active' | 'inactive';
-
-interface AllergyEntry {
-  id: string;
-  substance: string;
-  type: AllergyType;
-  severity: AllergySeverity;
-  reaction: string;
-  discoveredAt: string;
-  status: AllergyStatus;
-  lastUpdatedAt: string;
-  notes?: string;
-}
-
-// ─── Config ───────────────────────────────────────────────────────────────────
-
-const SEVERITY_CFG: Record<AllergySeverity, { label: string; color: string; bg: string; border: string; dot: string }> = {
-  légère:   { label: 'Légère',   color: 'text-yellow-700', bg: 'bg-yellow-50',  border: 'border-yellow-300', dot: 'bg-yellow-400' },
-  modérée:  { label: 'Modérée',  color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-300', dot: 'bg-orange-400' },
-  sévère:   { label: 'Sévère',   color: 'text-red-700',    bg: 'bg-red-50',     border: 'border-red-300',    dot: 'bg-red-500' },
-  critique: { label: 'Critique', color: 'text-white',      bg: 'bg-red-600',    border: 'border-red-700',    dot: 'bg-white animate-pulse' },
-};
-
-const TYPE_LABELS: Record<AllergyType, string> = {
-  médicament:     'Médicament',
-  aliment:        'Aliment',
-  environnemental: 'Environnemental',
-  chimique:       'Chimique',
-  autre:          'Autre',
-};
-
-const STATUS_CFG = {
-  active:   { label: 'Active',   cls: 'bg-red-100 text-red-700 border-red-200' },
-  inactive: { label: 'Inactive', cls: 'bg-gray-100 text-gray-500 border-gray-200' },
-};
-
-// ─── Seed mock allergies from patient data ────────────────────────────────────
-
-const ALLERGY_DB: Record<string, Partial<AllergyEntry>> = {
-  'Pénicilline':  { type: 'médicament', severity: 'critique', reaction: 'Choc anaphylactique', discoveredAt: '2010-04-15', notes: 'Documenté suite à réaction sévère en 2010. Ne jamais prescrire.' },
-  'Aspirine':     { type: 'médicament', severity: 'sévère',   reaction: 'Bronchospasme + urticaire', discoveredAt: '2015-08-20' },
-  'AINS':         { type: 'médicament', severity: 'sévère',   reaction: 'Réaction cutanée étendue', discoveredAt: '2018-03-10' },
-  'Sulfamides':   { type: 'médicament', severity: 'modérée',  reaction: 'Rash cutané + fièvre', discoveredAt: '2019-06-05' },
-  'Latex':        { type: 'chimique',   severity: 'modérée',  reaction: 'Urticaire au contact', discoveredAt: '2020-01-12' },
-  'Arachides':    { type: 'aliment',    severity: 'sévère',   reaction: 'Œdème de Quincke', discoveredAt: '2008-09-30' },
-  'Iode':         { type: 'chimique',   severity: 'modérée',  reaction: 'Érythème local', discoveredAt: '2016-11-22' },
-};
-
-function buildAllergies(patient: Patient): AllergyEntry[] {
-  return (patient.medical?.allergies ?? []).map((name, i) => {
-    const db = ALLERGY_DB[name] ?? {};
-    return {
-      id: `al-${patient.id}-${i}`,
-      substance:     name,
-      type:          db.type ?? 'médicament',
-      severity:      db.severity ?? 'modérée',
-      reaction:      db.reaction ?? 'Réaction indéterminée',
-      discoveredAt:  db.discoveredAt ?? patient.createdAt.split('T')[0],
-      status:        'active' as AllergyStatus,
-      lastUpdatedAt: patient.updatedAt.split('T')[0],
-      notes:         db.notes,
-    };
-  });
-}
-
-// ─── Add form ─────────────────────────────────────────────────────────────────
-
-const EMPTY_FORM: Omit<AllergyEntry, 'id' | 'lastUpdatedAt'> = {
-  substance: '', type: 'médicament', severity: 'légère',
-  reaction: '', discoveredAt: '', status: 'active',
-};
-
-function AddAllergyForm({ onSave, onCancel }: { onSave: (e: Omit<AllergyEntry, 'id' | 'lastUpdatedAt'>) => void; onCancel: () => void }) {
-  const [form, setForm] = useState(EMPTY_FORM);
-  const set = (k: keyof typeof form, v: string) => setForm(p => ({ ...p, [k]: v }));
-  const valid = form.substance.trim() && form.reaction.trim() && form.discoveredAt;
-
-  return (
-    <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-3">
-      <h4 className="text-sm font-semibold text-blue-800">Nouvelle allergie</h4>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="col-span-2 sm:col-span-1">
-          <label className="text-xs text-gray-500 mb-1 block">Substance / Allergène *</label>
-          <input value={form.substance} onChange={e => set('substance', e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            placeholder="ex : Pénicilline" />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">Type *</label>
-          <select value={form.type} onChange={e => set('type', e.target.value as AllergyType)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white">
-            {(Object.keys(TYPE_LABELS) as AllergyType[]).map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">Sévérité *</label>
-          <select value={form.severity} onChange={e => set('severity', e.target.value as AllergySeverity)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white">
-            {(['légère', 'modérée', 'sévère', 'critique'] as AllergySeverity[]).map(s =>
-              <option key={s} value={s}>{SEVERITY_CFG[s].label}</option>)}
-          </select>
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label className="text-xs text-gray-500 mb-1 block">Type de réaction *</label>
-          <input value={form.reaction} onChange={e => set('reaction', e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            placeholder="ex : Urticaire, Anaphylaxie…" />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">Date de découverte *</label>
-          <input type="date" value={form.discoveredAt} onChange={e => set('discoveredAt', e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
-        </div>
-      </div>
-      <div className="flex gap-2 pt-1">
-        <button onClick={() => valid && onSave(form)} disabled={!valid}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors">
-          <Save size={13} /> Enregistrer
-        </button>
-        <button onClick={onCancel}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
-          <X size={13} /> Annuler
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Allergy row ──────────────────────────────────────────────────────────────
-
-function AllergyRow({ entry, onToggleStatus }: { entry: AllergyEntry; onToggleStatus: (id: string) => void }) {
-  const [expanded, setExpanded] = useState(false);
-  const sev = SEVERITY_CFG[entry.severity];
-  const sta = STATUS_CFG[entry.status];
-
-  return (
-    <div className={cn('border-b border-gray-50 last:border-0', entry.status === 'inactive' ? 'opacity-60' : '')}>
-      <div
-        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors cursor-pointer"
-        onClick={() => setExpanded(e => !e)}
-      >
-        {/* Severity indicator */}
-        <div className={cn('w-2 h-8 rounded-full flex-shrink-0', sev.bg, sev.dot === 'bg-white animate-pulse' ? 'bg-red-600' : '')} />
-
-        {/* Substance */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-gray-800">{entry.substance}</span>
-            <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{TYPE_LABELS[entry.type]}</span>
-          </div>
-          <p className="text-xs text-gray-500 mt-0.5">{entry.reaction}</p>
-        </div>
-
-        {/* Severity badge */}
-        <span className={cn('text-xs px-2 py-1 rounded-full border font-semibold flex-shrink-0',
-          sev.color, sev.bg, sev.border)}>
-          {sev.label}
-        </span>
-
-        {/* Status */}
-        <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium flex-shrink-0', sta.cls)}>
-          {sta.label}
-        </span>
-
-        {/* Date */}
-        <span className="text-xs text-gray-400 flex-shrink-0 hidden sm:block">
-          {formatDate(entry.discoveredAt)}
-        </span>
-
-        {/* Expand */}
-        {expanded ? <ChevronUp size={14} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />}
-      </div>
-
-      {/* Expanded detail */}
-      {expanded && (
-        <div className="px-7 pb-3 bg-gray-50/30 border-t border-gray-100">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide">Découverte</p>
-              <p className="text-sm text-gray-700 font-medium mt-0.5">{formatDate(entry.discoveredAt)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide">Dernier M.À.J</p>
-              <p className="text-sm text-gray-700 font-medium mt-0.5">{formatDate(entry.lastUpdatedAt)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide">Type</p>
-              <p className="text-sm text-gray-700 font-medium mt-0.5">{TYPE_LABELS[entry.type]}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide">Statut</p>
-              <button
-                onClick={e => { e.stopPropagation(); onToggleStatus(entry.id); }}
-                className={cn('text-xs px-2.5 py-1 rounded-full border font-medium mt-0.5 hover:opacity-80 transition-opacity', sta.cls)}
-              >
-                {entry.status === 'active' ? '● Active — cliquer pour désactiver' : '○ Inactive — cliquer pour activer'}
-              </button>
-            </div>
-            {entry.notes && (
-              <div className="col-span-2 sm:col-span-4">
-                <p className="text-xs text-gray-400 uppercase tracking-wide">Notes cliniques</p>
-                <p className="text-sm text-gray-700 mt-0.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{entry.notes}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Real data only ───────────────────────────────────────────────────────────
+// Le dossier patient (PostgreSQL) stocke les allergies comme une liste de
+// substances (patients.allergies). Aucun détail fabriqué (sévérité, réaction,
+// date de découverte) n'est affiché : seules les substances réellement
+// enregistrées apparaissent. L'ajout / la suppression est persisté via
+// PATCH /patients/:id/allergies — endpoint étroit qui ne touche que ce champ
+// (jamais de full-PUT : risque d'écraser des modifications concurrentes).
 
 interface Props {
   patient: Patient;
+  onChanged?: () => void;
 }
 
-export function PatientAllergyManager({ patient }: Props) {
-  const [allergies, setAllergies] = useState<AllergyEntry[]>(() => buildAllergies(patient));
-  const [showAdd, setShowAdd]     = useState(false);
-  const [filter, setFilter]       = useState<'all' | 'active' | 'inactive'>('all');
+export function PatientAllergyManager({ patient, onChanged }: Props) {
+  const { can } = usePermission();
+  const canEdit = can('patients.edit');
 
-  const handleAdd = (data: Omit<AllergyEntry, 'id' | 'lastUpdatedAt'>) => {
-    setAllergies(prev => [...prev, {
-      ...data,
-      id: `al-new-${Date.now()}`,
-      lastUpdatedAt: new Date().toISOString().split('T')[0],
-    }]);
-    setShowAdd(false);
+  const allergies = (patient.medical?.allergies ?? []).filter(Boolean);
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [newSubstance, setNewSubstance] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const persist = async (next: string[]) => {
+    setSaving(true); setActionError(null);
+    try {
+      await apiClient.patch(`/patients/${encodeURIComponent(patient.id)}/allergies`, { allergies: next });
+      setNewSubstance('');
+      setShowAdd(false);
+      onChanged?.();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleToggleStatus = (id: string) => {
-    setAllergies(prev => prev.map(a =>
-      a.id === id ? { ...a, status: a.status === 'active' ? 'inactive' : 'active' } : a
-    ));
+  const handleAdd = () => {
+    const s = newSubstance.trim();
+    if (!s || saving) return;
+    if (allergies.some(a => a.toLowerCase() === s.toLowerCase())) {
+      setActionError('Cette allergie est déjà enregistrée.');
+      return;
+    }
+    void persist([...allergies, s]);
   };
 
-  const critiques = allergies.filter(a => a.severity === 'critique' && a.status === 'active');
-  const filtered  = allergies.filter(a => filter === 'all' ? true : a.status === filter);
+  const handleRemove = (name: string) => {
+    if (!window.confirm(`Retirer « ${name} » des allergies connues ?`)) return;
+    void persist(allergies.filter(a => a !== name));
+  };
 
   return (
     <div className="space-y-4">
-      {/* Critical alert */}
-      {critiques.length > 0 && (
-        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-300 rounded-xl">
-          <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+      {/* Critical banner — real allergy names only */}
+      {allergies.length > 0 && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <ShieldAlert size={20} className="text-red-600 mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-bold text-red-700">⚠ Allergie(s) critique(s) active(s) — vérifier avant toute prescription</p>
-            <p className="text-sm text-red-600 mt-0.5">
-              {critiques.map(c => c.substance).join(' · ')}
+            <p className="text-sm font-semibold text-red-700">
+              {allergies.length} allergie{allergies.length > 1 ? 's' : ''} connue{allergies.length > 1 ? 's' : ''} — à vérifier avant toute prescription
             </p>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {allergies.map(a => (
+                <span key={a} className="px-2 py-0.5 bg-white border border-red-200 text-red-700 rounded-full text-xs font-medium">
+                  {a}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <ShieldAlert size={16} className="text-red-600" />
-          <div>
-            <h3 className="font-semibold text-gray-800">Gestion des allergies</h3>
-            <p className="text-xs text-gray-400 mt-0.5">{allergies.filter(a => a.status === 'active').length} active(s) · {allergies.length} au total</p>
-          </div>
+      {/* Header + add */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold text-gray-800">Allergies enregistrées</h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Substances documentées dans le dossier patient — aucune donnée supposée.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Filter */}
-          <div className="flex gap-1 bg-gray-100 p-0.5 rounded-lg">
-            {(['all', 'active', 'inactive'] as const).map(f => (
-              <button key={f} onClick={() => setFilter(f)}
-                className={cn('text-xs px-2.5 py-1 rounded-md font-medium transition-colors',
-                  filter === f ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
-                {f === 'all' ? 'Toutes' : f === 'active' ? 'Actives' : 'Inactives'}
-              </button>
-            ))}
-          </div>
-          {!showAdd && (
-            <button onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-              <Plus size={13} /> Ajouter
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Add form */}
-      {showAdd && <AddAllergyForm onSave={handleAdd} onCancel={() => setShowAdd(false)} />}
-
-      {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        {/* Table head */}
-        <div className="hidden sm:grid grid-cols-[8px_1fr_120px_90px_80px_100px] gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-          <span />
-          <span>Substance / Réaction</span>
-          <span>Sévérité</span>
-          <span>Statut</span>
-          <span className="hidden sm:block">Découverte</span>
-          <span />
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-            <ShieldAlert size={32} className="opacity-20 mb-2" />
-            <p className="text-sm">Aucune allergie {filter !== 'all' ? `(${filter})` : ''}</p>
-          </div>
-        ) : (
-          filtered.map(entry => (
-            <AllergyRow key={entry.id} entry={entry} onToggleStatus={handleToggleStatus} />
-          ))
+        {canEdit && !showAdd && (
+          <button
+            onClick={() => { setShowAdd(true); setActionError(null); }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={14} /> Ajouter une allergie
+          </button>
         )}
       </div>
 
-      <p className="text-xs text-gray-400">
-        Les allergies critiques génèrent automatiquement une alerte rouge en haut du dossier patient.
+      {actionError && (
+        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <AlertTriangle size={14} /> {actionError}
+        </div>
+      )}
+
+      {/* Add form */}
+      {showAdd && (
+        <div className="bg-white border border-blue-200 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-sm text-gray-800">Nouvelle allergie</h3>
+            <button onClick={() => { setShowAdd(false); setNewSubstance(''); }} className="text-gray-400 hover:text-gray-600">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={newSubstance}
+              onChange={e => setNewSubstance(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
+              placeholder="Substance (ex : Pénicilline)"
+              autoFocus
+              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+            <button
+              onClick={handleAdd}
+              disabled={!newSubstance.trim() || saving}
+              className={cn('flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg text-white transition-colors',
+                !newSubstance.trim() || saving ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700')}
+            >
+              <Save size={14} /> {saving ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* List / empty state */}
+      {allergies.length === 0 ? (
+        !showAdd && (
+          <div className="flex flex-col items-center justify-center py-16 text-gray-400 space-y-2 bg-white border border-gray-200 rounded-xl">
+            <ShieldAlert size={36} className="opacity-20" />
+            <p className="font-semibold text-sm">Aucune allergie connue enregistrée pour ce patient</p>
+            <p className="text-xs">{canEdit ? 'Utilisez « Ajouter une allergie » pour documenter le dossier.' : 'Le dossier ne mentionne aucune allergie.'}</p>
+          </div>
+        )
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-50">
+          {allergies.map(a => (
+            <div key={a} className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                <p className="font-medium text-sm text-gray-800">{a}</p>
+              </div>
+              {canEdit && (
+                <button
+                  onClick={() => handleRemove(a)}
+                  disabled={saving}
+                  title="Retirer cette allergie"
+                  className="p-1.5 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-[11px] text-gray-400">
+        Les détails cliniques (sévérité, réaction, date de découverte) ne sont pas encore stockés dans le
+        dossier — seules les substances réellement enregistrées sont affichées. Modification via « Modifier le dossier » ou ce panneau.
       </p>
     </div>
   );
