@@ -10,7 +10,7 @@ router.get("/:documentId", requirePermission("documents.view_audit"), async (req
   try {
     const { limit = 50, offset = 0 } = req.query;
 
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       SELECT l.*,
              u.first_name || ' ' || u.last_name AS user_name,
              u.role AS user_role
@@ -27,8 +27,8 @@ router.get("/:documentId", requirePermission("documents.view_audit"), async (req
     );
 
     res.json({
-      logs: data.rows,
-      total: parseInt(countRes.data.rows[0].count)
+      logs: pqr.rows,
+      total: parseInt(countRes.rows[0].count)
     });
   } catch (err: any) {
     req.log?.error(err);
@@ -54,7 +54,7 @@ router.get("/", requirePermission("documents.view_audit"), async (req: Authentic
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       SELECT l.*,
              dr.title AS document_title, dr.document_number, dr.category,
              u.first_name || ' ' || u.last_name AS user_name, u.role AS user_role
@@ -66,7 +66,7 @@ router.get("/", requirePermission("documents.view_audit"), async (req: Authentic
       LIMIT $${p++} OFFSET $${p++}
     `, [...params, parseInt(limit as string), parseInt(offset as string)]);
 
-    res.json({ logs: data.rows });
+    res.json({ logs: pqr.rows });
   } catch (err: any) {
     req.log?.error(err);
     res.status(500).json({ error: "Erreur serveur" });

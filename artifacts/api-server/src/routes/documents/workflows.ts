@@ -12,7 +12,7 @@ router.get("/", requirePermission("documents.view"), async (req: AuthenticatedRe
     const userId = req.auth?.userId;
     const role = req.auth?.role;
 
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       SELECT w.*, dr.title AS document_title, dr.document_number, dr.category,
              u.first_name || ' ' || u.last_name AS initiated_by_name,
              (
@@ -34,7 +34,7 @@ router.get("/", requirePermission("documents.view"), async (req: AuthenticatedRe
       LIMIT 100
     `, siteId ? [siteId] : []);
 
-    res.json({ workflows: data.rows });
+    res.json({ workflows: pqr.rows });
   } catch (err: any) {
     req.log?.error(err);
     res.status(500).json({ error: "Erreur serveur" });

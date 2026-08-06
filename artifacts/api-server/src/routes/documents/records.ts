@@ -100,7 +100,7 @@ router.get("/", requirePermission("documents.view"), async (req: AuthenticatedRe
 
   try {
     const countRes = await pool.query(`SELECT count(*) FROM document_records dr ${where}`, params);
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       SELECT dr.*,
              df.name AS folder_name, df.path AS folder_path,
              u.first_name || ' ' || u.last_name AS created_by_name
@@ -113,8 +113,8 @@ router.get("/", requirePermission("documents.view"), async (req: AuthenticatedRe
     `, [...params, parseInt(limit as string), parseInt(offset as string)]);
 
     res.json({
-      documents: data.rows,
-      total: parseInt(countRes.data.rows[0].count),
+      documents: pqr.rows,
+      total: parseInt(countRes.rows[0].count),
       limit: parseInt(limit as string),
       offset: parseInt(offset as string),
     });
@@ -130,7 +130,7 @@ router.get("/", requirePermission("documents.view"), async (req: AuthenticatedRe
 router.get("/:id", requirePermission("documents.view"), async (req: AuthenticatedRequest, res) => {
   const userRole = req.auth?.role ?? "";
   try {
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       SELECT dr.*,
              df.name AS folder_name, df.path AS folder_path,
              p.first_name || ' ' || p.last_name AS patient_name,
@@ -152,9 +152,9 @@ router.get("/:id", requirePermission("documents.view"), async (req: Authenticate
       WHERE dr.id = $1 AND dr.deleted_at IS NULL
     `, [req.params.id]);
 
-    if (!data.rows.length) return res.status(404).json({ error: "Document introuvable" });
+    if (!pqr.rows.length) return res.status(404).json({ error: "Document introuvable" });
 
-    const doc = data.rows[0];
+    const doc = pqr.rows[0];
 
     // Confidentiality check
     if (doc.confidentiality === "direction_only" && !["admin","directeur_general","directeur_medical","directeur_financier","directeur_rh","directeur_soins"].includes(userRole)) {
@@ -202,17 +202,17 @@ router.post("/", requirePermission("documents.upload"), async (req: Authenticate
         "SELECT id, title FROM document_records WHERE checksum = $1 AND deleted_at IS NULL LIMIT 1",
         [checksum]
       );
-      if (dup.data.rows.length) {
+      if (dup.rows.length) {
         return res.status(409).json({
           error: "Ce fichier est identique à un document existant (checksum identique)",
-          duplicate: { id: dup.data.rows[0].id, title: dup.data.rows[0].title }
+          duplicate: { id: dup.rows[0].id, title: dup.rows[0].title }
         });
       }
     }
 
     const docNumber = `DOC-${Date.now().toString(36).toUpperCase()}`;
 
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       INSERT INTO document_records (
         document_number, title, description, category, module, entity_type, entity_id,
         patient_id, employee_id, encounter_id, invoice_id,
@@ -236,9 +236,9 @@ router.post("/", requirePermission("documents.upload"), async (req: Authenticate
     await pool.query(`
       INSERT INTO document_versions (document_id, version_number, file_name, storage_key, file_size, mime_type, checksum, change_reason, site_id, created_by)
       VALUES ($1, 1, $2, $3, $4, $5, $6, 'Version initiale', $7, $8)
-    `, [data.rows[0].id, fileName, storageKey, fileSize || 0, mimeType, checksum || null, req.auth?.siteId, req.auth?.userId]);
+    `, [pqr.rows[0].id, fileName, storageKey, fileSize || 0, mimeType, checksum || null, req.auth?.siteId, req.auth?.userId]);
 
-    res.status(201).json(data.rows[0]);
+    res.status(201).json(pqr.rows[0]);
   } catch (err: any) {
     req.log?.error(err);
     res.status(500).json({ error: "Erreur lors de l'enregistrement du document" });
@@ -251,7 +251,7 @@ router.post("/", requirePermission("documents.upload"), async (req: Authenticate
 router.patch("/:id", requirePermission("documents.update_metadata"), async (req: AuthenticatedRequest, res) => {
   const { title, description, category, confidentiality, folderId, tags, metadata, retentionUntil, expiresAt } = req.body;
   try {
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       UPDATE document_records SET
         title = COALESCE($1, title),
         description = COALESCE($2, description),
@@ -268,8 +268,8 @@ router.patch("/:id", requirePermission("documents.update_metadata"), async (req:
     `, [title, description, category, confidentiality, folderId,
         tags, metadata ? JSON.stringify(metadata) : null,
         retentionUntil, expiresAt, req.auth?.userId, req.params.id]);
-    if (!data.rows.length) return res.status(404).json({ error: "Document introuvable" });
-    res.json(data.rows[0]);
+    if (!pqr.rows.length) return res.status(404).json({ error: "Document introuvable" });
+    res.json(pqr.rows[0]);
   } catch (err: any) {
     req.log?.error(err);
     res.status(500).json({ error: "Erreur lors de la mise à jour" });
@@ -288,19 +288,19 @@ router.post("/:id/sign", requirePermission("documents.sign"), async (req: Authen
       "SELECT storage_key, status FROM document_records WHERE id = $1 AND deleted_at IS NULL",
       [req.params.id]
     );
-    if (!docRes.data.rows.length) return res.status(404).json({ error: "Document introuvable" });
+    if (!docRes.rows.length) return res.status(404).json({ error: "Document introuvable" });
 
     const userRes = await pool.query(
       "SELECT first_name, last_name, role FROM users WHERE id = $1",
       [req.auth?.userId]
     );
-    const user = userRes.data.rows[0];
+    const user = userRes.rows[0];
 
     const docHash = crypto.createHash("sha256")
-      .update(docRes.data.rows[0].storage_key + req.auth?.userId + Date.now())
+      .update(docRes.rows[0].storage_key + req.auth?.userId + Date.now())
       .digest("hex");
 
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       INSERT INTO document_signatures
         (document_id, signer_id, signer_name, signer_role, signature_type, doc_hash, reason, ip_address, site_id, created_by)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $2)
@@ -324,7 +324,7 @@ router.post("/:id/sign", requirePermission("documents.sign"), async (req: Authen
       [req.params.id, req.auth?.userId, req.ip, req.auth?.siteId]
     );
 
-    res.status(201).json(data.rows[0]);
+    res.status(201).json(pqr.rows[0]);
   } catch (err: any) {
     req.log?.error(err);
     res.status(500).json({ error: "Erreur lors de la signature" });
@@ -382,11 +382,11 @@ router.post("/:id/reject", requirePermission("documents.reject"), async (req: Au
 // POST /api/documents/records/:id/archive
 router.post("/:id/archive", requirePermission("documents.archive"), async (req: AuthenticatedRequest, res) => {
   try {
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       UPDATE document_records SET status = 'archived', archived_at = now(), updated_at = now(), updated_by = $1
       WHERE id = $2 AND deleted_at IS NULL RETURNING id
     `, [req.auth?.userId, req.params.id]);
-    if (!data.rows.length) return res.status(404).json({ error: "Document introuvable" });
+    if (!pqr.rows.length) return res.status(404).json({ error: "Document introuvable" });
     await pool.query("INSERT INTO document_download_logs (document_id,user_id,action,ip_address,site_id,created_by) VALUES ($1,$2,'archive',$3,$4,$2)",
       [req.params.id, req.auth?.userId, req.ip, req.auth?.siteId]);
     res.json({ success: true });
@@ -399,11 +399,11 @@ router.post("/:id/archive", requirePermission("documents.archive"), async (req: 
 // POST /api/documents/records/:id/restore
 router.post("/:id/restore", requirePermission("documents.restore"), async (req: AuthenticatedRequest, res) => {
   try {
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       UPDATE document_records SET status = 'uploaded', archived_at = NULL, deleted_at = NULL, updated_at = now(), updated_by = $1
       WHERE id = $2 RETURNING id
     `, [req.auth?.userId, req.params.id]);
-    if (!data.rows.length) return res.status(404).json({ error: "Document introuvable" });
+    if (!pqr.rows.length) return res.status(404).json({ error: "Document introuvable" });
     res.json({ success: true });
   } catch (err: any) {
     req.log?.error(err);
@@ -416,11 +416,11 @@ router.post("/:id/restore", requirePermission("documents.restore"), async (req: 
 // DELETE /api/documents/records/:id
 router.delete("/:id", requirePermission("documents.delete_soft"), async (req: AuthenticatedRequest, res) => {
   try {
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       UPDATE document_records SET deleted_at = now(), status = 'deleted_soft', updated_by = $1
       WHERE id = $2 AND deleted_at IS NULL AND legal_hold = false RETURNING id
     `, [req.auth?.userId, req.params.id]);
-    if (!data.rows.length) return res.status(404).json({ error: "Document introuvable ou sous legal hold" });
+    if (!pqr.rows.length) return res.status(404).json({ error: "Document introuvable ou sous legal hold" });
     res.json({ success: true });
   } catch (err: any) {
     req.log?.error(err);
@@ -433,13 +433,13 @@ router.delete("/:id", requirePermission("documents.delete_soft"), async (req: Au
 // GET /api/documents/records/:id/download-url
 router.get("/:id/download-url", requirePermission("documents.download"), async (req: AuthenticatedRequest, res) => {
   try {
-    const { data } = await pool.query(
+    const pqr = await pool.query(
       "SELECT storage_key, file_name, mime_type, confidentiality, legal_hold FROM document_records WHERE id = $1 AND deleted_at IS NULL",
       [req.params.id]
     );
-    if (!data.rows.length) return res.status(404).json({ error: "Document introuvable" });
+    if (!pqr.rows.length) return res.status(404).json({ error: "Document introuvable" });
 
-    const doc = data.rows[0];
+    const doc = pqr.rows[0];
     const userRole = req.auth?.role ?? "";
 
     // Confidentiality guard
@@ -482,13 +482,13 @@ router.get("/:id/download-url", requirePermission("documents.download"), async (
 // GET /api/documents/records/:id/preview-url — same but for inline preview (no download header)
 router.get("/:id/preview-url", requirePermission("documents.view"), async (req: AuthenticatedRequest, res) => {
   try {
-    const { data } = await pool.query(
+    const pqr = await pool.query(
       "SELECT storage_key, file_name, mime_type, confidentiality FROM document_records WHERE id = $1 AND deleted_at IS NULL",
       [req.params.id]
     );
-    if (!data.rows.length) return res.status(404).json({ error: "Document introuvable" });
+    if (!pqr.rows.length) return res.status(404).json({ error: "Document introuvable" });
 
-    const doc = data.rows[0];
+    const doc = pqr.rows[0];
 
     try {
       const { stream, size } = await localStorageService.streamFile(doc.storage_key);
@@ -525,11 +525,11 @@ router.post("/:id/comments", requirePermission("documents.view"), async (req: Au
   const { content, parentId, isInternal } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: "Contenu du commentaire requis" });
   try {
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       INSERT INTO document_comments (document_id, content, parent_id, is_internal, site_id, created_by)
       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
     `, [req.params.id, content.trim(), parentId || null, isInternal !== false, req.auth?.siteId, req.auth?.userId]);
-    res.status(201).json(data.rows[0]);
+    res.status(201).json(pqr.rows[0]);
   } catch (err: any) {
     req.log?.error(err);
     res.status(500).json({ error: "Erreur lors de l'ajout du commentaire" });

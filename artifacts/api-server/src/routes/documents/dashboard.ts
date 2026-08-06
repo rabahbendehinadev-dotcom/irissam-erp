@@ -91,7 +91,7 @@ router.get("/charts", requirePermission("documents.view"), async (req: Authentic
 router.get("/recent", requirePermission("documents.view"), async (req: AuthenticatedRequest, res) => {
   const siteId = req.auth?.siteId;
   try {
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       SELECT dr.id, dr.document_number, dr.title, dr.category, dr.status,
              dr.confidentiality, dr.mime_type, dr.file_size, dr.created_at,
              u.first_name || ' ' || u.last_name AS created_by_name
@@ -102,7 +102,7 @@ router.get("/recent", requirePermission("documents.view"), async (req: Authentic
       ORDER BY dr.created_at DESC
       LIMIT 20
     `, siteId ? [siteId] : []);
-    res.json({ documents: data.rows });
+    res.json({ documents: pqr.rows });
   } catch (err: any) {
     req.log?.error(err);
     res.status(500).json({ error: "Erreur serveur" });
@@ -112,7 +112,7 @@ router.get("/recent", requirePermission("documents.view"), async (req: Authentic
 // GET /api/documents/dashboard/notifications
 router.get("/notifications", requirePermission("documents.view"), async (req: AuthenticatedRequest, res) => {
   try {
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       SELECT n.*, dr.title AS document_title, dr.document_number
       FROM document_notifications n
       LEFT JOIN document_records dr ON dr.id = n.document_id
@@ -121,7 +121,7 @@ router.get("/notifications", requirePermission("documents.view"), async (req: Au
       ORDER BY n.created_at DESC
       LIMIT 50
     `, [req.auth?.userId]);
-    res.json({ notifications: data.rows });
+    res.json({ notifications: pqr.rows });
   } catch (err: any) {
     req.log?.error(err);
     res.status(500).json({ error: "Erreur serveur" });

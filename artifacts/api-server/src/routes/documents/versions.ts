@@ -8,14 +8,14 @@ const router = Router();
 // GET /api/documents/versions/:documentId — list all versions
 router.get("/:documentId", requirePermission("documents.view"), async (req: AuthenticatedRequest, res) => {
   try {
-    const { data } = await pool.query(`
+    const pqr = await pool.query(`
       SELECT v.*, u.first_name || ' ' || u.last_name AS created_by_name
       FROM document_versions v
       LEFT JOIN users u ON u.id = v.created_by
       WHERE v.document_id = $1 AND v.deleted_at IS NULL
       ORDER BY v.version_number DESC
     `, [req.params.documentId]);
-    res.json({ versions: data.rows });
+    res.json({ versions: pqr.rows });
   } catch (err: any) {
     req.log?.error(err);
     res.status(500).json({ error: "Erreur serveur" });
