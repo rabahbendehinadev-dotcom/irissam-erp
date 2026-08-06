@@ -4,7 +4,6 @@ import { ChunkErrorBoundary } from '@/components/shared/ChunkErrorBoundary';
 import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
 import { AppProvider } from '@/store/AppProvider';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { useLanguage } from '@/i18n';
 import { useAuth } from '@/store/AuthContext';
 import { IOSInstallBanner } from '@/components/pwa/IOSInstallBanner';
 import { PWAUpdateBanner } from '@/components/pwa/PWAUpdateBanner';
@@ -97,19 +96,6 @@ function FullPageSpinner() {
   );
 }
 
-function PlaceholderPage() {
-  const { t } = useLanguage();
-  return (
-    <DashboardLayout>
-      <div className="flex items-center justify-center h-full min-h-[400px]">
-        <div className="text-center text-gray-500">
-          <h2 className="text-2xl font-bold mb-2">{t('page.coming_soon')}</h2>
-          <p className="text-sm">{t('page.coming_soon_desc')}</p>
-        </div>
-      </div>
-    </DashboardLayout>
-  );
-}
 
 /** Shows a full-screen spinner while the session is being restored.
  *  If the API was unreachable, shows an error state with a retry button. */

@@ -169,8 +169,6 @@ export default {
   "footer.copyright": "© 2024 IRISSAM HOSPITAL ERP – All rights reserved",
 
   // Placeholder
-  "page.coming_soon": "Coming soon",
-  "page.coming_soon_desc": "This page is under development.",
 
   // MODULE PATIENTS — MPI
   "pat.page.title": "Patient Management — MPI",

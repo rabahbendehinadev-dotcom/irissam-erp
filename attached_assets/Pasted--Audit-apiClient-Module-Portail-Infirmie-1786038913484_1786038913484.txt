@@ -1,0 +1,152 @@
+ممتاز. اعتبر Audit استعمال `apiClient` منتهيًا.
+
+لا تبدأ أي Module جديد، ولا تبدأ Portail Infirmier بعد.
+
+الآن انتقل إلى المرحلة التالية من Production Hardening:
+
+# Audit شامل لـ Employee Detail وجميع Sidebar Routes
+
+## أولًا: Employee Detail
+
+افحص صفحة Employee Detail وجميع التبويبات الموجودة فيها.
+
+لكل Tab تحقق من:
+
+* هل الـComponent موجود؟
+* هل الـAPI موجودة؟
+* هل البيانات حقيقية من PostgreSQL؟
+* هل React Query أو الـService مربوط بطريقة صحيحة؟
+* هل توجد Placeholder أو Coming Soon؟
+* هل توجد Tab معطلة أو Disabled؟
+* هل توجد White Screen؟
+* هل توجد Runtime Errors؟
+* هل توجد Console Errors؟
+* هل الصلاحيات تعمل؟
+* هل Loading State موجود؟
+* هل Empty State موجود؟
+* هل Error State موجود؟
+* هل Retry موجود؟
+* هل الصفحة Responsive على Mobile وTablet وDesktop؟
+
+إذا كانت الـAPI موجودة:
+
+* اربط الـTab بها.
+
+إذا كان الـComponent موجودًا لكنه غير مربوط:
+
+* أكمل الربط فقط.
+
+إذا كانت الـFeature غير مبنية أصلًا:
+
+* أخفِ الـTab مؤقتًا.
+
+ممنوع عرض أي Placeholder للمستخدم.
+
+---
+
+## ثانيًا: Sidebar Routes
+
+راجع جميع عناصر الـSidebar واحدًا واحدًا.
+
+لكل عنصر سجل:
+
+* اسم الصفحة.
+* Route.
+* Component.
+* Permission المطلوبة.
+* هل Route تعمل؟
+* هل الصفحة تُفتح بدون White Screen؟
+* هل توجد API حقيقية؟
+* هل Loading / Empty / Error / Retry موجودة؟
+* هل الصفحة تعمل على Mobile وTablet وDesktop؟
+* هل يجب إبقاؤها ظاهرة أو إخفاؤها؟
+
+طبق القواعد التالية:
+
+* 403 → عرض `Accès refusé`.
+* 404 → عرض `Page introuvable`.
+* لا توجد بيانات → Empty State.
+* API Error → Error State مع زر Retry.
+* Feature غير جاهزة → إخفاء Menu أو Tab.
+* Route مكسورة → إصلاحها أو إخفاؤها.
+* ممنوع استعمال PlaceholderPage.
+
+---
+
+## ثالثًا: البحث العام
+
+ابحث مرة أخرى داخل المشروع عن:
+
+* Coming Soon
+* Coming soon
+* soon
+* Placeholder
+* PlaceholderPage
+* UnderDevelopment
+* En cours de développement
+* Cette page est en cours de développement
+* Module à venir
+* Disabled Tabs
+* TODO ظاهر للمستخدم
+* return null الذي قد ينتج White Screen
+
+لا تحذف TODO تقني داخلي لا يظهر للمستخدم إلا إذا كان يسبب عطلًا.
+
+---
+
+## قواعد مهمة
+
+* لا تعيد بناء أي Module.
+* لا تستعمل Mock Data.
+* لا تنشئ API جديدة إذا كانت موجودة.
+* لا تعدل Migration قديمة.
+* لا تنشئ Table جديدة إلا عند الضرورة الحقيقية.
+* استعمل Components وHooks وServices وPermissions الموجودة.
+* لا تغيّر Architecture الحالية.
+* لا تلمس Doctor Portal أو Patient Portal إذا لم تكن هناك مشكلة مؤكدة.
+* لا تبدأ Portail Infirmier.
+
+---
+
+## الاختبارات المطلوبة
+
+بعد الإصلاح نفذ:
+
+* TypeScript check.
+* Frontend build.
+* فحص Runtime Errors.
+* فحص Console Errors.
+* اختبار Routes.
+* اختبار Employee Detail Tabs.
+* اختبار الصلاحيات.
+* اختبار Mobile / Tablet / Desktop.
+
+---
+
+## التقرير النهائي المطلوب
+
+أعطني تقريرًا يحتوي على:
+
+1. عدد Employee Detail Tabs التي تمت مراجعتها.
+2. عدد Tabs التي كانت تعمل أصلًا.
+3. عدد Tabs التي تم ربطها بالـAPI.
+4. عدد Tabs التي تم إخفاؤها.
+5. عدد Sidebar Routes التي تمت مراجعتها.
+6. عدد Routes التي تم إصلاحها.
+7. عدد Routes التي تم إخفاؤها.
+8. عدد White Screens التي تم إصلاحها.
+9. عدد Runtime Errors التي تم إصلاحها.
+10. عدد Placeholders المتبقية والظاهرة للمستخدم.
+11. نتيجة TypeScript.
+12. نتيجة Build.
+13. نتيجة Responsive.
+14. قائمة الملفات المعدلة.
+
+ولا تعتبر المهمة منتهية حتى تؤكد:
+
+* 0 Placeholder مرئي.
+* 0 Soon Badge.
+* 0 White Screen.
+* 0 Runtime Error.
+* كل Employee Detail Tab تعمل أو مخفية.
+* كل Sidebar Route تعمل أو مخفية.

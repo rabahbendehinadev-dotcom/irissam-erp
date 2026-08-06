@@ -169,8 +169,6 @@ export default {
   "footer.copyright": "© 2024 نظام IRISSAM – جميع الحقوق محفوظة",
 
   // Placeholder
-  "page.coming_soon": "قريباً",
-  "page.coming_soon_desc": "هذه الصفحة قيد التطوير.",
 
   // MODULE PATIENTS — MPI
   "pat.page.title": "إدارة المرضى — MPI",
