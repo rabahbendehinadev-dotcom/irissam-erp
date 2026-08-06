@@ -1,12 +1,11 @@
 /**
  * Pharmacie — Module Dispensation
  *
- * Onglet Prescriptions : lit directement depuis MockRepository (réactif, sans refresh).
+ * Onglet Prescriptions : connecté à GET /prescriptions (PostgreSQL).
  *   - Prescriptions depuis Urgences et Consultations
- *   - Flux : Prescrite → Préparée → Délivrée
- *   - Enregistrement du pharmacien + horodatage
- *   - Notification au médecin + audit à chaque transition
- *   - Alertes mock allergie / stock insuffisant
+ *   - Flux : Prescrite → Préparée → Délivrée (PATCH /prescriptions/:id/status)
+ *   - Délivrance : POST /prescriptions/:id/dispense
+ *   - Alertes stock faible (Adrénaline, Kétamine, Rocuronium)
  *
  * Onglet Stock : gestion du stock médicamenteux via l'API (CRUD complet).
  */
