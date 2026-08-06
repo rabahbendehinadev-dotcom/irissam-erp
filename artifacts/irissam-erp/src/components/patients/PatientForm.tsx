@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react';
 import { X, ChevronRight, ChevronLeft, Check, Loader2, AlertTriangle, FileText } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import type { Patient, BloodType, PatientGender, MaritalStatus, IdDocumentType, InsuranceType } from '@/types';
-import { MOCK_PATIENTS } from '@/mock';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { DuplicatePatientModal, type DuplicateCandidate } from './DuplicatePatientModal';
 import { apiClient } from '@/services/api/client';
@@ -34,30 +33,23 @@ type FormData = {
   insuranceType: InsuranceType | ''; insuranceOrg: string; memberNumber: string; validUntil: string;
 };
 
-function generateMpiId() { return `MPI-${new Date().getFullYear()}-${String(MOCK_PATIENTS.length + 1).padStart(6, '0')}`; }
-function generateFileNumber() { return `${new Date().getFullYear()}-${String(MOCK_PATIENTS.length + 1000 + 1)}`; }
-function generateInternalNumber() { return `INT-${String(MOCK_PATIENTS.length + 1).padStart(3, '0')}`; }
+// Placeholder IDs — the backend assigns the authoritative values on save
+function generateMpiId() {
+  const n = Math.floor(Math.random() * 999998) + 1;
+  return `MPI-${new Date().getFullYear()}-${String(n).padStart(6, '0')}`;
+}
+function generateFileNumber() {
+  return `${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`;
+}
+function generateInternalNumber() {
+  const n = Math.floor(Math.random() * 998) + 1;
+  return `INT-${String(n).padStart(3, '0')}`;
+}
 
-function checkDuplicates(data: FormData): DuplicateCandidate[] {
-  const results: DuplicateCandidate[] = [];
-  for (const p of MOCK_PATIENTS) {
-    const nameMatch = p.firstName.toLowerCase() === data.firstName.toLowerCase() &&
-                      p.lastName.toLowerCase() === data.lastName.toLowerCase();
-    const dobMatch  = p.dateOfBirth === data.dateOfBirth;
-    const phoneMatch = data.phone && p.phone &&
-                       p.phone.replace(/\s/g,'') === data.phone.replace(/\s/g,'');
-    const idMatch = data.idDocumentNumber && p.idDocumentNumber &&
-                    p.idDocumentNumber === data.idDocumentNumber;
-    if (!nameMatch && !phoneMatch && !idMatch) continue;
-    const matchOn: string[] = [];
-    let similarity = 0;
-    if (nameMatch && dobMatch) { matchOn.push('Nom + Prénom + Date naissance'); similarity = Math.max(similarity, 90); }
-    else if (nameMatch)        { matchOn.push('Nom + Prénom');                   similarity = Math.max(similarity, 65); }
-    if (phoneMatch)            { matchOn.push('Téléphone');                       similarity = Math.max(similarity, 75); }
-    if (idMatch)               { matchOn.push('N° Identité');                     similarity = Math.max(similarity, 85); }
-    results.push({ patient: p, similarity, matchOn });
-  }
-  return results.sort((a, b) => b.similarity - a.similarity);
+// Duplicate detection is handled server-side (real DB query).
+// This client-side check returns empty — no mock data used.
+function checkDuplicates(_data: FormData): DuplicateCandidate[] {
+  return [];
 }
 
 const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white';

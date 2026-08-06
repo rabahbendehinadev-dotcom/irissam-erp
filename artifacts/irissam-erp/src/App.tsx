@@ -30,7 +30,10 @@ const ResuscitationPage = lazy(() => import('@/pages/Resuscitation'));
 const OperatingRoomPage = lazy(() => import('@/pages/OperatingRoom'));
 const PersonnelPage = lazy(() => import('@/pages/Personnel'));
 
-const DevTestRunnerPage = lazy(() => import('@/pages/DevTestRunner'));
+// DevTestRunner is excluded from the production bundle — only available in development
+const DevTestRunnerPage = import.meta.env.DEV
+  ? lazy(() => import('@/pages/DevTestRunner'))
+  : null;
 const ChangePasswordPage = lazy(() => import('@/pages/ChangePassword'));
 const FacturationPage = lazy(() => import('@/pages/Facturation'));
 
@@ -246,7 +249,9 @@ function Router() {
       <Route path="/finance" component={() => <ProtectedRoute component={FacturationPage} />} />
       <Route path="/insurance" component={() => <ProtectedRoute component={InsurancePage} />} />
       <Route path="/ambulances" component={() => <Redirect to="/" />} />
-      <Route path="/dev/tests" component={() => <ProtectedRoute component={DevTestRunnerPage} />} />
+      {import.meta.env.DEV && DevTestRunnerPage && (
+        <Route path="/dev/tests" component={() => <ProtectedRoute component={DevTestRunnerPage} />} />
+      )}
       <Route path="/archives" component={() => <Redirect to="/" />} />
       <Route path="/reports" component={() => <Redirect to="/" />} />
       <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />

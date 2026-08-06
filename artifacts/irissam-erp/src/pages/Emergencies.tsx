@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation } from 'wouter';
+import { toast } from '@/hooks/use-toast';
 import {
   AlertTriangle, Activity, Ambulance as AmbulanceIcon, Bed, Users,
   Clock, Search, ChevronRight, Radio, Stethoscope, FlaskConical,
@@ -366,13 +367,19 @@ function PatientExpandedCard({ patient, isDark, onClose }: {
 
       {/* Start care button */}
       <button
+        disabled={!patient.patientId}
         onClick={() => {
-          // Navigate to the real encounter dossier (patientId for DB patients)
-          // Patients without a real DB record are no longer supported
-          if (!patient.patientId) return;
+          if (!patient.patientId) {
+            toast({
+              title: "Dossier inaccessible",
+              description: "Impossible d'ouvrir le dossier : aucun patient réel n'est associé à cette visite.",
+              variant: 'destructive',
+            });
+            return;
+          }
           setLocation(`/emergencies/${patient.patientId}`);
         }}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
       >
         <Play size={15} fill="white" /> Démarrer la prise en charge
       </button>
@@ -502,13 +509,20 @@ function PatientRow({ patient, tick, isDark }: { patient: EmergencyPatient; tick
         {/* Start care + expand */}
         <div className="flex-shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
           <button
+            disabled={!patient.patientId}
             onClick={() => {
-              // Navigate to the real encounter dossier — only DB-backed patients are supported
-              if (!patient.patientId) return;
+              if (!patient.patientId) {
+                toast({
+                  title: "Dossier inaccessible",
+                  description: "Impossible d'ouvrir le dossier : aucun patient réel n'est associé à cette visite.",
+                  variant: 'destructive',
+                });
+                return;
+              }
               setLocation(`/emergencies/${patient.patientId}`);
             }}
             className={cn(
-              'flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors whitespace-nowrap',
+              'flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed',
               patient.status === 'attente_soins' || patient.status === 'attente_triage'
                 ? 'bg-green-600 hover:bg-green-700 text-white'
                 : dk(isDark,

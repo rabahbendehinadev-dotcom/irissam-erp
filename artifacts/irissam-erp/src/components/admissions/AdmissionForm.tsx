@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, Check, Loader2, Search, UserCheck, AlertCircle } from 'lucide-react';
 import { useLanguage } from '@/i18n';
-import { MOCK_PATIENTS, MOCK_SERVICES, MOCK_DOCTORS } from '@/mock';
+import { MOCK_SERVICES, MOCK_DOCTORS } from '@/mock';
+import { useGetPatientsList } from '@workspace/api-client-react';
 import type { Patient } from '@/types';
 import type { Admission, AdmissionType, AdmissionPriority } from '@/types/admission';
 import type { OccupancyBed } from '@/types/repository';
@@ -29,6 +30,33 @@ function generateAdmNumber() {
   return `ADM-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000).padStart(4, '0')}`;
 }
 
+/** Map a raw API patient record to the local Patient type. */
+function apiToPatient(r: Record<string, unknown>): Patient {
+  return {
+    id:               r.id as string,
+    mpiId:            (r.mpiId as string) ?? '',
+    fileNumber:       (r.fileNumber as string) ?? (r.internalNumber as string) ?? '',
+    internalNumber:   (r.internalNumber as string) ?? '',
+    firstName:        (r.firstName as string) ?? '',
+    lastName:         (r.lastName as string) ?? '',
+    status:           (r.status as Patient['status']) ?? 'active',
+    gender:           (r.gender as Patient['gender']) ?? 'M',
+    dateOfBirth:      (r.dateOfBirth as string) ?? '',
+    phone:            (r.phone as string) ?? '',
+    phoneSecondary:   (r.phoneSecondary as string) ?? undefined,
+    bloodType:        (r.bloodType as Patient['bloodType']) ?? undefined,
+    rhesus:           (r.rhesus as '+' | '-') ?? undefined,
+    isIncomplete:     Boolean(r.isIncomplete),
+    potentialDuplicate: Boolean(r.potentialDuplicate),
+    syncStatus:       (r.syncStatus as Patient['syncStatus']) ?? 'synced',
+    medical:          (r.medical as Patient['medical']) ?? { allergies: [], chronicDiseases: [], majorHistory: [] },
+    createdAt:        (r.createdAt as string) ?? new Date().toISOString(),
+    updatedAt:        (r.updatedAt as string) ?? new Date().toISOString(),
+    siteId:           'site-1',
+    createdById:      'system',
+  } as Patient;
+}
+
 const inputCls  = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white';
 const selectCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white';
 const labelCls  = 'block text-xs font-medium text-gray-600 mb-1';
@@ -46,12 +74,29 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // API patient list — used for local search filtering (no mock data)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: apiPatients } = useGetPatientsList({} as any);
+
   // Step 1 state — patient search
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Patient[] | null>(null);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(
-    admission ? MOCK_PATIENTS.find(p => p.id === admission.patientId) ?? null : null,
-  );
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+
+  // When editing an existing admission, fetch the patient from the real API
+  useEffect(() => {
+    if (!admission?.patientId) return;
+    const list = Array.isArray(apiPatients) ? apiPatients : [];
+    const found = list.find((p: any) => p.id === admission.patientId);
+    if (found) { setSelectedPatient(apiToPatient(found as any)); return; }
+    // Fallback: direct fetch by ID
+    import('@/services/api/client').then(({ apiClient }) =>
+      apiClient.get<Record<string, unknown>>(`/patients/${admission.patientId}`)
+        .then(r => setSelectedPatient(apiToPatient(r)))
+        .catch(() => {})
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [admission?.patientId]);
 
   // Step 3 state — bed (OccupancyBed from MockRepository)
   const [selectedBed, setSelectedBed] = useState<OccupancyBed | null>(null);
@@ -77,16 +122,16 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
     setErrors(e2 => ({ ...e2, [key]: '' }));
   };
 
-  // Patient search
+  // Patient search — filters from the real API list (no mock data)
   const handleSearch = () => {
     if (!query.trim()) return;
     const q = query.toLowerCase();
-    const results = MOCK_PATIENTS.filter(p =>
-      p.mpiId.toLowerCase().includes(q) ||
-      p.firstName.toLowerCase().includes(q) ||
-      p.lastName.toLowerCase().includes(q) ||
-      (p.phone ?? '').includes(q)
-    );
+    const list = Array.isArray(apiPatients) ? apiPatients as unknown as Record<string, unknown>[] : [];
+    const results: Patient[] = list
+      .filter(p =>
+        `${p.mpiId} ${p.firstName} ${p.lastName} ${p.phone ?? ''}`.toLowerCase().includes(q)
+      )
+      .map(r => apiToPatient(r));
     setSearchResults(results);
   };
 

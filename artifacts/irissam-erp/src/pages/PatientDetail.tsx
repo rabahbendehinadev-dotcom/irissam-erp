@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { ArrowLeft, AlertTriangle, Phone, Droplets, User, Shield, Stethoscope, ChevronRight, PlusCircle } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -30,8 +30,6 @@ import { PatientEmergencyVisitsTab } from '@/components/patients/PatientEmergenc
 import { ConsultationTable } from '@/components/consultations/ConsultationTable';
 import { ConsultationForm } from '@/components/consultations/ConsultationForm';
 import { ConsultationStatusBadge } from '@/components/consultations/ConsultationStatusBadge';
-import { MOCK_PATIENTS, MOCK_PATIENT_TIMELINES } from '@/mock';
-import { getConsultationsByPatient } from '@/mock/consultations';
 import type { Consultation } from '@/types/consultation';
 import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
@@ -39,7 +37,7 @@ import { useAuditLog } from '@/hooks/useAuditLog';
 import { formatDate } from '@/utils/format';
 import { cn } from '@/lib/utils';
 import type { Patient } from '@/types';
-import { useGetPatientsList } from '@workspace/api-client-react';
+import { apiClient } from '@/services/api/client';
 
 function InfoRow({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
   if (!value) return null;
@@ -150,62 +148,78 @@ export default function PatientDetailPage() {
   const [archiving, setArchiving] = useState(false);
   const [showNewConsultation, setShowNewConsultation] = useState(false);
 
-  // Try mock data first (p-* IDs), then fall back to API list cache (db-* IDs)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: apiPatients, refetch: refetchPatients } = useGetPatientsList({} as any);
-  const patient: Patient | null = (() => {
-    if (!patientId) return null;
-    const mock = MOCK_PATIENTS.find(p => p.id === patientId);
-    if (mock) return mock;
-    const api = (Array.isArray(apiPatients) ? apiPatients : []).find(
-      p => (p as unknown as Record<string, unknown>).id === patientId,
-    );
-    if (!api) return null;
-    const r = api as unknown as Record<string, unknown>;
-    return {
-      id:                   r.id as string,
-      mpiId:                (r.mpiId as string) ?? '',
-      fileNumber:           (r.fileNumber as string) ?? (r.internalNumber as string) ?? (r.mpiId as string) ?? '',
-      internalNumber:       (r.internalNumber as string) ?? '',
-      firstName:            (r.firstName as string) ?? '',
-      lastName:             (r.lastName as string) ?? '',
-      maidenName:           (r.maidenName as string) ?? undefined,
-      status:               (r.status as Patient['status']) ?? 'active',
-      gender:               (r.gender as Patient['gender']) ?? 'M',
-      dateOfBirth:          (r.dateOfBirth as string) ?? '',
-      placeOfBirth:         (r.placeOfBirth as string) ?? undefined,
-      nationality:          (r.nationality as string) ?? 'Algérienne',
-      maritalStatus:        (r.maritalStatus as Patient['maritalStatus']) ?? undefined,
-      idDocumentType:       (r.idDocumentType as Patient['idDocumentType']) ?? undefined,
-      idDocumentNumber:     (r.idDocumentNumber as string) ?? undefined,
-      socialSecurityNumber: (r.socialSecurityNumber as string) ?? undefined,
-      bloodType:            (r.bloodType as Patient['bloodType']) ?? undefined,
-      rhesus:               (r.rhesus as '+' | '-') ?? undefined,
-      phone:                (r.phone as string) ?? '',
-      phoneSecondary:       (r.phoneSecondary as string) ?? undefined,
-      email:                (r.email as string) ?? undefined,
-      address:              (r.address as string) ?? undefined,
-      commune:              (r.commune as string) ?? undefined,
-      wilaya:               (r.wilaya as string) ?? undefined,
-      postalCode:           (r.postalCode as string) ?? undefined,
-      country:              (r.country as string) ?? 'Algérie',
-      isIncomplete:         Boolean(r.isIncomplete),
-      potentialDuplicate:   Boolean(r.potentialDuplicate),
-      syncStatus:           (r.syncStatus as Patient['syncStatus']) ?? 'synced',
-      medical:              (r.medical as Patient['medical']) ?? { allergies: [], chronicDiseases: [], majorHistory: [] },
-      emergencyContact:     (r.emergencyContact as Patient['emergencyContact']) ?? undefined,
-      insurance:            (r.insurance as Patient['insurance']) ?? undefined,
-      createdAt:            (r.createdAt as string) ?? new Date().toISOString(),
-      updatedAt:            (r.updatedAt as string) ?? new Date().toISOString(),
-      createdById:          'system',
-      siteId:               'site-1',
-    } as Patient;
-  })();
-  const timeline = MOCK_PATIENT_TIMELINES[patientId ?? ''] ?? [];
+  // ── Real API fetch — no mock fallback ─────────────────────────────────────
+  type LoadState = 'loading' | 'success' | 'not_found' | 'forbidden' | 'error';
+  const [loadState,   setLoadState]   = useState<LoadState>('loading');
+  const [patient,     setPatient]     = useState<Patient | null>(null);
+  const [apiErrorMsg, setApiErrorMsg] = useState('');
+  const [refetchTick, setRefetchTick] = useState(0);
+  const refetch = useCallback(() => setRefetchTick(t => t + 1), []);
 
-  // Consultations for this patient from the shared mock store
-  const patientConsultations = patientId ? getConsultationsByPatient(patientId) : [];
+  useEffect(() => {
+    if (!patientId) { setLoadState('not_found'); return; }
+    let aborted = false;
+    setLoadState('loading');
+    setPatient(null);
+    apiClient.get<Record<string, unknown>>(`/patients/${patientId}`)
+      .then(r => {
+        if (aborted) return;
+        setPatient({
+          id:                   r.id as string,
+          mpiId:                (r.mpiId as string) ?? '',
+          fileNumber:           (r.fileNumber as string) ?? (r.internalNumber as string) ?? (r.mpiId as string) ?? '',
+          internalNumber:       (r.internalNumber as string) ?? '',
+          firstName:            (r.firstName as string) ?? '',
+          lastName:             (r.lastName as string) ?? '',
+          maidenName:           (r.maidenName as string) ?? undefined,
+          status:               (r.status as Patient['status']) ?? 'active',
+          gender:               (r.gender as Patient['gender']) ?? 'M',
+          dateOfBirth:          (r.dateOfBirth as string) ?? '',
+          placeOfBirth:         (r.placeOfBirth as string) ?? undefined,
+          nationality:          (r.nationality as string) ?? 'Algérienne',
+          maritalStatus:        (r.maritalStatus as Patient['maritalStatus']) ?? undefined,
+          idDocumentType:       (r.idDocumentType as Patient['idDocumentType']) ?? undefined,
+          idDocumentNumber:     (r.idDocumentNumber as string) ?? undefined,
+          socialSecurityNumber: (r.socialSecurityNumber as string) ?? undefined,
+          bloodType:            (r.bloodType as Patient['bloodType']) ?? undefined,
+          rhesus:               (r.rhesus as '+' | '-') ?? undefined,
+          phone:                (r.phone as string) ?? '',
+          phoneSecondary:       (r.phoneSecondary as string) ?? undefined,
+          email:                (r.email as string) ?? undefined,
+          address:              (r.address as string) ?? undefined,
+          commune:              (r.commune as string) ?? undefined,
+          wilaya:               (r.wilaya as string) ?? undefined,
+          postalCode:           (r.postalCode as string) ?? undefined,
+          country:              (r.country as string) ?? 'Algérie',
+          isIncomplete:         Boolean(r.isIncomplete),
+          potentialDuplicate:   Boolean(r.potentialDuplicate),
+          syncStatus:           (r.syncStatus as Patient['syncStatus']) ?? 'synced',
+          medical:              (r.medical as Patient['medical']) ?? { allergies: [], chronicDiseases: [], majorHistory: [] },
+          emergencyContact:     (r.emergencyContact as Patient['emergencyContact']) ?? undefined,
+          insurance:            (r.insurance as Patient['insurance']) ?? undefined,
+          createdAt:            (r.createdAt as string) ?? new Date().toISOString(),
+          updatedAt:            (r.updatedAt as string) ?? new Date().toISOString(),
+          createdById:          'system',
+          siteId:               'site-1',
+        } as Patient);
+        setLoadState('success');
+      })
+      .catch(err => {
+        if (aborted) return;
+        const status = (err as { status?: number }).status;
+        if (status === 404)      setLoadState('not_found');
+        else if (status === 403) setLoadState('forbidden');
+        else { setApiErrorMsg(err?.message ?? 'Erreur réseau'); setLoadState('error'); }
+      });
+    return () => { aborted = true; };
+  }, [patientId, refetchTick]);
 
+  // No mock data — timeline will be populated by a dedicated API in a future task
+  const timeline: never[] = [];
+  // No mock consultations — real data fetched inside the Consultations tab
+  const patientConsultations: Consultation[] = [];
+
+  // ── Permission guard (runs before load states to avoid waiting on patient data) ──
   if (!can('patients.view')) {
     return (
       <DashboardLayout>
@@ -216,7 +230,21 @@ export default function PatientDetailPage() {
     );
   }
 
-  if (!patient) {
+  // ── Load states ──────────────────────────────────────────────────────────────
+  if (loadState === 'loading') {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center gap-3 text-gray-400">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+            <p className="text-sm">Chargement du dossier patient…</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (loadState === 'not_found') {
     return (
       <DashboardLayout>
         <div className="p-6">
@@ -226,12 +254,63 @@ export default function PatientDetailPage() {
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-gray-400 space-y-2">
             <AlertTriangle size={48} className="opacity-30" />
             <p className="font-semibold">Patient introuvable</p>
-            <p className="text-sm">ID : {patientId}</p>
+            {patientId && <p className="text-xs font-mono text-gray-300">{patientId}</p>}
           </div>
         </div>
       </DashboardLayout>
     );
   }
+
+  if (loadState === 'forbidden') {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <button onClick={() => setLocation('/patients')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-6">
+            <ArrowLeft size={16} /> {t('pat.back_to_list')}
+          </button>
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-gray-400 space-y-2">
+            <Shield size={48} className="opacity-30" />
+            <p className="font-semibold">Accès refusé</p>
+            <p className="text-sm">Vous n'avez pas les droits pour consulter ce dossier.</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (loadState === 'error') {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <button onClick={() => setLocation('/patients')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-6">
+            <ArrowLeft size={16} /> {t('pat.back_to_list')}
+          </button>
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-gray-400 space-y-3">
+            <AlertTriangle size={48} className="opacity-30" />
+            <p className="font-semibold">Erreur de chargement</p>
+            <p className="text-sm">{apiErrorMsg}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={refetch}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Réessayer
+              </button>
+              <button
+                onClick={() => setLocation('/patients')}
+                className="px-4 py-2 text-sm border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Retour à la liste
+              </button>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // patient is guaranteed non-null when loadState === 'success'
+  if (!patient) return null;
 
   const canViewSensitive = can('patients.view_sensitive');
   const canEdit    = can('patients.edit');
@@ -496,7 +575,7 @@ export default function PatientDetailPage() {
       {showEdit && (
         <PatientForm
           patient={patient}
-          onSave={() => { setShowEdit(false); refetchPatients(); }}
+          onSave={() => { setShowEdit(false); refetch(); }}
           onCancel={() => setShowEdit(false)}
         />
       )}

@@ -1,0 +1,258 @@
+ممتاز. بقيت آخر مهمة تقنية قبل إغلاق Production Hardening رسميًا.
+
+لا تبدأ Portail Infirmier بعد.
+
+## الهدف
+
+الوصول إلى:
+
+* 0 Mock Data داخل Production Runtime.
+* 0 Silent Failure.
+* 0 Mock fallback داخل Patient Detail.
+* 0 Dev Routes قابلة للوصول في Production.
+
+---
+
+# أولًا: إزالة MOCK_PATIENTS من PatientDetail
+
+يوجد داخل:
+
+`PatientDetail.tsx`
+
+Fallback يستعمل:
+
+`MOCK_PATIENTS`
+
+إذا لم تُرجع الـAPI المريض المطلوب.
+
+هذا ممنوع في Production.
+
+## المطلوب
+
+احذف `MOCK_PATIENTS` من Runtime الخاص بصفحة Patient Detail.
+
+صفحة Patient Detail يجب أن تعتمد فقط على:
+
+* Patient ID الحقيقي من Route.
+* API الحقيقية.
+* PostgreSQL الحقيقي.
+* React Query أو الـService الموجود.
+
+طبق الحالات التالية:
+
+### أثناء تحميل بيانات المريض
+
+اعرض Loading State الموجود في Design System.
+
+### إذا رجعت الـAPI مريضًا حقيقيًا
+
+اعرض Patient Detail بشكل طبيعي.
+
+### إذا رجعت الـAPI 404
+
+اعرض:
+
+`Patient introuvable`
+
+مع:
+
+* زر الرجوع إلى قائمة المرضى.
+* عدم عرض أي بيانات وهمية.
+* عدم حدوث White Screen.
+
+### إذا رجعت الـAPI 403
+
+اعرض:
+
+`Accès refusé`
+
+### إذا حدث API Error
+
+اعرض:
+
+* Error State.
+* زر Réessayer.
+* زر الرجوع إلى قائمة المرضى.
+
+### إذا كان Route ID غير صالح
+
+اعرض Not Found State مباشرة.
+
+ممنوع:
+
+* استعمال Mock Patient كـfallback.
+* استعمال بيانات ثابتة.
+* عرض أول مريض من القائمة بدل المريض المطلوب.
+* تحويل الخطأ إلى Empty Patient وهمي.
+
+---
+
+# ثانيًا: إصلاح Silent Failure داخل Emergencies
+
+حاليًا عند الضغط على:
+
+* Prendre en charge
+* Ouvrir
+
+إذا لم يوجد `patient.patientId` حقيقي، الكود ينفذ:
+
+```ts
+if (!patient.patientId) return;
+```
+
+هذا Silent Failure وغير مقبول في Production.
+
+## المطلوب
+
+إذا لم يوجد `patientId` حقيقي:
+
+* عطّل الزر مسبقًا إذا كان ذلك مناسبًا.
+* أو اعرض Error State / Toast واضحًا باستعمال نظام الإشعارات الموجود.
+* لا تستعمل `alert()`.
+* لا تتجاهل الحدث بصمت.
+* لا تنشئ Patient وهميًا.
+* لا تستعمل MockRepository.
+
+استعمل رسالة واضحة مثل:
+
+`Impossible d’ouvrir le dossier : aucun patient réel n’est associé à cette visite.`
+
+إذا كان بالإمكان استخراج `patientId` الحقيقي من:
+
+* encounter
+* emergency visit
+* admission
+* patient relation
+
+استعمل العلاقة الموجودة بدل تعطيل الإجراء.
+
+ابحث أولًا في الـBackend والـTypes قبل تعديل السلوك.
+
+---
+
+# ثالثًا: إغلاق Dev Routes في Production
+
+راجع:
+
+* `/dev/tests`
+* `DevTestRunner.tsx`
+* أي Route أو Page أو Tool خاص بالتطوير.
+
+في Production:
+
+* لا يجب أن تكون Route مسجلة أصلًا.
+* لا يكفي إخفاؤها من Sidebar.
+* يجب ربط تسجيلها بشرط:
+
+`import.meta.env.DEV`
+
+أو إزالتها من Production Router.
+
+نفس المبدأ ينطبق على:
+
+* Demo tools
+* Test runners
+* Seed buttons
+* Debug panels
+* Development reset actions
+
+---
+
+# رابعًا: Ambulances
+
+`Ambulances.tsx` مازالت تحتوي على `useMockRepository()` رغم أن Route تقوم بالـredirect.
+
+أريد فصلًا كاملًا عن Production Runtime.
+
+طبق أحد الحلين:
+
+1. لا تستورد `Ambulances.tsx` داخل Production bundle أصلًا.
+2. اجعل الاستيراد والـRoute مشروطين بـDevelopment فقط.
+3. أو احذف استعمال MockRepository من الصفحة.
+
+لا يكفي أن Route تعمل Redirect إذا كان الملف مازال مستوردًا داخل Production bundle.
+
+---
+
+# خامسًا: البحث النهائي
+
+ابحث داخل كامل Frontend Runtime عن:
+
+* `MOCK_PATIENTS`
+* `MockRepository`
+* `useMockRepository`
+* `mockPatients`
+* `mockData`
+* `fakeData`
+* `demoData`
+* `DevTestRunner`
+* `/dev/tests`
+* `if (!patient.patientId) return`
+* أي action handler يحتوي على `return` صامت بسبب بيانات ناقصة
+
+فرّق بين:
+
+* Tests وfixtures غير المضمنة في Production bundle.
+* Runtime Production الفعلي.
+
+---
+
+# الاختبارات المطلوبة
+
+نفذ:
+
+* TypeScript check.
+* Backend build.
+* Frontend production build باستعمال نفس Environment Variables التي يستخدمها Docker.
+* فحص Production bundle.
+* فحص Router.
+* اختبار Patient Detail مع:
+
+  * Patient موجود.
+  * Patient غير موجود.
+  * ID غير صالح.
+  * 403.
+  * 500.
+* اختبار زر Prendre en charge مع:
+
+  * patientId موجود.
+  * patientId غير موجود.
+
+---
+
+# شروط الإغلاق النهائي
+
+لا تعتبر المهمة منتهية حتى تؤكد:
+
+* 0 MOCK_PATIENTS في Production Runtime.
+* 0 MockRepository في Production bundle.
+* 0 Dev Route في Production.
+* 0 Silent Failure في Emergencies.
+* 0 Placeholder.
+* 0 Soon Badge.
+* 0 White Screen.
+* 0 Runtime Error.
+* 0 TypeScript Error.
+
+---
+
+# التقرير المطلوب
+
+أعطني:
+
+1. آخر Commit Hash.
+2. الملفات المعدلة.
+3. كيف أصبح Patient Detail يتعامل مع 404 و403 و500.
+4. كيف تم حذف MOCK_PATIENTS.
+5. كيف تم إصلاح زر Prendre en charge.
+6. كيف تم عزل DevTestRunner عن Production.
+7. كيف تم عزل Ambulances Mock عن Production bundle.
+8. نتيجة البحث النهائي عن Mock Runtime.
+9. نتيجة TypeScript.
+10. نتيجة Backend Build.
+11. نتيجة Frontend Production Build.
+12. هل وصلنا إلى:
+
+`0 Mock Data in Production Runtime`
+
+لا تبدأ Portail Infirmier في هذه المهمة.

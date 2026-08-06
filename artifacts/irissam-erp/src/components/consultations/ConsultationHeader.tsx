@@ -7,7 +7,7 @@ import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
 import { ConsultationStatusBadge, ConsultationTypeBadge } from './ConsultationStatusBadge';
-import { MOCK_PATIENTS } from '@/mock';
+import { apiClient } from '@/services/api/client';
 import type { Consultation, ConsultationStatus, ConsultationPriority } from '@/types/consultation';
 
 // ─── Priority config ──────────────────────────────────────────────────────────
@@ -120,14 +120,21 @@ export function ConsultationHeader({ consultation: c, saving = false, onStatusCh
   const [, setLocation] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Patient lookup for extra fields
-  const patient = MOCK_PATIENTS.find(p => p.id === c.patientId);
+  // Fetch patient enrichment data from the real API (allergies, DOB, blood type)
+  const [apiPatient, setApiPatient] = useState<Record<string, unknown> | null>(null);
+  useEffect(() => {
+    if (!c.patientId) return;
+    apiClient.get<Record<string, unknown>>(`/patients/${c.patientId}`)
+      .then(r => setApiPatient(r))
+      .catch(() => {}); // enrichment only — silent failure is acceptable
+  }, [c.patientId]);
+
   const nameParts = c.patientName.split(' ');
-  const allergies = patient?.medical?.allergies ?? [];
-  const diseases  = patient?.medical?.chronicDiseases ?? [];
-  const bloodType = (patient?.medical as any)?.bloodType;
-  const age       = calcAge((patient as any)?.dateOfBirth);
-  const gender    = (patient as any)?.gender;
+  const allergies = (apiPatient?.medical as any)?.allergies ?? [];
+  const diseases  = (apiPatient?.medical as any)?.chronicDiseases ?? [];
+  const bloodType = (apiPatient?.medical as any)?.bloodType ?? (apiPatient?.bloodType as string | undefined);
+  const age       = calcAge(apiPatient?.dateOfBirth as string | undefined);
+  const gender    = apiPatient?.gender as string | undefined;
   const priority  = (c as any).priority as ConsultationPriority | undefined;
 
   const canStart    = c.status === 'en_attente' || c.status === 'planifiee';
@@ -256,14 +263,14 @@ export function ConsultationHeader({ consultation: c, saving = false, onStatusCh
             </span>
 
             {/* Allergies */}
-            {allergies.map(a => (
+            {(allergies as string[]).map((a: string) => (
               <span key={a} className="flex items-center gap-1 text-xs bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-full font-medium">
                 <ShieldAlert size={10} /> {a}
               </span>
             ))}
 
             {/* Chronic diseases as small chips */}
-            {diseases.slice(0, 2).map(d => (
+            {(diseases as string[]).slice(0, 2).map((d: string) => (
               <span key={d} className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-1.5 py-0.5 rounded-full">
                 {d}
               </span>

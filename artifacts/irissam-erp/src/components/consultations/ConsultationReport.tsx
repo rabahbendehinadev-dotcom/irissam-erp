@@ -2,11 +2,12 @@
  * ConsultationReport — A4-formatted medical report (Compte Rendu de consultation)
  * Renders a clean printable layout; also used inside the print modal preview.
  */
+import { useState, useEffect } from 'react';
 import type {
   Consultation, VitalSigns, Diagnosis, PrescriptionItem,
   LabOrder, ImagingOrder, ClinicalExam, FollowUpPlan,
 } from '@/types/consultation';
-import { MOCK_PATIENTS } from '@/mock';
+import { apiClient } from '@/services/api/client';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -276,12 +277,19 @@ interface Props {
 }
 
 export function ConsultationReport({ consultation: c }: Props) {
-  const patient    = MOCK_PATIENTS.find(p => p.id === c.patientId);
-  const dob        = (patient as any)?.dateOfBirth;
-  const gender     = (patient as any)?.gender;
-  const bloodType  = (patient?.medical as any)?.bloodType;
-  const allergies  = patient?.medical?.allergies ?? [];
-  const diseases   = patient?.medical?.chronicDiseases ?? [];
+  const [apiPatient, setApiPatient] = useState<Record<string, unknown> | null>(null);
+  useEffect(() => {
+    if (!c.patientId) return;
+    apiClient.get<Record<string, unknown>>(`/patients/${c.patientId}`)
+      .then(r => setApiPatient(r))
+      .catch(() => {}); // enrichment only — silent failure is acceptable
+  }, [c.patientId]);
+
+  const dob        = apiPatient?.dateOfBirth as string | undefined;
+  const gender     = apiPatient?.gender as string | undefined;
+  const bloodType  = (apiPatient?.medical as any)?.bloodType ?? (apiPatient?.bloodType as string | undefined);
+  const allergies  = (apiPatient?.medical as any)?.allergies ?? [];
+  const diseases   = (apiPatient?.medical as any)?.chronicDiseases ?? [];
   const age        = calcAge(dob);
 
   const printDate = new Date().toLocaleString('fr-FR', {
@@ -336,7 +344,7 @@ export function ConsultationReport({ consultation: c }: Props) {
             <Row label="Date de naissance" value={dob ? fmtDate(dob) : undefined} />
             {allergies.length > 0 && (
               <div className="flex gap-1 mt-1 flex-wrap">
-                {allergies.map(a => (
+                {(allergies as string[]).map((a: string) => (
                   <span key={a} className="bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 rounded text-[10px] font-semibold">
                     ⚠ {a}
                   </span>

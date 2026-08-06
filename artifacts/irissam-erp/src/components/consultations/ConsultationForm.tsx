@@ -6,7 +6,8 @@ import {
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
-import { MOCK_PATIENTS, addSessionConsultation } from '@/mock';
+import { addSessionConsultation } from '@/mock';
+import { useGetPatientsList } from '@workspace/api-client-react';
 import type { Patient } from '@/types';
 import type {
   Consultation, ConsultationType, ConsultationOrigin,
@@ -188,10 +189,29 @@ function PatientSelector({ selected, onSelect }: { selected: Patient | null; onS
   const [, setLocation] = useLocation();
   const q = query.toLowerCase();
 
-  const results = q.length > 1
-    ? MOCK_PATIENTS.filter(p =>
-        `${p.lastName} ${p.firstName} ${p.mpiId} ${p.phone}`.toLowerCase().includes(q)
-      ).slice(0, 6)
+  // Use the real API patient list for search (no mock data)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: apiPatients } = useGetPatientsList({} as any);
+  const patientList = Array.isArray(apiPatients) ? apiPatients as unknown as Record<string, unknown>[] : [];
+
+  const results: Patient[] = q.length > 1
+    ? patientList
+        .filter(p => `${p.lastName} ${p.firstName} ${p.mpiId} ${p.phone}`.toLowerCase().includes(q))
+        .slice(0, 6)
+        .map(p => ({
+          id:          p.id as string,
+          mpiId:       (p.mpiId as string) ?? '',
+          fileNumber:  (p.internalNumber as string) ?? '',
+          firstName:   (p.firstName as string) ?? '',
+          lastName:    (p.lastName as string) ?? '',
+          status:      (p.status as Patient['status']) ?? 'active',
+          gender:      (p.gender as Patient['gender']) ?? 'M',
+          dateOfBirth: (p.dateOfBirth as string) ?? '',
+          phone:       (p.phone as string) ?? '',
+          isIncomplete: false, potentialDuplicate: false, syncStatus: 'synced' as const,
+          createdAt:   (p.createdAt as string) ?? '', updatedAt: (p.updatedAt as string) ?? '',
+          siteId: 'site-1', createdById: 'system',
+        } as Patient))
     : [];
 
   return (
@@ -692,9 +712,29 @@ function getNow() {
 export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props) {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
-  const [patient, setPatient] = useState<Patient | null>(
-    () => MOCK_PATIENTS.find(p => p.id === initialPatientId) ?? null
-  );
+  const [patient, setPatient] = useState<Patient | null>(null);
+
+  // If opened with a pre-selected patient ID, fetch it from the real API
+  useEffect(() => {
+    if (!initialPatientId) return;
+    import('@/services/api/client').then(({ apiClient }) =>
+      apiClient.get<Record<string, unknown>>(`/patients/${initialPatientId}`)
+        .then(r => setPatient({
+          id:          r.id as string,
+          mpiId:       (r.mpiId as string) ?? '',
+          fileNumber:  (r.internalNumber as string) ?? '',
+          firstName:   (r.firstName as string) ?? '',
+          lastName:    (r.lastName as string) ?? '',
+          status:      (r.status as Patient['status']) ?? 'active',
+          gender:      (r.gender as Patient['gender']) ?? 'M',
+          dateOfBirth: (r.dateOfBirth as string) ?? '',
+          phone:       (r.phone as string) ?? '',
+          isIncomplete: false, potentialDuplicate: false, syncStatus: 'synced' as const,
+          createdAt: '', updatedAt: '', siteId: 'site-1', createdById: 'system',
+        } as Patient))
+        .catch(() => {})
+    );
+  }, [initialPatientId]);
   const { date: today, time: nowTime } = getNow();
   const [ctx, setCtx] = useState<CtxState>({
     serviceId: '', specialtyId: '', doctorId: '',

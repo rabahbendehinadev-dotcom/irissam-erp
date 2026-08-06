@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { X, Phone, MapPin, Droplets, ArrowRight, AlertTriangle, User } from 'lucide-react';
-import { MOCK_PATIENTS } from '@/mock';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
 import { PatientStatusBadge } from '@/components/patients/PatientStatusBadge';
 import { calculateAge, formatDate } from '@/utils/format';
@@ -48,12 +47,9 @@ export function PatientDrawer({ patientId, onClose }: PatientDrawerProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: apiPatients } = useGetPatientsList({} as any);
 
-  // 1. Try mock data first (handles p-* IDs from mock-only pages)
-  // 2. Fall back to API list (handles db-* IDs from real API data)
+  // Look up the patient from the API list (real data only)
   const patient: Patient | null = (() => {
     if (!patientId) return null;
-    const mock = MOCK_PATIENTS.find(p => p.id === patientId);
-    if (mock) return mock;
     const apiMatch = (Array.isArray(apiPatients) ? apiPatients : []).find(
       (p) => (p as unknown as Record<string, unknown>).id === patientId,
     );

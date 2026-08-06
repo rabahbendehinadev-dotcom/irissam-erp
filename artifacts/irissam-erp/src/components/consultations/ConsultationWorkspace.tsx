@@ -15,7 +15,7 @@ import { ClinicalExamForm } from './ClinicalExamForm';
 import { MedicalDocumentBuilder } from './MedicalDocumentBuilder';
 import { FollowUpPlanForm } from './FollowUpPlanForm';
 import { ConsultationHistoryPanel } from './ConsultationHistoryPanel';
-import { MOCK_PATIENTS } from '@/mock';
+import { apiClient } from '@/services/api/client';
 import type { Consultation, ConsultationStatus, VitalSigns, AuditEntry } from '@/types/consultation';
 import { useAuth } from '@/store/AuthContext';
 
@@ -504,9 +504,14 @@ export function ConsultationWorkspace({ consultation, onChange, onStatusChange }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Patient lookup for allergies (PrescriptionBuilder conflict detection)
-  const patient = MOCK_PATIENTS.find(p => p.id === consultation.patientId);
-  const patientAllergies = patient?.medical?.allergies ?? [];
+  // Fetch patient allergies from the real API for PrescriptionBuilder conflict detection
+  const [patientAllergies, setPatientAllergies] = useState<string[]>([]);
+  useEffect(() => {
+    if (!consultation.patientId) return;
+    apiClient.get<Record<string, unknown>>(`/patients/${consultation.patientId}`)
+      .then(r => setPatientAllergies((r?.medical as any)?.allergies ?? []))
+      .catch(() => {}); // conflict detection degrades gracefully if fetch fails
+  }, [consultation.patientId]);
 
   const readOnly = consultation.status === 'terminee' || consultation.status === 'annulee' || consultation.status === 'patient_absent';
 
