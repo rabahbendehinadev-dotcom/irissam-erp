@@ -147,6 +147,7 @@ Usage : `const { can } = usePermission(); if (can('patients.create')) { ... }`
 - Le logo est importé via `@assets/9e2f711d-...png` (alias Vite @assets → attached_assets/)
 
 ## User preferences
+- Reports/deliverables (UAT reports, summaries): ALWAYS provide inside a single fenced code block so the user can copy them in one tap (explicit user request, 2026-08-07). User is on iOS.
 
 - Reproduire la maquette de référence avec fidélité maximale
 - Pas de texte hardcodé — tout passe par useLanguage() / t()
