@@ -19,7 +19,6 @@ import type { Consultation, ConsultationStatus, VitalSigns } from '@/types/consu
 
 import {
   useGetConsultationsList,
-  useCreateConsultation,
   useUpdateConsultationStatus,
 } from '@workspace/api-client-react';
 import { useAppointmentStore } from '@/store/AppointmentStore';
@@ -40,7 +39,6 @@ export default function ConsultationsPage() {
   // ── API hooks ──────────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: apiConsultations, isLoading, isError, refetch } = useGetConsultationsList({} as any);
-  const createMutation = useCreateConsultation();
   const updateStatusMutation = useUpdateConsultationStatus();
 
   // ── Auto-refresh every 30 s ────────────────────────────────────────────────
@@ -117,35 +115,14 @@ export default function ConsultationsPage() {
     }
   };
 
-  const handleCreated = async (partial: Partial<Consultation>): Promise<boolean> => {
-    try {
-      await createMutation.mutateAsync({
-        data: {
-          patientName: partial.patientName ?? 'Patient',
-          patientMpi: partial.patientMpi ?? `MPI-NEW-${Date.now()}`,
-          doctorName: partial.doctorName ?? '',
-          specialty: partial.specialty ?? 'Médecine générale',
-          serviceName: partial.serviceName ?? 'Médecine générale',
-          date: partial.date ?? new Date().toISOString().slice(0, 10),
-          type: partial.type ?? 'consultation_externe',
-          origin: partial.origin ?? 'rdv',
-          reason: partial.reason ?? '',
-          status: partial.status ?? 'en_attente',
-          duration: partial.duration ?? undefined,
-        },
-      });
-      await refetch();
-      setShowForm(false);
-      return true;
-    } catch (err) {
-      console.error('Failed to create consultation', err);
-      toast({
-        variant: 'destructive',
-        title: 'Échec de l\'enregistrement',
-        description: 'Impossible de créer la consultation. Vérifiez votre connexion et réessayez.',
-      });
-      return false;
-    }
+  // La création est effectuée par ConsultationForm lui-même (POST /consultations
+  // avec patientId/doctorId réels vérifiés côté serveur).  Ici on ne fait QUE
+  // rafraîchir la liste et fermer le modal — le second POST historique créait
+  // un doublon dégradé (« Patient » / MPI-NEW-*) à chaque soumission.
+  const handleCreated = async (): Promise<boolean> => {
+    await refetch();
+    setShowForm(false);
+    return true;
   };
 
   const handleVitalsEntered = (consultationId: string, vitals: VitalSigns) => {

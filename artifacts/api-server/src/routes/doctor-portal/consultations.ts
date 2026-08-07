@@ -26,11 +26,26 @@ function doctorCtx(req: AuthenticatedRequest) {
 }
 
 async function nextConsultationNumber(client: typeof pool): Promise<string> {
+  // Compteur atomique partagé avec le service principal (migration 039).
+  // INSERT..ON CONFLICT..RETURNING est atomique en un seul statement : les
+  // écrivains concurrents (portail médecin + module staff) se sérialisent sur
+  // le verrou de ligne de l'année.  Plus jamais de COUNT(*)+1 : ça ignorait
+  // les numéros soft-deleted et deux créations simultanées prenaient le même
+  // numéro (violation d'unicité → 500).
   const year = new Date().getFullYear();
   const row = await client.query(
-    `SELECT COUNT(*) FROM consultations WHERE EXTRACT(YEAR FROM created_at)=$1`, [year]
+    `INSERT INTO consultation_number_counters (year, last_value)
+     VALUES ($1, 1)
+     ON CONFLICT (year) DO UPDATE
+       SET last_value = consultation_number_counters.last_value + 1,
+           updated_at = now()
+     RETURNING last_value`,
+    [year],
   );
-  const seq = Number(row.rows[0].count) + 1;
+  const seq = Number(row.rows[0].last_value);
+  if (!Number.isInteger(seq) || seq < 1) {
+    throw new Error("consultation_number_counters returned an invalid sequence value");
+  }
   return `CONS-${year}-${String(seq).padStart(5, "0")}`;
 }
 

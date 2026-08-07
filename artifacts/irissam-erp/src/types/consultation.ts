@@ -194,6 +194,8 @@ export interface Consultation {
   familyContext?: string;
   professionalContext?: string;
   freeNotes?: string;
+  /** Notes du dossier — colonne réelle consultations.notes (PostgreSQL), éditée via PATCH. */
+  notes?: string;
   clinicalExam?: ClinicalExam;
   diagnoses?: Diagnosis[];
   prescriptions?: PrescriptionItem[];

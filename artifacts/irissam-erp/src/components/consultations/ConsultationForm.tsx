@@ -15,77 +15,12 @@ import type {
   ConsultationPriority, VitalSigns,
 } from '@/types/consultation';
 
-// ─── Cascade Data (Service → Spécialité → Médecin) ───────────────────────────
+// ─── Référentiel réel (PostgreSQL via /directory) ────────────────────────────
 
-const SERVICE_TREE = [
-  {
-    id: 'svc-card', label: 'Cardiologie',
-    specialties: [
-      { id: 'sp-cardio', label: 'Cardiologie',
-        doctors: [{ id: 'doc-hamidou', name: 'Dr. Hamidou Karim', title: 'Cardiologue' }] },
-    ],
-  },
-  {
-    id: 'svc-med', label: 'Médecine interne',
-    specialties: [
-      { id: 'sp-med-int', label: 'Médecine interne',
-        doctors: [{ id: 'doc-meziane', name: 'Dr. Meziane Farid', title: 'Médecin interniste' }] },
-      { id: 'sp-med-gen', label: 'Médecine générale',
-        doctors: [{ id: 'doc-meziane', name: 'Dr. Meziane Farid', title: 'Médecin interniste' }] },
-    ],
-  },
-  {
-    id: 'svc-neur', label: 'Neurologie',
-    specialties: [
-      { id: 'sp-neur', label: 'Neurologie',
-        doctors: [{ id: 'doc-tahir', name: 'Dr. Tahir Mohamed', title: 'Neurologue' }] },
-    ],
-  },
-  {
-    id: 'svc-chir', label: 'Chirurgie',
-    specialties: [
-      { id: 'sp-chir-gen', label: 'Chirurgie générale',
-        doctors: [{ id: 'doc-bensalah', name: 'Dr. Bensalah Nadia', title: 'Chirurgien général' }] },
-      { id: 'sp-ortho', label: 'Orthopédie',
-        doctors: [{ id: 'doc-bensalah', name: 'Dr. Bensalah Nadia', title: 'Chirurgien' }] },
-    ],
-  },
-  {
-    id: 'svc-pneu', label: 'Pneumologie',
-    specialties: [
-      { id: 'sp-pneu', label: 'Pneumologie',
-        doctors: [{ id: 'doc-ghezali', name: 'Dr. Ghezali Leila', title: 'Pneumologue' }] },
-    ],
-  },
-  {
-    id: 'svc-mat', label: 'Maternité',
-    specialties: [
-      { id: 'sp-gyn', label: 'Gynécologie-Obstétrique',
-        doctors: [{ id: 'doc-kheloufi', name: 'Dr. Kheloufi Souad', title: 'Gynécologue-obstétricien' }] },
-    ],
-  },
-  {
-    id: 'svc-ped', label: 'Pédiatrie',
-    specialties: [
-      { id: 'sp-ped', label: 'Pédiatrie',
-        doctors: [{ id: 'doc-belkacemi', name: 'Dr. Belkacemi Riad', title: 'Pédiatre' }] },
-    ],
-  },
-  {
-    id: 'svc-urg', label: 'Urgences',
-    specialties: [
-      { id: 'sp-urg', label: "Médecine d'urgence",
-        doctors: [{ id: 'doc-amrani', name: 'Dr. Amrani Yacine', title: 'Urgentiste' }] },
-    ],
-  },
-  {
-    id: 'svc-rea', label: 'Réanimation',
-    specialties: [
-      { id: 'sp-rea', label: 'Réanimation',
-        doctors: [{ id: 'doc-rahmani', name: 'Dr. Rahmani Omar', title: 'Réanimateur' }] },
-    ],
-  },
-];
+/** Département (service hospitalier) réel — /directory/departments. */
+interface DirectoryDepartment { id: string; name: string }
+/** Médecin réel (users.role = doctor) — /directory/doctors. */
+interface DirectoryDoctor { id: string; firstName: string; lastName: string; fullName: string; specialty: string }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -302,15 +237,16 @@ function PatientSelector({ selected, onSelect }: { selected: Patient | null; onS
 // ─── Step 2: Context Form ─────────────────────────────────────────────────────
 
 interface CtxState {
-  serviceId: string; specialtyId: string; doctorId: string;
+  serviceId: string; doctorId: string;
   date: string; time: string;
   type: ConsultationType; origin: ConsultationOrigin;
   reason: string; reasonDescription: string;
   companion: string; priority: ConsultationPriority;
 }
 
-function ContextFormStep({ form, onChange, patient }: {
+function ContextFormStep({ form, onChange, patient, services, doctors, dirError }: {
   form: CtxState; onChange: (f: CtxState) => void; patient: Patient | null;
+  services: DirectoryDepartment[]; doctors: DirectoryDoctor[]; dirError: boolean;
 }) {
   const [motifOpen, setMotifOpen] = useState(false);
   const motifRef = useRef<HTMLDivElement>(null);
@@ -325,14 +261,10 @@ function ContextFormStep({ form, onChange, patient }: {
 
   const set = <K extends keyof CtxState>(k: K, v: CtxState[K]) => onChange({ ...form, [k]: v });
 
-  // Cascade
-  const serviceNode    = SERVICE_TREE.find(s => s.id === form.serviceId);
-  const availableSpecs = serviceNode?.specialties ?? [];
-  const specialtyNode  = availableSpecs.find(sp => sp.id === form.specialtyId);
-  const availableDocs  = specialtyNode?.doctors ?? [];
+  // Référentiel réel : la spécialité affichée est déduite du médecin choisi
+  const selectedDoctor = doctors.find(d => d.id === form.doctorId);
 
-  const handleServiceChange = (id: string) => onChange({ ...form, serviceId: id, specialtyId: '', doctorId: '' });
-  const handleSpecialtyChange = (id: string) => onChange({ ...form, specialtyId: id, doctorId: '' });
+  const handleServiceChange = (id: string) => onChange({ ...form, serviceId: id });
   const handleOriginChange = (origin: ConsultationOrigin) => {
     onChange({ ...form, origin, type: ORIGIN_TYPE_MAP[origin] ?? form.type });
   };
@@ -372,36 +304,33 @@ function ContextFormStep({ form, onChange, patient }: {
         </div>
       </div>
 
-      {/* Cascade: Service → Spécialité → Médecin */}
+      {/* Référentiel réel PostgreSQL : Service + Médecin (spécialité déduite) */}
       <div className="space-y-3">
+        {dirError && (
+          <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+            <span>Impossible de charger le référentiel réel (services / médecins). Vérifiez la connexion puis rouvrez le formulaire.</span>
+          </div>
+        )}
         <div>
           <label className="text-xs font-medium text-gray-600 mb-1 block">Service *</label>
           <select value={form.serviceId} onChange={e => handleServiceChange(e.target.value)} className={SEL()}>
             <option value="">Sélectionner un service…</option>
-            {SERVICE_TREE.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
         <div>
-          <label className={cn('text-xs font-medium mb-1 block', form.serviceId ? 'text-gray-600' : 'text-gray-400')}>
-            Spécialité *
-            {!form.serviceId && <span className="font-normal"> — sélectionnez d'abord un service</span>}
-          </label>
-          <select value={form.specialtyId} onChange={e => handleSpecialtyChange(e.target.value)}
-            disabled={!form.serviceId} className={SEL(!form.serviceId)}>
-            <option value="">Sélectionner une spécialité…</option>
-            {availableSpecs.map(sp => <option key={sp.id} value={sp.id}>{sp.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={cn('text-xs font-medium mb-1 block', form.specialtyId ? 'text-gray-600' : 'text-gray-400')}>
-            Médecin *
-            {!form.specialtyId && <span className="font-normal"> — sélectionnez d'abord une spécialité</span>}
-          </label>
-          <select value={form.doctorId} onChange={e => set('doctorId', e.target.value)}
-            disabled={!form.specialtyId} className={SEL(!form.specialtyId)}>
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Médecin *</label>
+          <select value={form.doctorId} onChange={e => set('doctorId', e.target.value)} className={SEL()}>
             <option value="">Sélectionner un médecin…</option>
-            {availableDocs.map(d => <option key={d.id} value={d.id}>{d.name} — {d.title}</option>)}
+            {doctors.map(d => (
+              <option key={d.id} value={d.id}>Dr {d.fullName}{d.specialty ? ` — ${d.specialty}` : ''}</option>
+            ))}
           </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-400 mb-1 block">Spécialité <span className="font-normal">(déduite du médecin)</span></label>
+          <input type="text" value={selectedDoctor?.specialty ?? ''} disabled placeholder="—" className={cn(INP, 'bg-gray-50 text-gray-500')} />
         </div>
       </div>
 
@@ -738,7 +667,7 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
   }, [initialPatientId]);
   const { date: today, time: nowTime } = getNow();
   const [ctx, setCtx] = useState<CtxState>({
-    serviceId: '', specialtyId: '', doctorId: '',
+    serviceId: '', doctorId: '',
     date: today, time: nowTime,
     type: 'programmee', origin: 'rdv',
     reason: '', reasonDescription: '', companion: '',
@@ -748,14 +677,32 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const selectedService  = SERVICE_TREE.find(s => s.id === ctx.serviceId);
-  const selectedSpecialty = selectedService?.specialties.find(sp => sp.id === ctx.specialtyId);
-  const selectedDoctor    = selectedSpecialty?.doctors.find(d => d.id === ctx.doctorId);
+  // Référentiel réel : départements + médecins depuis PostgreSQL (/directory)
+  const [services, setServices] = useState<DirectoryDepartment[]>([]);
+  const [doctors, setDoctors] = useState<DirectoryDoctor[]>([]);
+  const [dirError, setDirError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      apiClient.get<DirectoryDepartment[]>('/directory/departments'),
+      apiClient.get<DirectoryDoctor[]>('/directory/doctors'),
+    ])
+      .then(([depts, docs]) => {
+        if (cancelled) return;
+        setServices(Array.isArray(depts) ? depts : []);
+        setDoctors(Array.isArray(docs) ? docs : []);
+      })
+      .catch(() => { if (!cancelled) setDirError(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedService = services.find(s => s.id === ctx.serviceId);
+  const selectedDoctor  = doctors.find(d => d.id === ctx.doctorId);
 
   const canNext = step === 1
     ? !!patient
     : step === 2
-    ? !!(ctx.doctorId && ctx.specialtyId && ctx.serviceId && ctx.date && ctx.time && ctx.reason)
+    ? !!(ctx.doctorId && ctx.serviceId && ctx.date && ctx.time && ctx.reason)
     : true;
 
   const handleCreate = async () => {
@@ -781,15 +728,13 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
     try {
       // Persistance réelle d'abord : la consultation existe en PostgreSQL
       // avec un vrai UUID et un vrai numéro CONS-… (plus de `c-new-*` volatile).
+      // Identifiants RÉELS uniquement : le serveur vérifie patientId/doctorId
+      // en base, résout lui-même les noms/MPI et le service (400 sinon).
       const created = await apiClient.post<{ id: string; number: string }>('/consultations', {
         patientId:   patient!.id,
-        patientName: `${patient!.lastName} ${patient!.firstName}`,
-        patientMpi:  patient!.mpiId || undefined,
-        // doctorId / serviceId volontairement omis : colonnes UUID côté DB,
-        // alors que l'arbre de services du wizard utilise des ids locaux.
-        doctorName:  selectedDoctor?.name ?? ctx.doctorId,
-        specialty:   selectedSpecialty?.label || undefined,
-        serviceName: selectedService?.label || undefined,
+        doctorId:    ctx.doctorId,
+        serviceName: selectedService?.name,
+        specialty:   selectedDoctor?.specialty || undefined,
         scheduledAt: `${ctx.date}T${ctx.time}:00`,
         type:        API_TYPE[ctx.type] ?? 'consultation_externe',
         origin:      API_ORIGIN[ctx.origin] ?? 'rdv',
@@ -804,10 +749,10 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
         patientName: `${patient!.lastName} ${patient!.firstName}`,
         patientMpi:  patient!.mpiId,
         doctorId:    ctx.doctorId,
-        doctorName:  selectedDoctor?.name ?? ctx.doctorId,
-        specialty:   selectedSpecialty?.label ?? ctx.specialtyId,
+        doctorName:  selectedDoctor ? `Dr ${selectedDoctor.fullName}` : ctx.doctorId,
+        specialty:   selectedDoctor?.specialty ?? selectedService?.name ?? '',
         serviceId:   ctx.serviceId,
-        serviceName: selectedService?.label ?? ctx.serviceId,
+        serviceName: selectedService?.name ?? ctx.serviceId,
         siteId:      'site-main',
         siteName:    'IRISSAM Hospital',
         date:        ctx.date,
@@ -887,7 +832,7 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {step === 1 && <PatientSelector selected={patient} onSelect={setPatient} />}
-          {step === 2 && <ContextFormStep form={ctx} onChange={setCtx} patient={patient} />}
+          {step === 2 && <ContextFormStep form={ctx} onChange={setCtx} patient={patient} services={services} doctors={doctors} dirError={dirError} />}
           {step === 3 && <VitalsStep vitals={vitals} onChange={setVitals} patient={patient} />}
         </div>
 
