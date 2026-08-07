@@ -1,0 +1,223 @@
+نحن نواصل UAT الحقيقي للنظام.
+
+لا تبدأ Prescription.
+لا تبدأ Laboratory.
+لا تبدأ Imaging.
+لا تبدأ Portail Infirmier.
+لا تبدأ أي Module جديد.
+
+الهدف الحالي:
+إزالة آخر عناصر Demo/Mock من مسار Consultation وجعل الاستشارة الطبية تعمل 100% ببيانات حقيقية.
+
+استعمل نفس المريض ونفس الاستشارة الحالية فقط:
+
+Patient ID:
+4410bc4a-317c-4b97-9b2e-7b9557aafe66
+
+MRN:
+MRN-2026-00016
+
+Consultation ID:
+7e291123-5f31-446f-9731-49955551bec0
+
+Consultation Number:
+CONS-2026-00010
+
+Encounter ID:
+5eb6c34c-4369-4287-819b-3a587a59921a
+
+Doctor:
+Dr Karim Martin — Cardiologie
+
+==================================================
+1. DIAGNOSIS
+==================================================
+
+حاليًا diagnosis موجود في PostgreSQL ويمكن تعديله عبر API، لكن الواجهة لا تحفظه بشكل صحيح من Consultation UI.
+
+المطلوب:
+
+- ابحث أولًا عن الحقل الموجود بالفعل في Consultation Form / Workspace.
+- لا تنشئ Component جديد إذا كان موجودًا.
+- اربط حقل Diagnosis الحقيقي بعمود diagnosis في PostgreSQL.
+- استعمل API الحالية إذا كانت موجودة.
+- لا تنشئ Endpoint جديدة بدون ضرورة.
+
+اختبر:
+
+- فتح Consultation.
+- تعديل diagnosis من الواجهة فقط.
+- Save.
+- Refresh.
+- إعادة فتح Consultation.
+- التأكد أن نفس القيمة موجودة.
+- التأكد أنها تظهر في Patient Detail / Historique إذا كان التصميم يسمح بذلك.
+- Audit Log يسجل التعديل.
+
+لا تستعمل curl لتعديل diagnosis في الاختبار النهائي.
+الطبيب يجب أن يقدر يديرها من UI.
+
+==================================================
+2. VITAL SIGNS
+==================================================
+
+حاليًا Vitals داخل Consultation عبارة عن Mock/Display فقط.
+
+هذا ممنوع.
+
+ابحث داخل المشروع كاملًا قبل إنشاء أي شيء عن:
+
+- vitals
+- vital_signs
+- observations
+- nursing observations
+- measurements
+- emergency triage vitals
+- admission vitals
+- ICU vitals
+- existing APIs / tables / hooks / services
+
+إذا يوجد Backend/Table/API حقيقية:
+استعمل الموجود واربط Consultation بها.
+
+إذا توجد Vitals في Urgences أو Admissions:
+لا تبنِ نظامًا ثانيًا.
+استعمل نفس الـmodel أو نفس API إذا Architecture تسمح.
+
+البيانات التي نريد دعمها فقط إذا كانت موجودة فعليًا في النظام:
+
+- Température
+- Tension artérielle systolique/diastolique
+- Fréquence cardiaque
+- SpO2
+- Fréquence respiratoire
+- Glycémie إذا model يدعمها
+- Poids / Taille إذا كانت موجودة
+
+كل Record يجب أن يرتبط على الأقل بـ:
+
+- patientId
+- encounterId
+- timestamp
+- recordedBy
+
+وإذا Architecture الحالية تربطها بـ consultationId فاستعملها.
+
+لا تستعمل قيمًا ثابتة.
+
+==================================================
+3. إذا لم يوجد Backend Vitals
+==================================================
+
+إذا بعد البحث تأكدت أنه لا يوجد Model/API حقيقي للـVitals:
+
+لا تبنِ Module جديدًا في هذه المهمة.
+
+قم بـ:
+
+- إزالة Mock Values.
+- إخفاء Section Vitals مؤقتًا أو عرض Empty State حقيقي فقط.
+- لا تعرض ضغط/نبض/حرارة وهمية.
+- أخبرني في التقرير أن Vitals تحتاج Feature مستقلة لاحقًا.
+
+==================================================
+4. البحث داخل Consultation عن أي Demo آخر
+==================================================
+
+راجع كامل Consultation workflow بحثًا عن:
+
+- Mock
+- Static arrays
+- Fake doctor
+- Fake service
+- Random IDs
+- Fake vitals
+- Fake diagnosis
+- hard-coded medical history
+- fake allergies
+- fake prescriptions
+- fake labs
+- fake imaging
+- placeholder buttons
+- disabled controls
+- TODO ظاهر للمستخدم
+
+أي معلومة طبية تظهر للمستخدم يجب أن تأتي من PostgreSQL أو تكون Empty State.
+
+==================================================
+5. DATA SAFETY
+==================================================
+
+راجع أن:
+
+- Consultation لا تستطيع قراءة بيانات مريض آخر.
+- encounterId يعود لنفس patientId.
+- doctorId حقيقي.
+- serviceId حقيقي.
+- لا يوجد Full PUT يمسح حقولًا لم يعدلها المستخدم.
+- لا يوجد Silent catch.
+- لا يوجد Query يضيع WHERE condition.
+- لا يوجد Pool Deadlock pattern.
+
+==================================================
+6. UAT
+==================================================
+
+بعد الإصلاح نفذ UAT حقيقي على نفس Consultation:
+
+A. Diagnosis:
+- تعديل من UI.
+- Save.
+- F5.
+- القيمة تبقى.
+
+B. Vitals إذا Backend موجود:
+سجل قيم اختبار واضحة:
+
+Température: 37.0
+TA: 120/80
+FC: 75
+SpO2: 98
+FR: 16
+
+هذه قيم UAT فقط وليست بيانات طبية حقيقية.
+
+ثم تحقق:
+
+- POST/PATCH API.
+- PostgreSQL.
+- Refresh.
+- Patient correct.
+- Encounter correct.
+- recordedBy correct.
+- Audit صحيح.
+
+C. إذا Vitals غير موجودة:
+- لا تدخل هذه القيم.
+- أخفِ الـMock UI.
+- أثبت أنه لا توجد Vitals وهمية بعد Refresh.
+
+==================================================
+7. التقرير المطلوب
+==================================================
+
+أعطني فقط تقرير هذه المهمة:
+
+1. هل Diagnosis أصبح يعمل 100% من UI؟
+2. ما API المستعملة؟
+3. ما العمود في PostgreSQL؟
+4. نتيجة Save + Refresh.
+5. هل يوجد Backend Vitals حقيقي؟
+6. إذا نعم: ما Tables/APIs الموجودة التي أعدت استعمالها؟
+7. إذا لا: كيف تم إزالة Mock Vitals؟
+8. هل بقي أي Mock داخل Consultation؟
+9. نتيجة Audit Log.
+10. نتيجة RBAC.
+11. نتيجة TypeScript.
+12. نتيجة Production Build.
+13. الملفات المعدلة.
+14. Commit Hash.
+15. الحكم النهائي PASS أو FAIL.
+
+لا تبدأ المرحلة 4.
+انتظر موافقتي.

@@ -35,3 +35,4 @@
 - [Drizzle $dynamic .where() trap](drizzle-where-trap.md) — .where() REPLACES the previous clause; accumulate conditions + single and(...); caused a cross-patient leak
 - [Frontend audit events pipeline](audit-frontend-events.md) — module aliases→source_module enum, unknown→system, write failure→500 (never fake 201)
 - [Admissions integrity & bed lifecycle](admissions-integrity.md) — POST refuses fictional doctor/service/foreign encounter (critique→vital alias); cancel transactional; beds gated admissions.*; free-only-if-still-linked
+- [Consultation de-mock](consultation-demock.md) — diagnosis/notes = explicit-save narrow-PATCH panels; vitals are Urgences-visit-scoped only (honest empty state elsewhere); demo tabs removed, not hidden
