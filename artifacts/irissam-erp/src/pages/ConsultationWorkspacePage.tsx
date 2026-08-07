@@ -1,57 +1,40 @@
 import { useState, useEffect } from 'react';
 import { useRoute } from 'wouter';
 import { RefreshCw, Save } from 'lucide-react';
-import { getAllConsultations, getNurseVitals } from '@/mock/consultations';
 import { ConsultationWorkspace } from '@/components/consultations/ConsultationWorkspace';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import type { Consultation, ConsultationStatus } from '@/types/consultation';
 import { apiClient } from '@/services/api/client';
-import { useAppointmentStore } from '@/store/AppointmentStore';
 import { toast } from '@/hooks/use-toast';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Merge nurse-entered vitals overlay into a consultation object (non-destructive). */
-function withNurseVitals(c: Consultation): Consultation {
-  const nurseVitals = getNurseVitals(c.id);
-  return nurseVitals ? { ...c, vitalSigns: nurseVitals } : c;
-}
-
-// The workspace page renders inside DashboardLayout (sidebar present).
-// ConsultationWorkspace owns its own sticky header and tab bar.
+// Page de l'espace de travail — PostgreSQL est l'unique source de vérité :
+// GET direct /consultations/:id (F5 sur un lien profond fonctionne), aucune
+// donnée fictive, aucun identifiant de démonstration.
 
 export default function ConsultationWorkspacePage() {
   const [, params] = useRoute('/consultations/:id');
   const id = params?.id;
-  const rawId = (id ?? '').replace(/^db-/, '');
-  const isDbBacked = UUID_RE.test(rawId);
+  // Contrat de route strict : uniquement des UUID PostgreSQL réels.
+  const rawId = id ?? '';
+  const isValidId = UUID_RE.test(rawId);
 
-  // 1. Mock data (c-* IDs) — merge nurse vitals overlay immediately
-  const mockMatch = !isDbBacked && id ? getAllConsultations().find(c => c.id === id) : undefined;
-
-  const [consultation, setConsultation] = useState<Consultation | undefined>(
-    mockMatch ? withNurseVitals(mockMatch as Consultation) : undefined
-  );
-  const [loading, setLoading] = useState(isDbBacked);
+  const [consultation, setConsultation] = useState<Consultation | undefined>(undefined);
+  const [loading, setLoading] = useState(isValidId);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // 2. Consultations réelles (UUID) : GET direct /consultations/:id.
-  //    PostgreSQL est la source de vérité — F5 sur un lien profond fonctionne,
-  //    plus de dépendance au cache de la liste des consultations.
   useEffect(() => {
-    if (!isDbBacked) return;
+    if (!isValidId) return;
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
     apiClient.get<Consultation>(`/consultations/${rawId}`)
-      .then(c => { if (!cancelled) setConsultation(withNurseVitals(c)); })
+      .then(c => { if (!cancelled) setConsultation(c); })
       .catch(e => { if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Erreur de chargement'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [rawId, isDbBacked]);
-
-  // ── Appointment sync — must be called unconditionally (Rules of Hooks) ─────
-  const { syncFromConsultation } = useAppointmentStore();
+  }, [rawId, isValidId]);
 
   // ── Notes du dossier (colonne réelle `notes`) — PATCH /consultations/:id ───
   const [notesDraft, setNotesDraft] = useState('');
@@ -64,51 +47,8 @@ export default function ConsultationWorkspacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consultationId]);
 
-  const handleChange = (updated: Consultation) => {
-    setConsultation(updated);
-  };
-
-  const handleStatusChange = (status: ConsultationStatus) => {
-    const appointmentId = consultation?.appointmentId;
-
-    if (isDbBacked) {
-      // Persistance réelle : le serveur valide l'enum, horodate startedAt /
-      // endedAt et calcule la durée ; l'état local reflète la réponse DB.
-      apiClient.patch<Consultation>(`/consultations/${rawId}`, { status })
-        .then(updated => {
-          setConsultation(prev => withNurseVitals(prev ? { ...prev, ...updated } : updated));
-          if (appointmentId) syncFromConsultation(appointmentId, status);
-        })
-        .catch(() => {
-          toast({
-            variant: 'destructive',
-            title: 'Échec de la mise à jour',
-            description: "Le changement de statut n'a pas été enregistré en base. Veuillez réessayer.",
-          });
-        });
-      return;
-    }
-
-    // Consultations mock (c-*) : comportement local historique
-    setConsultation(prev => prev ? {
-      ...prev,
-      status,
-      startedAt: status === 'en_cours' && !prev.startedAt ? new Date().toISOString() : prev.startedAt,
-      endedAt:   status === 'terminee' ? new Date().toISOString() : prev.endedAt,
-      duration:  status === 'terminee' && prev.startedAt
-        ? Math.round((Date.now() - new Date(prev.startedAt).getTime()) / 60000)
-        : prev.duration,
-      syncStatus: 'pending',
-      updatedAt: new Date().toISOString(),
-    } : prev);
-
-    if (appointmentId) {
-      syncFromConsultation(appointmentId, status);
-    }
-  };
-
   const handleSaveNotes = async () => {
-    if (!isDbBacked || notesSaving) return;
+    if (notesSaving) return;
     setNotesSaving(true);
     try {
       const updated = await apiClient.patch<Consultation>(`/consultations/${rawId}`, { notes: notesDraft });
@@ -123,6 +63,44 @@ export default function ConsultationWorkspacePage() {
     } finally {
       setNotesSaving(false);
     }
+  };
+
+  // ── Diagnostic (colonne réelle `diagnosis`) — PATCH /consultations/:id ─────
+  const [diagnosisSaving, setDiagnosisSaving] = useState(false);
+
+  const handleSaveDiagnosis = async (diagnosis: string): Promise<boolean> => {
+    if (diagnosisSaving) return false;
+    setDiagnosisSaving(true);
+    try {
+      const updated = await apiClient.patch<Consultation>(`/consultations/${rawId}`, { diagnosis });
+      setConsultation(prev => prev ? { ...prev, diagnosis: updated.diagnosis, updatedAt: updated.updatedAt } : prev);
+      toast({ title: 'Diagnostic enregistré', description: 'Diagnostic mis à jour (PostgreSQL + audit).' });
+      return true;
+    } catch (e) {
+      toast({
+        variant: 'destructive',
+        title: "Échec de l'enregistrement",
+        description: e instanceof Error ? e.message : "Impossible d'enregistrer le diagnostic. Veuillez réessayer.",
+      });
+      return false;
+    } finally {
+      setDiagnosisSaving(false);
+    }
+  };
+
+  // ── Statut — le serveur valide l'enum, horodate startedAt/endedAt ──────────
+  const handleStatusChange = (status: ConsultationStatus) => {
+    apiClient.patch<Consultation>(`/consultations/${rawId}`, { status })
+      .then(updated => {
+        setConsultation(prev => prev ? { ...prev, ...updated } : updated);
+      })
+      .catch(() => {
+        toast({
+          variant: 'destructive',
+          title: 'Échec de la mise à jour',
+          description: "Le changement de statut n'a pas été enregistré en base. Veuillez réessayer.",
+        });
+      });
   };
 
   if (loading) {
@@ -157,34 +135,34 @@ export default function ConsultationWorkspacePage() {
 
   return (
     <DashboardLayout noPadding>
-      {isDbBacked && (
-        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-            Notes du dossier
-          </label>
-          <div className="flex items-start gap-2">
-            <textarea
-              value={notesDraft}
-              onChange={e => setNotesDraft(e.target.value)}
-              rows={2}
-              placeholder="Notes cliniques persistées sur la consultation…"
-              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-y"
-            />
-            <button
-              onClick={handleSaveNotes}
-              disabled={notesSaving || (consultation.notes ?? '') === notesDraft}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
-            >
-              {notesSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-              Enregistrer
-            </button>
-          </div>
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3">
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+          Notes du dossier
+        </label>
+        <div className="flex items-start gap-2">
+          <textarea
+            value={notesDraft}
+            onChange={e => setNotesDraft(e.target.value)}
+            rows={2}
+            placeholder="Notes cliniques persistées sur la consultation…"
+            className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-y"
+          />
+          <button
+            onClick={handleSaveNotes}
+            disabled={notesSaving || (consultation.notes ?? '') === notesDraft}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+          >
+            {notesSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+            Enregistrer
+          </button>
         </div>
-      )}
+      </div>
       <ConsultationWorkspace
         consultation={consultation}
-        onChange={handleChange}
         onStatusChange={handleStatusChange}
+        onSaveDiagnosis={handleSaveDiagnosis}
+        diagnosisSaving={diagnosisSaving}
+        saving={notesSaving || diagnosisSaving}
       />
     </DashboardLayout>
   );

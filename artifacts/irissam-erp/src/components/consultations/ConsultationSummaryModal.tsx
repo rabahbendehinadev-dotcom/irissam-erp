@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, CheckCircle2, AlertTriangle, ClipboardList, Pill, FlaskConical, Scan, FileText, Calendar } from 'lucide-react';
+import { X, CheckCircle2, AlertTriangle, ClipboardList, FileText } from 'lucide-react';
 import { ConsultationStatusBadge, ConsultationTypeBadge } from './ConsultationStatusBadge';
 import type { Consultation } from '@/types/consultation';
 
@@ -13,28 +13,20 @@ interface CheckItem {
 
 interface Props {
   consultation: Consultation;
-  onConfirm: (reason: string) => void;
+  onConfirm: () => void;
   onClose: () => void;
 }
 
 export function ConsultationSummaryModal({ consultation: c, onConfirm, onClose }: Props) {
-  const [reason, setReason] = useState('');
   const [confirmed, setConfirmed] = useState(false);
 
-  const dxOk     = (c.diagnoses?.filter(d => d.kind === 'principal' && d.label).length ?? 0) > 0;
-  const rxCount  = c.prescriptions?.length ?? 0;
-  const labCount = c.labOrders?.length ?? 0;
-  const imgCount = c.imagingOrders?.length ?? 0;
-  const docCount = c.documents?.length ?? 0;
-  const followUp = !!(c.followUp?.controlDate || c.followUp?.newAppointment);
+  // Vérifications sur les champs RÉELS du dossier PostgreSQL uniquement.
+  const dxOk    = !!c.diagnosis?.trim();
+  const notesOk = !!c.notes?.trim();
 
   const checks: CheckItem[] = [
-    { icon: ClipboardList, label: 'Diagnostic principal', ok: dxOk,     required: true,  message: dxOk ? 'Diagnostic renseigné' : '⚠ Diagnostic principal manquant' },
-    { icon: Pill,          label: 'Ordonnance',           ok: rxCount > 0, required: false, message: rxCount > 0 ? `${rxCount} médicament(s)` : 'Aucune prescription' },
-    { icon: FlaskConical,  label: 'Analyses',             ok: labCount > 0, required: false, message: labCount > 0 ? `${labCount} demande(s)` : 'Aucune analyse demandée' },
-    { icon: Scan,          label: 'Imagerie',             ok: imgCount > 0, required: false, message: imgCount > 0 ? `${imgCount} examen(s)` : 'Aucun examen d\'imagerie' },
-    { icon: FileText,      label: 'Documents',            ok: docCount > 0, required: false, message: docCount > 0 ? `${docCount} document(s)` : 'Aucun document généré' },
-    { icon: Calendar,      label: 'Suivi planifié',       ok: followUp,    required: false, message: followUp ? 'Suivi planifié' : 'Aucun suivi planifié' },
+    { icon: ClipboardList, label: 'Diagnostic',       ok: dxOk,    required: true,  message: dxOk ? 'Diagnostic renseigné' : '⚠ Diagnostic manquant' },
+    { icon: FileText,      label: 'Notes du dossier', ok: notesOk, required: false, message: notesOk ? 'Notes renseignées' : 'Aucune note' },
   ];
 
   const canComplete = dxOk && confirmed;
@@ -111,30 +103,20 @@ export function ConsultationSummaryModal({ consultation: c, onConfirm, onClose }
           {!dxOk && (
             <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
               <AlertTriangle size={15} className="flex-shrink-0 mt-0.5" />
-              <p>Un <strong>diagnostic principal confirmé</strong> est requis avant de pouvoir terminer la consultation.</p>
+              <p>
+                Un <strong>diagnostic</strong> est requis avant de pouvoir terminer la
+                consultation. Saisissez-le dans l'onglet <strong>Diagnostic</strong> puis
+                enregistrez-le.
+              </p>
             </div>
           )}
-
-          {/* Reason */}
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
-              Commentaire de clôture (optionnel)
-            </label>
-            <textarea
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              rows={2}
-              placeholder="Notes de fin de consultation, informations complémentaires…"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 resize-none"
-            />
-          </div>
 
           {/* Confirmation checkbox */}
           <label className="flex items-start gap-3 cursor-pointer group">
             <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)}
               className="rounded border-gray-300 text-green-600 focus:ring-green-500 mt-0.5" />
             <span className="text-sm text-gray-700 group-hover:text-gray-900">
-              Je confirme que la consultation est terminée. Le statut sera verrouillé en <strong>Terminée</strong> et toute modification ultérieure créera une nouvelle version.
+              Je confirme que la consultation est terminée. Le statut sera verrouillé en <strong>Terminée</strong> et le dossier passera en lecture seule.
             </span>
           </label>
         </div>
@@ -145,7 +127,7 @@ export function ConsultationSummaryModal({ consultation: c, onConfirm, onClose }
             Annuler
           </button>
           <button
-            onClick={() => onConfirm(reason)}
+            onClick={onConfirm}
             disabled={!canComplete}
             className="flex items-center gap-2 px-5 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >

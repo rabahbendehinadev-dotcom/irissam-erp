@@ -196,6 +196,8 @@ export interface Consultation {
   freeNotes?: string;
   /** Notes du dossier — colonne réelle consultations.notes (PostgreSQL), éditée via PATCH. */
   notes?: string;
+  /** Diagnostic — colonne réelle consultations.diagnosis (PostgreSQL), éditée via PATCH. */
+  diagnosis?: string | null;
   clinicalExam?: ClinicalExam;
   diagnoses?: Diagnosis[];
   prescriptions?: PrescriptionItem[];

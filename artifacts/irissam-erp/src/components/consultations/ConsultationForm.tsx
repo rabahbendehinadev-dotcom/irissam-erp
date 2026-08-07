@@ -1,18 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   X, Search, ChevronRight, ChevronLeft, Stethoscope, User,
-  Activity, Check, ExternalLink, AlertTriangle, RefreshCw,
+  Check, ExternalLink, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
-import { addSessionConsultation } from '@/mock';
 import { apiClient } from '@/services/api/client';
 import { useGetPatientsList } from '@workspace/api-client-react';
 import type { Patient } from '@/types';
 import type {
-  Consultation, ConsultationType, ConsultationOrigin,
-  ConsultationPriority, VitalSigns,
+  ConsultationType, ConsultationOrigin, ConsultationPriority,
 } from '@/types/consultation';
 
 // ─── Référentiel réel (PostgreSQL via /directory) ────────────────────────────
@@ -411,223 +409,17 @@ function ContextFormStep({ form, onChange, patient, services, doctors, dirError 
   );
 }
 
-// ─── Step 3: Vital Signs ──────────────────────────────────────────────────────
-
-type VS = Partial<VitalSigns>;
-
-function VitalsStep({ vitals, onChange, patient }: { vitals: VS; onChange: (v: VS) => void; patient: Patient | null }) {
-  const setNum = (k: keyof VS, raw: string) => {
-    const num = parseFloat(raw);
-    const next: VS = { ...vitals, [k]: isNaN(num) ? undefined : num };
-    if (next.weight && next.height) {
-      next.bmi = parseFloat((next.weight / Math.pow(next.height / 100, 2)).toFixed(1));
-    }
-    onChange(next);
-  };
-  const setStr = (k: keyof VS, v: string) => onChange({ ...vitals, [k]: v || undefined });
-  const setBool = (k: keyof VS, v: boolean) => onChange({ ...vitals, [k]: v });
-
-  const INP = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400';
-  const alertCls = (k: keyof VS, lo: number, hi: number) => {
-    const v = vitals[k] as number | undefined;
-    return !v ? '' : (v < lo || v > hi) ? 'border-red-400 bg-red-50' : 'border-green-300';
-  };
-  const isAbn = (k: keyof VS, lo: number, hi: number) => {
-    const v = vitals[k] as number | undefined;
-    return v !== undefined && (v < lo || v > hi);
-  };
-
-  const abnLabels: string[] = [
-    isAbn('temperature',     36,   38.5) && 'Température',
-    isAbn('systolicBP',      90,   140)  && 'Tension systolique',
-    isAbn('diastolicBP',     60,   90)   && 'Tension diastolique',
-    isAbn('heartRate',       60,   100)  && 'Fréq. cardiaque',
-    isAbn('respiratoryRate', 12,   20)   && 'Fréq. respiratoire',
-    isAbn('oxygenSaturation',95,   100)  && 'Saturation O₂',
-    isAbn('bloodGlucose',    3.9,  7.8)  && 'Glycémie',
-  ].filter(Boolean) as string[];
-
-  return (
-    <div className="space-y-4">
-      <MedicalAlertBanner patient={patient} />
-
-      {abnLabels.length > 0 && (
-        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-          <AlertTriangle size={13} className="mt-0.5 shrink-0" />
-          <span>Valeurs anormales détectées : <strong>{abnLabels.join(', ')}</strong></span>
-        </div>
-      )}
-
-      {/* Standard numeric vitals */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {([
-          { key: 'weight',            label: 'Poids',              unit: 'kg',     lo: 30,  hi: 300  },
-          { key: 'height',            label: 'Taille',             unit: 'cm',     lo: 50,  hi: 250  },
-          { key: 'temperature',       label: 'Température',        unit: '°C',     lo: 36,  hi: 38.5 },
-          { key: 'systolicBP',        label: 'Tension syst.',      unit: 'mmHg',   lo: 90,  hi: 140  },
-          { key: 'diastolicBP',       label: 'Tension diast.',     unit: 'mmHg',   lo: 60,  hi: 90   },
-          { key: 'heartRate',         label: 'Fréq. cardiaque',    unit: 'bpm',    lo: 60,  hi: 100  },
-          { key: 'respiratoryRate',   label: 'Fréq. respiratoire', unit: '/min',   lo: 12,  hi: 20   },
-          { key: 'oxygenSaturation',  label: 'Saturation O₂',      unit: '%',      lo: 95,  hi: 100  },
-          { key: 'bloodGlucose',      label: 'Glycémie',           unit: 'mmol/L', lo: 3.9, hi: 7.8  },
-          { key: 'painLevel',         label: 'Douleur (0–10)',      unit: '/10',    lo: 0,   hi: 10   },
-        ] as const).map(f => (
-          <div key={f.key}>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">{f.label}</label>
-            <div className="flex gap-1.5 items-center">
-              <input type="number" step="0.1"
-                value={(vitals[f.key as keyof VS] as number | undefined) ?? ''}
-                onChange={e => setNum(f.key as keyof VS, e.target.value)}
-                className={cn(INP, 'flex-1', alertCls(f.key as keyof VS, f.lo, f.hi))}
-                placeholder="—" />
-              <span className="text-xs text-gray-400 whitespace-nowrap">{f.unit}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Auto-BMI */}
-      {vitals.bmi && (
-        <div className={cn('flex items-center gap-3 p-3 rounded-lg text-sm font-medium',
-          vitals.bmi < 18.5 ? 'bg-blue-50 text-blue-700' :
-          vitals.bmi < 25   ? 'bg-green-50 text-green-700' :
-          vitals.bmi < 30   ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-700'
-        )}>
-          <span>IMC calculé :</span>
-          <span className="font-bold">{vitals.bmi}</span>
-          <span>
-            {vitals.bmi < 18.5 ? '— Insuffisance pondérale' :
-             vitals.bmi < 25   ? '— Poids normal ✓' :
-             vitals.bmi < 30   ? '— Surpoids' : '— Obésité'}
-          </span>
-        </div>
-      )}
-
-      {/* Additional fields */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-medium text-gray-600 mb-1 block">Tour de taille</label>
-          <div className="flex gap-1.5 items-center">
-            <input type="number" step="0.5"
-              value={vitals.waistCircumference ?? ''}
-              onChange={e => setNum('waistCircumference', e.target.value)}
-              className={cn(INP, 'flex-1')} placeholder="—" />
-            <span className="text-xs text-gray-400">cm</span>
-          </div>
-        </div>
-        <div>
-          <label className={cn('text-xs font-medium text-gray-600 mb-1 block')}>
-            Score de Glasgow <span className="font-normal text-gray-400">(optionnel)</span>
-          </label>
-          <div className="flex gap-1.5 items-center">
-            <input type="number" step="1" min={3} max={15}
-              value={vitals.glasgowScore ?? ''}
-              onChange={e => setNum('glasgowScore', e.target.value)}
-              className={cn(INP, 'flex-1',
-                vitals.glasgowScore !== undefined && vitals.glasgowScore < 8  ? 'border-red-400 bg-red-50' :
-                vitals.glasgowScore !== undefined && vitals.glasgowScore < 14 ? 'border-amber-400 bg-amber-50' : ''
-              )} placeholder="3–15" />
-            <span className="text-xs text-gray-400">/15</span>
-          </div>
-        </div>
-      </div>
-
-      {/* État de conscience */}
-      <div>
-        <label className="text-xs font-medium text-gray-600 mb-1.5 block">État de conscience</label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {([
-            { value: 'alerte',      label: 'Alerte',              color: 'green' },
-            { value: 'voix',        label: 'Répond à la voix',    color: 'blue'  },
-            { value: 'douleur',     label: 'Répond à la douleur', color: 'amber' },
-            { value: 'inconscient', label: 'Inconscient',         color: 'red'   },
-          ] as const).map(opt => {
-            const sel = vitals.consciousnessState === opt.value;
-            const colMap: Record<string, string> = {
-              green: 'border-green-500 bg-green-50 text-green-700',
-              blue:  'border-blue-500 bg-blue-50 text-blue-700',
-              amber: 'border-amber-500 bg-amber-50 text-amber-700',
-              red:   'border-red-500 bg-red-50 text-red-700',
-            };
-            return (
-              <button key={opt.value} type="button"
-                onClick={() => setStr('consciousnessState', sel ? '' : opt.value)}
-                className={cn(
-                  'py-2 px-2 rounded-lg border-2 text-xs font-medium transition-all text-center',
-                  sel ? colMap[opt.color] : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                )}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Oxygène */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox"
-            checked={vitals.oxygenAdministered ?? false}
-            onChange={e => onChange({
-              ...vitals,
-              oxygenAdministered: e.target.checked,
-              oxygenFlowRate: e.target.checked ? vitals.oxygenFlowRate : undefined,
-            })}
-            className="rounded border-gray-300 text-blue-600" />
-          Oxygène administré
-        </label>
-        {vitals.oxygenAdministered && (
-          <div className="flex items-center gap-2">
-            <input type="number" step="0.5" min={0} max={15}
-              value={vitals.oxygenFlowRate ?? ''}
-              onChange={e => setNum('oxygenFlowRate', e.target.value)}
-              className="w-20 px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              placeholder="—" />
-            <span className="text-xs text-gray-500">L/min</span>
-          </div>
-        )}
-      </div>
-
-      {/* Grossesse */}
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input type="checkbox"
-          checked={vitals.pregnancy ?? false}
-          onChange={e => setBool('pregnancy', e.target.checked)}
-          className="rounded border-gray-300 text-blue-600" />
-        Grossesse en cours
-      </label>
-
-      {/* Commentaire clinique */}
-      <div>
-        <label className="text-xs font-medium text-gray-600 mb-1 block">Commentaire clinique</label>
-        <textarea value={vitals.clinicalComment ?? ''} onChange={e => setStr('clinicalComment', e.target.value)}
-          rows={2} placeholder="Observations cliniques rapides…"
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" />
-      </div>
-
-      {/* Notes infirmières */}
-      <div>
-        <label className="text-xs font-medium text-gray-600 mb-1 block">Notes infirmières</label>
-        <textarea value={vitals.nursingNotes ?? ''} onChange={e => setStr('nursingNotes', e.target.value)}
-          rows={2} placeholder="Observations infirmières…"
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" />
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Wizard ──────────────────────────────────────────────────────────────
 
 const STEPS = [
   { id: 1, icon: User,        label: 'Patient' },
   { id: 2, icon: Stethoscope, label: 'Contexte' },
-  { id: 3, icon: Activity,    label: 'Signes vitaux' },
 ];
 
 interface Props {
   onClose: () => void;
-  onCreated: (c: Partial<Consultation>) => Promise<boolean>;
+  /** Rafraîchit la liste depuis l'API après création — résout à true si OK. */
+  onCreated: () => Promise<boolean>;
   initialPatientId?: string;
 }
 
@@ -644,26 +436,28 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
   const [step, setStep] = useState(1);
   const [patient, setPatient] = useState<Patient | null>(null);
 
-  // If opened with a pre-selected patient ID, fetch it from the real API
+  // If opened with a pre-selected patient ID, fetch it from the real API.
+  // Échec visible (pas de catch silencieux) : l'utilisateur peut toujours
+  // rechercher le patient manuellement à l'étape 1.
   useEffect(() => {
     if (!initialPatientId) return;
-    import('@/services/api/client').then(({ apiClient }) =>
-      apiClient.get<Record<string, unknown>>(`/patients/${initialPatientId}`)
-        .then(r => setPatient({
-          id:          r.id as string,
-          mpiId:       (r.mpiId as string) ?? '',
-          fileNumber:  (r.internalNumber as string) ?? '',
-          firstName:   (r.firstName as string) ?? '',
-          lastName:    (r.lastName as string) ?? '',
-          status:      (r.status as Patient['status']) ?? 'active',
-          gender:      (r.gender as Patient['gender']) ?? 'M',
-          dateOfBirth: (r.dateOfBirth as string) ?? '',
-          phone:       (r.phone as string) ?? '',
-          isIncomplete: false, potentialDuplicate: false, syncStatus: 'synced' as const,
-          createdAt: '', updatedAt: '', siteId: 'site-1', createdById: 'system',
-        } as Patient))
-        .catch(() => {})
-    );
+    apiClient.get<Record<string, unknown>>(`/patients/${initialPatientId}`)
+      .then(r => setPatient({
+        id:          r.id as string,
+        mpiId:       (r.mpiId as string) ?? '',
+        fileNumber:  (r.internalNumber as string) ?? '',
+        firstName:   (r.firstName as string) ?? '',
+        lastName:    (r.lastName as string) ?? '',
+        status:      (r.status as Patient['status']) ?? 'active',
+        gender:      (r.gender as Patient['gender']) ?? 'M',
+        dateOfBirth: (r.dateOfBirth as string) ?? '',
+        phone:       (r.phone as string) ?? '',
+        isIncomplete: false, potentialDuplicate: false, syncStatus: 'synced' as const,
+        createdAt: '', updatedAt: '', siteId: 'site-1', createdById: 'system',
+      } as Patient))
+      .catch(() => {
+        setSubmitError('Impossible de charger le patient présélectionné — recherchez-le manuellement ci-dessous.');
+      });
   }, [initialPatientId]);
   const { date: today, time: nowTime } = getNow();
   const [ctx, setCtx] = useState<CtxState>({
@@ -673,7 +467,6 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
     reason: '', reasonDescription: '', companion: '',
     priority: 'normale',
   });
-  const [vitals, setVitals] = useState<VS>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -701,9 +494,7 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
 
   const canNext = step === 1
     ? !!patient
-    : step === 2
-    ? !!(ctx.doctorId && ctx.serviceId && ctx.date && ctx.time && ctx.reason)
-    : true;
+    : !!(ctx.doctorId && ctx.serviceId && ctx.date && ctx.time && ctx.reason);
 
   const handleCreate = async () => {
     if (isSubmitting) return;
@@ -722,7 +513,6 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
       hospitalisation: 'hospitalisation', admission: 'hospitalisation', controle: 'rdv',
     };
 
-    const now    = new Date().toISOString();
     const reason = ctx.reason + (ctx.reasonDescription ? `\n${ctx.reasonDescription}` : '');
 
     try {
@@ -742,37 +532,9 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
         status:      'en_attente',
       });
 
-      const newConsultation = {
-        id:          created.id,
-        number:      created.number,
-        patientId:   patient!.id,
-        patientName: `${patient!.lastName} ${patient!.firstName}`,
-        patientMpi:  patient!.mpiId,
-        doctorId:    ctx.doctorId,
-        doctorName:  selectedDoctor ? `Dr ${selectedDoctor.fullName}` : ctx.doctorId,
-        specialty:   selectedDoctor?.specialty ?? selectedService?.name ?? '',
-        serviceId:   ctx.serviceId,
-        serviceName: selectedService?.name ?? ctx.serviceId,
-        siteId:      'site-main',
-        siteName:    'IRISSAM Hospital',
-        date:        ctx.date,
-        scheduledAt: `${ctx.date}T${ctx.time}:00`,
-        type:        ctx.type,
-        origin:      ctx.origin,
-        reason,
-        companion:   ctx.companion || undefined,
-        priority:    ctx.priority,
-        status:      'en_attente' as const,
-        syncStatus:  'synced'     as const,
-        vitalSigns:  Object.keys(vitals).length > 0 ? (vitals as VitalSigns) : undefined,
-        createdAt:   now,
-        updatedAt:   now,
-        createdById: 'u-current',
-      } as Consultation;
-
-      // Copie de session pour l'espace de travail (vitals saisis au step 3, etc.)
-      addSessionConsultation(newConsultation);
-      const success = await onCreated(newConsultation);
+      // La ligne affichée provient ensuite du refetch API (PostgreSQL) —
+      // aucune copie de session, aucune donnée fictive.
+      const success = await onCreated();
       setIsSubmitting(false);
 
       if (success) {
@@ -833,7 +595,6 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {step === 1 && <PatientSelector selected={patient} onSelect={setPatient} />}
           {step === 2 && <ContextFormStep form={ctx} onChange={setCtx} patient={patient} services={services} doctors={doctors} dirError={dirError} />}
-          {step === 3 && <VitalsStep vitals={vitals} onChange={setVitals} patient={patient} />}
         </div>
 
         {/* Submission error banner */}
@@ -864,11 +625,11 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
               </span>
             )}
             <button
-              onClick={step < 3 ? () => setStep(s => s + 1) : handleCreate}
+              onClick={step < 2 ? () => setStep(s => s + 1) : handleCreate}
               disabled={!canNext || isSubmitting}
               className="flex items-center gap-1.5 px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {step < 3
+              {step < 2
                 ? <><ChevronRight size={15} /> Suivant</>
                 : isSubmitting
                 ? <><RefreshCw size={15} className="animate-spin" /> Enregistrement…</>

@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
-import { ChevronUp, ChevronDown, MoreVertical, Eye, Play, Pencil, CheckSquare, Printer, History, XCircle, ChevronsUpDown, Activity } from 'lucide-react';
+import { ChevronUp, ChevronDown, MoreVertical, Eye, Play, Pencil, CheckSquare, Printer, History, XCircle, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
 import { ConsultationStatusBadge, ConsultationTypeBadge, ConsultationOriginBadge } from './ConsultationStatusBadge';
 import { SyncStatusBadge } from '@/components/patients/SyncStatusBadge';
 import { formatDate, formatTime } from '@/utils/format';
-import { usePermission } from '@/hooks/usePermission';
 import type { Consultation, ConsultationStatus } from '@/types/consultation';
 
 type SortKey = 'number' | 'date' | 'patientName' | 'doctorName' | 'status' | 'duration';
@@ -23,13 +22,11 @@ interface ActionsMenuProps {
 
 function ActionsMenu({ consultation: c, onAction }: ActionsMenuProps) {
   const [open, setOpen] = useState(false);
-  const { can: canDo } = usePermission();
   const can = {
     start:       c.status === 'en_attente' || c.status === 'planifiee',
     edit:        c.status !== 'terminee' && c.status !== 'annulee',
     complete:    c.status === 'en_cours' || c.status === 'suspendue',
     cancel:      c.status !== 'terminee' && c.status !== 'annulee',
-    vitalsEntry: (c.status === 'en_attente' || c.status === 'planifiee') && canDo('consultations.vitals_entry'),
   };
 
   return (
@@ -46,7 +43,6 @@ function ActionsMenu({ consultation: c, onAction }: ActionsMenuProps) {
           <div className="absolute right-0 top-8 z-50 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-hidden">
             {[
               { key: 'open',         icon: Eye,        label: 'Ouvrir',                show: true,               danger: false },
-              { key: 'vitals_entry', icon: Activity,   label: 'Saisir les signes vitaux', show: can.vitalsEntry, danger: false, highlight: true },
               { key: 'start',        icon: Play,       label: 'Commencer',             show: can.start,           danger: false },
               { key: 'edit',         icon: Pencil,     label: 'Modifier',              show: can.edit,            danger: false },
               { key: 'complete',     icon: CheckSquare,label: 'Terminer',              show: can.complete,        danger: false },
@@ -55,7 +51,6 @@ function ActionsMenu({ consultation: c, onAction }: ActionsMenuProps) {
               { key: 'cancel',       icon: XCircle,    label: 'Annuler',               show: can.cancel,          danger: true  },
             ].filter(a => a.show).map(a => {
               const Icon = a.icon;
-              const isHighlight = 'highlight' in a && a.highlight;
               return (
                 <button
                   key={a.key}
@@ -64,12 +59,10 @@ function ActionsMenu({ consultation: c, onAction }: ActionsMenuProps) {
                     'flex items-center gap-2.5 w-full px-4 py-2 text-sm transition-colors',
                     a.danger
                       ? 'text-red-600 hover:bg-red-50'
-                      : isHighlight
-                      ? 'text-blue-700 hover:bg-blue-50 font-medium'
                       : 'text-gray-700 hover:bg-gray-50'
                   )}
                 >
-                  <Icon size={14} className={isHighlight ? 'text-blue-500' : 'text-gray-400'} />
+                  <Icon size={14} className="text-gray-400" />
                   {a.label}
                 </button>
               );
@@ -85,12 +78,11 @@ interface Props {
   consultations: Consultation[];
   onStatusChange?: (id: string, status: ConsultationStatus) => void;
   onPatientClick?: (patientId: string) => void;
-  onVitalsEntry?: (consultation: Consultation) => void;
 }
 
 const PAGE_SIZE = 10;
 
-export function ConsultationTable({ consultations, onStatusChange, onPatientClick, onVitalsEntry }: Props) {
+export function ConsultationTable({ consultations, onStatusChange, onPatientClick }: Props) {
   const [, setLocation] = useLocation();
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -118,7 +110,6 @@ export function ConsultationTable({ consultations, onStatusChange, onPatientClic
 
   const handleAction = (action: string, c: Consultation) => {
     if (action === 'open')           setLocation(`/consultations/${c.id}`);
-    else if (action === 'vitals_entry') onVitalsEntry?.(c);
     else if (action === 'start')     onStatusChange?.(c.id, 'en_cours');
     else if (action === 'complete')  setLocation(`/consultations/${c.id}`);
     else if (action === 'cancel')    onStatusChange?.(c.id, 'annulee');
@@ -200,16 +191,14 @@ export function ConsultationTable({ consultations, onStatusChange, onPatientClic
                   <td className="px-4 py-3"><ConsultationTypeBadge type={c.type} /></td>
                   <td className="px-4 py-3 max-w-[160px]">
                     <p className="text-xs text-gray-600 truncate" title={c.reason}>{c.reason}</p>
+                    {c.diagnosis?.trim() && (
+                      <p className="text-xs text-purple-700 truncate mt-0.5" title={c.diagnosis}>
+                        Dx&nbsp;: {c.diagnosis}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-col gap-1">
-                      <ConsultationStatusBadge status={c.status} />
-                      {c.vitalSigns && (c.status === 'en_attente' || c.status === 'planifiee') && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                          <Activity size={9} /> Vitaux saisis
-                        </span>
-                      )}
-                    </div>
+                    <ConsultationStatusBadge status={c.status} />
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                     {c.duration ? `${c.duration} min` : <span className="text-gray-300">—</span>}

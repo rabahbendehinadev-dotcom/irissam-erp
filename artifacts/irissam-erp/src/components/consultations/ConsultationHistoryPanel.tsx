@@ -1,20 +1,8 @@
 import { useState } from 'react';
-import { Clock, History, Shield, ChevronRight } from 'lucide-react';
+import { Clock, History } from 'lucide-react';
 import type { Consultation, ConsultationVersion } from '@/types/consultation';
 
-// ─── Mock audit entries ───────────────────────────────────────────────────────
-
-const MOCK_AUDIT = [
-  { id: 1, user: 'Dr Karim Benamara',  role: 'Médecin',     action: 'Ouverture consultation',      at: '08:05',  device: 'PC-MED-01' },
-  { id: 2, user: 'Inf. Sara Medjdoub', role: 'Infirmier',   action: 'Saisie des signes vitaux',    at: '08:08',  device: 'TAB-NRS-03' },
-  { id: 3, user: 'Dr Karim Benamara',  role: 'Médecin',     action: 'Ajout diagnostic principal',  at: '08:12',  device: 'PC-MED-01' },
-  { id: 4, user: 'Dr Karim Benamara',  role: 'Médecin',     action: 'Prescription créée',          at: '08:18',  device: 'PC-MED-01' },
-  { id: 5, user: 'Dr Karim Benamara',  role: 'Médecin',     action: 'Demande analyse ajoutée',     at: '08:22',  device: 'PC-MED-01' },
-  { id: 6, user: 'Dr Karim Benamara',  role: 'Médecin',     action: 'Plan de suivi complété',      at: '08:28',  device: 'PC-MED-01' },
-  { id: 7, user: 'Dr Karim Benamara',  role: 'Médecin',     action: 'Consultation terminée',       at: '08:32',  device: 'PC-MED-01' },
-];
-
-// ─── Timeline ─────────────────────────────────────────────────────────────────
+// ─── Chronologie — dérivée uniquement des champs PostgreSQL réels ─────────────
 
 interface TimelineEvent {
   time: string;
@@ -24,20 +12,33 @@ interface TimelineEvent {
   icon: string;
 }
 
+function hhmm(iso?: string): string {
+  if (!iso || iso.length < 16) return '—';
+  return iso.substring(11, 16);
+}
+
 function buildTimeline(c: Consultation): TimelineEvent[] {
   const events: TimelineEvent[] = [
-    { time: c.scheduledAt.substring(11, 16), title: 'Consultation planifiée', desc: `Type : ${c.type} · Motif : ${c.reason}`, color: 'bg-gray-200', icon: '📋' },
+    {
+      time: hhmm(c.scheduledAt ?? c.createdAt),
+      title: 'Consultation planifiée',
+      desc: c.reason ? `Motif : ${c.reason}` : undefined,
+      color: 'bg-gray-200',
+      icon: '📋',
+    },
   ];
-  if (c.startedAt) events.push({ time: c.startedAt.substring(11, 16), title: 'Consultation démarrée', desc: `Médecin : ${c.doctorName}`, color: 'bg-blue-400', icon: '▶️' });
-  if (c.vitalSigns) events.push({ time: '-', title: 'Signes vitaux saisis', desc: c.vitalSigns.temperature ? `T° ${c.vitalSigns.temperature}°C · TA ${c.vitalSigns.systolicBP}/${c.vitalSigns.diastolicBP} mmHg` : undefined, color: 'bg-teal-400', icon: '❤️' });
-  if (c.clinicalExam) events.push({ time: '-', title: 'Examen clinique renseigné', color: 'bg-indigo-400', icon: '🩺' });
-  if ((c.diagnoses?.length ?? 0) > 0) events.push({ time: '-', title: `${c.diagnoses!.length} diagnostic(s) posé(s)`, desc: c.diagnoses![0]?.label, color: 'bg-purple-400', icon: '📊' });
-  if ((c.prescriptions?.length ?? 0) > 0) events.push({ time: '-', title: `Ordonnance : ${c.prescriptions!.length} médicament(s)`, color: 'bg-green-400', icon: '💊' });
-  if ((c.labOrders?.length ?? 0) > 0) events.push({ time: '-', title: `${c.labOrders!.length} analyse(s) demandée(s)`, color: 'bg-teal-500', icon: '🧪' });
-  if ((c.imagingOrders?.length ?? 0) > 0) events.push({ time: '-', title: `${c.imagingOrders!.length} examen(s) d\'imagerie`, color: 'bg-cyan-400', icon: '🔬' });
-  if ((c.documents?.length ?? 0) > 0) events.push({ time: '-', title: `${c.documents!.length} document(s) généré(s)`, color: 'bg-violet-400', icon: '📝' });
-  if (c.followUp?.controlDate) events.push({ time: '-', title: 'Plan de suivi établi', desc: `Contrôle : ${c.followUp.controlDate}`, color: 'bg-orange-400', icon: '📅' });
-  if (c.endedAt) events.push({ time: c.endedAt.substring(11, 16), title: 'Consultation terminée', desc: c.duration ? `Durée : ${c.duration} min` : undefined, color: 'bg-green-500', icon: '✅' });
+  if (c.startedAt) {
+    events.push({ time: hhmm(c.startedAt), title: 'Consultation démarrée', desc: `Médecin : ${c.doctorName}`, color: 'bg-blue-400', icon: '▶️' });
+  }
+  if (c.diagnosis?.trim()) {
+    events.push({ time: '-', title: 'Diagnostic renseigné', desc: c.diagnosis, color: 'bg-purple-400', icon: '📊' });
+  }
+  if (c.notes?.trim()) {
+    events.push({ time: '-', title: 'Notes du dossier renseignées', color: 'bg-teal-400', icon: '📝' });
+  }
+  if (c.endedAt) {
+    events.push({ time: hhmm(c.endedAt), title: 'Consultation terminée', desc: c.duration ? `Durée : ${c.duration} min` : undefined, color: 'bg-green-500', icon: '✅' });
+  }
   return events;
 }
 
@@ -51,13 +52,13 @@ function TimelineTab({ consultation }: { consultation: Consultation }) {
             <div className={`w-3 h-3 rounded-full ${evt.color} flex-shrink-0 mt-0.5`} />
             {i < events.length - 1 && <div className="w-px flex-1 bg-gray-200 mt-1" />}
           </div>
-          <div className={`pb-4 ${i < events.length - 1 ? '' : ''}`}>
+          <div className="pb-4">
             <div className="flex items-center gap-2">
               <span className="text-base">{evt.icon}</span>
               <span className="font-medium text-sm text-gray-800">{evt.title}</span>
               {evt.time !== '-' && <span className="text-xs text-gray-400 font-mono">{evt.time}</span>}
             </div>
-            {evt.desc && <p className="text-xs text-gray-500 mt-0.5 ml-6">{evt.desc}</p>}
+            {evt.desc && <p className="text-xs text-gray-500 mt-0.5 ml-6 line-clamp-2">{evt.desc}</p>}
           </div>
         </div>
       ))}
@@ -93,43 +94,11 @@ function VersionsTab({ versions }: { versions?: ConsultationVersion[] }) {
   );
 }
 
-// ─── Audit ───────────────────────────────────────────────────────────────────
-
-function AuditTab() {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-gray-50 border-b border-gray-200">
-            {['Heure', 'Utilisateur', 'Rôle', 'Action', 'Appareil'].map(h => (
-              <th key={h} className="text-left px-3 py-2 font-semibold text-gray-500 uppercase tracking-wide text-xs">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {MOCK_AUDIT.map(entry => (
-            <tr key={entry.id} className="hover:bg-gray-50">
-              <td className="px-3 py-2 font-mono text-gray-500">{entry.at}</td>
-              <td className="px-3 py-2 font-medium text-gray-800">{entry.user}</td>
-              <td className="px-3 py-2">
-                <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{entry.role}</span>
-              </td>
-              <td className="px-3 py-2 text-gray-700">{entry.action}</td>
-              <td className="px-3 py-2 text-gray-400 font-mono">{entry.device}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── Panel ────────────────────────────────────────────────────────────────────
+// ─── Panneau ──────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'timeline', label: 'Chronologie',     icon: Clock },
-  { id: 'versions', label: 'Versions',         icon: History },
-  { id: 'audit',    label: 'Journal d\'audit', icon: Shield },
+  { id: 'timeline', label: 'Chronologie', icon: Clock },
+  { id: 'versions', label: 'Versions',    icon: History },
 ];
 
 interface Props { consultation: Consultation }
@@ -157,7 +126,6 @@ export function ConsultationHistoryPanel({ consultation }: Props) {
 
       {tab === 'timeline' && <TimelineTab consultation={consultation} />}
       {tab === 'versions' && <VersionsTab versions={consultation.versions} />}
-      {tab === 'audit' && <AuditTab />}
     </div>
   );
 }

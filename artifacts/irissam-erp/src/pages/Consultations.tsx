@@ -9,13 +9,7 @@ import { ConsultationStats } from '@/components/consultations/ConsultationStats'
 import { ConsultationFilters, DEFAULT_FILTERS, type ConsultationFiltersState } from '@/components/consultations/ConsultationFilters';
 import { ConsultationTable } from '@/components/consultations/ConsultationTable';
 import { ConsultationForm } from '@/components/consultations/ConsultationForm';
-import { VitalsEntryModal } from '@/components/consultations/VitalsEntryModal';
-import { setNurseVitals } from '@/mock/consultations';
-import type { Consultation, ConsultationStatus, VitalSigns } from '@/types/consultation';
-
-// Module-level vitals overlay: survives refetch() calls (lives outside React state
-// to also be accessible from ConsultationWorkspacePage via getNurseVitals).
-// The React state below mirrors it to trigger re-renders.
+import type { Consultation, ConsultationStatus } from '@/types/consultation';
 
 import {
   useGetConsultationsList,
@@ -27,11 +21,6 @@ export default function ConsultationsPage() {
   const [filters, setFilters] = useState<ConsultationFiltersState>(DEFAULT_FILTERS);
   const [showForm, setShowForm] = useState(false);
   const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
-  const [vitalsConsultation, setVitalsConsultation] = useState<Consultation | null>(null);
-  // Local overlay: nurse-entered vitals keyed by consultation ID.
-  // Applied on top of both API and mock consultations so the "Vitaux saisis"
-  // badge and the workspace pre-fill work regardless of data source.
-  const [vitalsOverlay, setVitalsOverlay] = useState<Record<string, VitalSigns>>({});
 
   // ── Appointment sync ───────────────────────────────────────────────────────
   const { syncFromConsultation, updateAppointmentStatus, appointments: storeAppointments } = useAppointmentStore();
@@ -44,21 +33,12 @@ export default function ConsultationsPage() {
   // ── Auto-refresh every 30 s ────────────────────────────────────────────────
   const { lastUpdatedLabel } = useAutoRefresh({ refetch, data: apiConsultations });
 
-  // Fall back to mock data if API unavailable, then apply nurse vitals overlay
+  // Liste 100 % API (PostgreSQL). En cas d'erreur : liste vide + bannière —
+  // aucune donnée fictive n'est jamais affichée.
   const consultations = useMemo((): Consultation[] => {
-    let base: Consultation[];
-    if (isLoading) return [];
-    if (isError) base = [];
-    else base = Array.isArray(apiConsultations) ? (apiConsultations as unknown as Consultation[]) : [];
-
-    // Merge nurse-entered vitals: overlay takes precedence over API/mock value
-    const overlayKeys = Object.keys(vitalsOverlay);
-    if (overlayKeys.length === 0) return base;
-    return base.map(c => {
-      const nurseVitals = vitalsOverlay[c.id];
-      return nurseVitals ? { ...c, vitalSigns: nurseVitals } : c;
-    });
-  }, [apiConsultations, isLoading, isError, vitalsOverlay]);
+    if (isLoading || isError) return [];
+    return Array.isArray(apiConsultations) ? (apiConsultations as unknown as Consultation[]) : [];
+  }, [apiConsultations, isLoading, isError]);
 
   // ── Filter logic ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -123,14 +103,6 @@ export default function ConsultationsPage() {
     await refetch();
     setShowForm(false);
     return true;
-  };
-
-  const handleVitalsEntered = (consultationId: string, vitals: VitalSigns) => {
-    // 1. Update mock/session arrays so mock-ID workspace navigation works immediately
-    setNurseVitals(consultationId, vitals);
-    // 2. Update React state overlay so API-backed rows also re-render with the badge
-    setVitalsOverlay(prev => ({ ...prev, [consultationId]: vitals }));
-    setVitalsConsultation(null);
   };
 
   const handleRefresh = async () => {
@@ -240,7 +212,7 @@ export default function ConsultationsPage() {
         {!isLoading && (
           <>
             <div className="mb-6">
-              <ConsultationStats />
+              <ConsultationStats consultations={consultations} />
             </div>
 
             {/* ── Filters ─────────────────────────────────────────────────── */}
@@ -253,7 +225,6 @@ export default function ConsultationsPage() {
               consultations={filtered}
               onStatusChange={handleStatusChange}
               onPatientClick={setDrawerPatientId}
-              onVitalsEntry={setVitalsConsultation}
             />
           </>
         )}
@@ -264,15 +235,6 @@ export default function ConsultationsPage() {
         <ConsultationForm
           onClose={() => setShowForm(false)}
           onCreated={handleCreated}
-        />
-      )}
-
-      {/* ── Nurse vitals entry modal ────────────────────────────────────── */}
-      {vitalsConsultation && (
-        <VitalsEntryModal
-          consultation={vitalsConsultation}
-          onSave={handleVitalsEntered}
-          onClose={() => setVitalsConsultation(null)}
         />
       )}
 

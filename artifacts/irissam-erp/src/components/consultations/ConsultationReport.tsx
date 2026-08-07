@@ -437,10 +437,19 @@ export function ConsultationReport({ consultation: c }: Props) {
         </Section>
       )}
 
-      {/* ── Diagnostics ── */}
-      <Section title="Diagnostics">
-        <DiagnosisList diagnoses={c.diagnoses ?? []} />
+      {/* ── Diagnostic (colonne PostgreSQL consultations.diagnosis) ── */}
+      <Section title="Diagnostic">
+        {c.diagnosis?.trim()
+          ? <p className="font-medium whitespace-pre-wrap">{c.diagnosis}</p>
+          : <span className="italic text-gray-400">Non renseigné</span>}
       </Section>
+
+      {/* ── Notes du dossier (colonne PostgreSQL consultations.notes) ── */}
+      {c.notes?.trim() && (
+        <Section title="Notes du dossier">
+          <p className="whitespace-pre-wrap">{c.notes}</p>
+        </Section>
+      )}
 
       {/* ── Prescription ── */}
       {(c.prescriptions?.length ?? 0) > 0 && (

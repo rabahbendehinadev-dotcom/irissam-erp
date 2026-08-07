@@ -99,7 +99,7 @@ function DernieresConsultations({ consultations, onOpen, onNew }: {
         <div className="divide-y divide-gray-50">
           {recent.map(c => {
             const dateStr = c.scheduledAt ?? c.date;
-            const diagnosis = c.diagnoses?.[0]?.label ?? '—';
+            const diagnosis = c.diagnosis?.trim() ? c.diagnosis : '—';
             return (
               <div key={c.id} className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
                 <div className="flex-shrink-0 text-right w-20">
