@@ -1,8 +1,9 @@
 import { useLanguage } from "@/i18n";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
-import { Calendar } from "lucide-react";
+import { Calendar, Lock } from "lucide-react";
 import { useGetUpcomingAppointments } from "@workspace/api-client-react";
+import { usePermission } from "@/hooks/usePermission";
 
 function fmtTime(isoStr: string): string {
   const d = new Date(isoStr);
@@ -15,19 +16,31 @@ interface UpcomingAppointmentsProps {
 
 export function UpcomingAppointments({ onPatientClick }: UpcomingAppointmentsProps) {
   const { t } = useLanguage();
-  const { data: appointments, isLoading } = useGetUpcomingAppointments({ query: { refetchInterval: 30_000 } });
+  const { can } = usePermission();
+  const canView = can("appointments.view");
+  // Ne lance pas la requête sans permission (évite un 403 inutile en console)
+  const { data: appointments, isLoading } = useGetUpcomingAppointments({
+    query: { refetchInterval: 30_000, enabled: canView },
+  });
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden">
       <div className="p-4 border-b border-gray-100 flex items-center justify-between shrink-0">
         <h3 className="font-bold text-sm text-gray-900">{t("appointments.upcoming.title")}</h3>
-        <Link href="/appointments" className="text-xs text-blue-500 hover:underline">
-          {t("appointments.upcoming.view_all")}
-        </Link>
+        {canView && (
+          <Link href="/appointments" className="text-xs text-blue-500 hover:underline">
+            {t("appointments.upcoming.view_all")}
+          </Link>
+        )}
       </div>
-      
+
       <div className="flex-1 overflow-x-auto">
-        {isLoading ? (
+        {!canView ? (
+          <div className="flex flex-col items-center justify-center gap-2 p-6 text-gray-400">
+            <Lock className="w-5 h-5 opacity-40" />
+            <p className="text-xs text-center">Accès restreint — votre rôle n'a pas la permission de consulter les rendez-vous.</p>
+          </div>
+        ) : isLoading ? (
           <div className="p-3 space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 animate-pulse">

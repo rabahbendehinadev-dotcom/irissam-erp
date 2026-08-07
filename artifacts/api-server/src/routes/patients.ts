@@ -103,7 +103,7 @@ function mapPatient(p: DbPatient) {
 }
 
 /** GET /patients/recent — dashboard widget (5 newest) */
-router.get("/recent", async (_req, res, next) => {
+router.get("/recent", requirePermission("patients.view"), async (_req: AuthenticatedRequest, res, next) => {
   try {
     const rows = await db
       .select()
@@ -128,7 +128,7 @@ router.get("/recent", async (_req, res, next) => {
 });
 
 /** GET /patients — full patient list */
-router.get("/", async (req, res, next) => {
+router.get("/", requirePermission("patients.view"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const { search, status, gender, bloodType } =
       req.query as Record<string, string | undefined>;
@@ -199,7 +199,7 @@ router.get("/check-duplicates", requirePermission("patients.view"), async (req: 
 });
 
 /** GET /patients/:id — fetch one patient by UUID */
-router.get("/:id", async (req, res, next) => {
+router.get("/:id", requirePermission("patients.view"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const id = String(req.params.id);
     const row = await repos.patient.findById(id);

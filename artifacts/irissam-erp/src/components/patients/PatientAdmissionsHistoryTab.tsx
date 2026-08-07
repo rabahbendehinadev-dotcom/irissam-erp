@@ -3,8 +3,9 @@
  * typeFilter: undefined = all, 'hospitalisation' = hospitalizations only
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Bed, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Bed, RefreshCw, AlertTriangle, Lock } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { usePermission } from '@/hooks/usePermission';
 
 interface Admission {
   id: string;
@@ -54,6 +55,8 @@ interface Props {
 }
 
 export function PatientAdmissionsHistoryTab({ patientId, typeFilter }: Props) {
+  const { can } = usePermission();
+  const canView = can('admissions.view');
   const [admissions, setAdmissions] = useState<Admission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +65,7 @@ export function PatientAdmissionsHistoryTab({ patientId, typeFilter }: Props) {
   const labelPlural = typeFilter === 'hospitalisation' ? 'hospitalisations' : 'admissions';
 
   const load = useCallback(async () => {
+    if (!canView) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
@@ -74,9 +78,20 @@ export function PatientAdmissionsHistoryTab({ patientId, typeFilter }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [patientId, typeFilter, labelPlural]);
+  }, [patientId, typeFilter, labelPlural, canView]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Accès restreint — pas de requête inutile ni de 403 en console
+  if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[200px] gap-2 text-gray-400">
+        <Lock size={28} className="opacity-30" />
+        <p className="font-semibold text-sm">Accès restreint</p>
+        <p className="text-xs">Votre rôle n'a pas la permission de consulter les {labelPlural}.</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

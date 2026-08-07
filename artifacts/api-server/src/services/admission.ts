@@ -18,6 +18,8 @@
  *  - admissionNumber (not null, generated here)
  */
 import { db } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { occupancyBedsTable } from "@workspace/db/schema";
 import { repos } from "../repositories";
 import { encounterService } from "./encounter";
 import { auditService } from "./audit";
@@ -49,6 +51,8 @@ export interface AdmitInput {
   // Clinical
   motif:               string;   // required by schema (not null)
   type?:               string;   // admissionTypeEnum default "standard"
+  priority?:           string;   // admissionPriorityEnum default "normal"
+  serviceId?:          string;   // FK departments.id (optional, resolved by route)
   serviceName:         string;   // required by schema (not null)
   doctorId?:           string;
   doctorName:          string;   // required by schema (not null)
@@ -129,8 +133,10 @@ export class AdmissionService {
         patientMpiId:   input.patientMpiId,
         patientDob:     input.patientDob,
         patientPhone:   input.patientPhone,
-        type:           (input.type ?? "standard") as any,
+        type:           (input.type ?? "hospitalisation") as any,
+        priority:       (input.priority ?? "normal") as any,
         status:         "active",
+        serviceId:      input.serviceId,
         serviceName:    input.serviceName,
         doctorId:       input.doctorId,
         doctorName:     input.doctorName,
@@ -254,6 +260,63 @@ export class AdmissionService {
         resourceId:   admissionId,
         oldValue:     { bedId: admission.bedId },
         newValue:     { bedId: newBedId, bedNumber: newBed.number },
+        patientId:    admission.patientId,
+        encounterId:  admission.encounterId ?? undefined,
+        siteId:       admission.siteId ?? undefined,
+      }, actor, ctx);
+
+      return updated;
+    });
+  }
+
+  // ── Cancel ────────────────────────────────────────────────────────────────────
+
+  /**
+   * Annulation transactionnelle : statut → cancelled, lit libéré, encounter
+   * clôturé et audit — même garantie d'atomicité que discharge/transferBed.
+   * (Revue UAT Phase 2 : l'ancienne route ne libérait ni lit ni encounter.)
+   */
+  async cancel(admissionId: string, actor: ActorCtx): Promise<DbAdmission> {
+    return db.transaction(async (tx) => {
+      const ctx: TxContext = { ...actor, tx };
+
+      const admission = await repos.admission.findById(admissionId, ctx);
+      if (!admission) throw new Error(`Admission ${admissionId} introuvable`);
+      if (admission.status === "discharged") throw new Error("Patient déjà sorti — annulation impossible");
+      if (admission.status === "cancelled")  throw new Error("Admission déjà annulée");
+
+      const updated = await repos.admission.update(admissionId, { status: "cancelled" }, ctx);
+      if (!updated) throw new Error("L'annulation a échoué");
+
+      if (admission.bedId) {
+        // Durcissement (données héritées) : un lit peut avoir été réassigné à un
+        // autre patient depuis — ne le libérer que s'il est encore rattaché à
+        // CETTE admission (même encounter ou même patient).
+        const [bed] = await tx
+          .select({ patientId: occupancyBedsTable.patientId, encounterId: occupancyBedsTable.encounterId })
+          .from(occupancyBedsTable)
+          .where(eq(occupancyBedsTable.id, admission.bedId))
+          .limit(1);
+        const stillLinked = !!bed && (
+          (admission.encounterId != null && bed.encounterId === admission.encounterId) ||
+          (bed.patientId != null && bed.patientId === admission.patientId)
+        );
+        if (stillLinked) {
+          await repos.occupancyBed.free(admission.bedId, ctx);
+        }
+      }
+
+      if (admission.encounterId) {
+        await encounterService.close(admission.encounterId, "Admission annulée", actor, ctx);
+      }
+
+      await auditService.log({
+        module:       "admissions",
+        action:       "cancelled",
+        resourceType: "admission",
+        resourceId:   admissionId,
+        oldValue:     { status: admission.status },
+        newValue:     { status: "cancelled" },
         patientId:    admission.patientId,
         encounterId:  admission.encounterId ?? undefined,
         siteId:       admission.siteId ?? undefined,

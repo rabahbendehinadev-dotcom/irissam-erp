@@ -1,8 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import { PlusCircle, Download, AlertTriangle } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
@@ -89,15 +88,39 @@ function DischargeModal({ admission, onConfirm, onCancel }: {
 
 function TransferModal({ admission, onConfirm, onCancel }: {
   admission: Admission;
-  onConfirm: (to: string, date: string, notes: string) => void;
+  onConfirm: (newBedId: string, date: string, notes: string) => Promise<void>;
   onCancel: () => void;
 }) {
   const { t } = useLanguage();
   const today = new Date().toISOString().slice(0, 10);
-  const [to, setTo] = useState('');
+  const [beds, setBeds] = useState<{ id: string; number: string; roomNumber: string | null; type: string }[]>([]);
+  const [bedsLoading, setBedsLoading] = useState(true);
+  const [bedId, setBedId] = useState('');
   const [date, setDate] = useState(today);
   const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
   const cls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400';
+
+  // Lits réels disponibles depuis PostgreSQL — plus de destination en texte libre
+  useEffect(() => {
+    apiClient.get<{ id: string; number: string; roomNumber: string | null; type: string }[]>('/occupancy-beds/available')
+      .then(rows => setBeds((rows ?? []).filter(b => b.id !== admission.bedId)))
+      .catch(() => setError('Impossible de charger les lits disponibles'))
+      .finally(() => setBedsLoading(false));
+  }, [admission.bedId]);
+
+  const submit = async () => {
+    if (!bedId) return;
+    setBusy(true);
+    setError('');
+    try {
+      await onConfirm(bedId, date, notes);
+    } catch (e: any) {
+      setError(e?.message ?? 'Échec du transfert — le lit est peut-être devenu indisponible.');
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
@@ -106,9 +129,15 @@ function TransferModal({ admission, onConfirm, onCancel }: {
         <h3 className="font-bold text-gray-900 text-lg mb-4">{t('adm.transfer.title')}</h3>
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">{t('adm.transfer.to')} *</label>
-            <input value={to} onChange={e => setTo(e.target.value)} className={cls}
-              placeholder="Ex: CHU Mustapha — Cardiologie" />
+            <label className="block text-xs font-medium text-gray-600 mb-1">Lit de destination *</label>
+            <select value={bedId} onChange={e => setBedId(e.target.value)} className={cls} disabled={bedsLoading}>
+              <option value="">{bedsLoading ? 'Chargement des lits…' : beds.length === 0 ? 'Aucun lit disponible' : 'Sélectionner un lit…'}</option>
+              {beds.map(b => (
+                <option key={b.id} value={b.id}>
+                  Lit {b.number}{b.roomNumber ? ` — Ch. ${b.roomNumber}` : ''} ({b.type})
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">{t('adm.transfer.date')}</label>
@@ -118,12 +147,13 @@ function TransferModal({ admission, onConfirm, onCancel }: {
             <label className="block text-xs font-medium text-gray-600 mb-1">{t('adm.transfer.notes')}</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={`${cls} resize-none`} />
           </div>
+          {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
         <div className="flex gap-3 mt-5">
           <button onClick={onCancel} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">{t('adm.form.cancel')}</button>
-          <button onClick={() => onConfirm(to, date, notes)} disabled={!to.trim()}
+          <button onClick={submit} disabled={!bedId || busy}
             className="flex-1 px-3 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium disabled:opacity-40">
-            {t('adm.transfer.confirm')}
+            {busy ? '…' : t('adm.transfer.confirm')}
           </button>
         </div>
       </div>
@@ -206,7 +236,7 @@ export default function AdmissionsPage() {
   const { can } = usePermission();
   const { log } = useAuditLog();
   const [, navigate] = useLocation();
-  const { admissions, discharge, transfer, cancel, addAdmission, updateAdmission, loading: admLoading } = useAdmissionsApi();
+  const { admissions, discharge, transfer, cancel, addAdmission, updateAdmission, refresh, loading: admLoading } = useAdmissionsApi();
   const { user } = useAuth();
   const [bedRefreshKey, setBedRefreshKey] = useState(0);
 
@@ -222,6 +252,7 @@ export default function AdmissionsPage() {
   const [discharging,     setDischarging]     = useState<Admission | null>(null);
   const [transferring,    setTransferring]    = useState<Admission | null>(null);
   const [cancelling,      setCancelling]      = useState<Admission | null>(null);
+  const [cancelError,      setCancelError]      = useState('');
   const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
 
   const handleSort = (field: string) => {
@@ -372,39 +403,16 @@ export default function AdmissionsPage() {
       {showForm && (
         <AdmissionForm
           admission={editing ?? undefined}
-          onSave={async (data) => {
-            // Update local list immediately (optimistic)
+          onSave={(data) => {
+            // Le formulaire a déjà enregistré via l'API (POST/PATCH /admissions).
+            // Le lit est occupé côté serveur dans la même transaction (admit()) —
+            // plus d'assignation séparée ici (évitait un double-assign).
             if (editing) {
               updateAdmission(data);
             } else {
               addAdmission(data);
             }
-            // Assign bed via API when one is selected; surface failure visibly.
-            // Only UUID-format IDs are sent — the backend silently ignores
-            // non-UUID mock IDs to avoid DB type errors.
-            if (data.bedId) {
-              const isUuid = (s?: string) =>
-                !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-              try {
-                await apiClient.post(`/occupancy-beds/${data.bedId}/assign`, {
-                  patientName:  data.patientName,
-                  patientId:    isUuid(data.patientId)   ? data.patientId   : undefined,
-                  encounterId:  isUuid(data.encounterId) ? data.encounterId : undefined,
-                  admissionId:  isUuid(data.id)          ? data.id          : undefined,
-                  expectedReleaseAt: data.expectedDischargeDate
-                    ? `${data.expectedDischargeDate}T12:00:00`
-                    : undefined,
-                });
-              } catch (err: any) {
-                // Bed assignment failed — admission is saved but bed status may
-                // not have updated. Notify so staff can re-assign manually.
-                toast({
-                  variant: 'destructive',
-                  title: 'Assignation du lit incomplète',
-                  description: `Admission enregistrée, mais l'assignation du lit a échoué : ${err?.message ?? 'erreur inconnue'}. Veuillez vérifier la disponibilité du lit.`,
-                });
-              }
-            }
+            refresh();
             setBedRefreshKey(k => k + 1);
             setShowForm(false);
             setEditing(null);
@@ -438,11 +446,12 @@ export default function AdmissionsPage() {
       {transferring && (
         <TransferModal
           admission={transferring}
-          onConfirm={async (to, date, notes) => {
-            await transfer(transferring.id, to, date, notes).catch(() => {});
-            log('update', 'admission', transferring.id, `Transfert → ${to}`);
-            if (transferring.bedId) {
-              apiClient.post(`/occupancy-beds/${transferring.bedId}/start-cleaning`, {}).catch(() => {});
+          onConfirm={async (newBedId, date, notes) => {
+            const oldBedId = transferring.bedId;
+            await transfer(transferring.id, newBedId, date, notes); // jette en cas d'échec — le modal affiche l'erreur
+            log('update', 'admission', transferring.id, `Transfert lit → ${newBedId}`);
+            if (oldBedId) {
+              apiClient.post(`/occupancy-beds/${oldBedId}/start-cleaning`, {}).catch(() => {});
             }
             setBedRefreshKey(k => k + 1);
             setTransferring(null);
@@ -453,7 +462,7 @@ export default function AdmissionsPage() {
 
       {cancelling && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setCancelling(null)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setCancelling(null); setCancelError(''); }} />
           <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 w-full sm:max-w-sm max-h-[95dvh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
@@ -462,18 +471,22 @@ export default function AdmissionsPage() {
               <h3 className="font-bold text-gray-900">{t('adm.confirm.cancel.title')}</h3>
             </div>
             <p className="text-sm text-gray-600 mb-5">{t('adm.confirm.cancel.desc')}</p>
+            {cancelError && <p className="text-xs text-red-600 mb-3">{cancelError}</p>}
             <div className="flex gap-3">
-              <button onClick={() => setCancelling(null)} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+              <button onClick={() => { setCancelling(null); setCancelError(''); }} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
                 {t('adm.confirm.cancel.no')}
               </button>
               <button onClick={async () => {
-                await cancel(cancelling.id).catch(() => {});
-                log('archive', 'admission', cancelling.id);
-                if (cancelling.bedId) {
-                  apiClient.post(`/occupancy-beds/${cancelling.bedId}/release`, {}).catch(() => {});
+                try {
+                  // Le backend annule, libère le lit et clôt l'encounter en une transaction
+                  await cancel(cancelling.id);
+                  log('archive', 'admission', cancelling.id);
+                  setBedRefreshKey(k => k + 1);
+                  setCancelling(null);
+                  setCancelError('');
+                } catch (e: any) {
+                  setCancelError(e?.message ?? "Échec de l'annulation");
                 }
-                setBedRefreshKey(k => k + 1);
-                setCancelling(null);
               }}
                 className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">
                 {t('adm.confirm.cancel.yes')}

@@ -2,8 +2,9 @@
  * PatientAppointmentsTab — Rendez-vous d'un patient.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Calendar, RefreshCw, AlertTriangle, Lock } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { usePermission } from '@/hooks/usePermission';
 
 interface Appointment {
   id: string;
@@ -18,17 +19,20 @@ interface Appointment {
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  pending:    { label: 'En attente',  color: 'bg-yellow-100 text-yellow-700' },
-  confirmed:  { label: 'Confirmé',    color: 'bg-green-100 text-green-700' },
-  completed:  { label: 'Terminé',     color: 'bg-blue-100 text-blue-700' },
-  cancelled:  { label: 'Annulé',      color: 'bg-red-100 text-red-500' },
-  no_show:    { label: 'Non présenté',color: 'bg-gray-100 text-gray-500' },
+  pending:     { label: 'En attente',  color: 'bg-yellow-100 text-yellow-700' },
+  confirmed:   { label: 'Confirmé',    color: 'bg-green-100 text-green-700' },
+  in_progress: { label: 'En cours',    color: 'bg-blue-100 text-blue-700' },
+  completed:   { label: 'Terminé',     color: 'bg-blue-100 text-blue-700' },
+  cancelled:   { label: 'Annulé',      color: 'bg-red-100 text-red-500' },
+  no_show:     { label: 'Non présenté',color: 'bg-gray-100 text-gray-500' },
 };
 
 const TYPE_MAP: Record<string, string> = {
   consultation_externe: 'Consultation externe',
-  suivi:                'Suivi',
   urgence:              'Urgence',
+  hospitalier:          'Hospitalier',
+  teleconsultation:     'Téléconsultation',
+  suivi:                'Suivi',
   examen:               'Examen',
   intervention:         'Intervention',
 };
@@ -41,11 +45,14 @@ function fmtTime(d: string) {
 }
 
 export function PatientAppointmentsTab({ patientId }: { patientId: string }) {
+  const { can } = usePermission();
+  const canView = can('appointments.view');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!canView) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
@@ -59,9 +66,20 @@ export function PatientAppointmentsTab({ patientId }: { patientId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [patientId]);
+  }, [patientId, canView]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Accès restreint — pas de requête inutile ni de 403 en console
+  if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[200px] gap-2 text-gray-400">
+        <Lock size={28} className="opacity-30" />
+        <p className="font-semibold text-sm">Accès restreint</p>
+        <p className="text-xs">Votre rôle n'a pas la permission de consulter les rendez-vous.</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -95,7 +113,6 @@ export function PatientAppointmentsTab({ patientId }: { patientId: string }) {
 
   const now = new Date();
   const upcoming = appointments.filter(a => new Date(a.scheduledAt) >= now && a.status !== 'cancelled');
-  const past     = appointments.filter(a => new Date(a.scheduledAt) < now || a.status === 'cancelled');
 
   return (
     <div className="space-y-4">

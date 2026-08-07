@@ -100,12 +100,22 @@ async function logDenied(
     );
     const name = rows[0] ? `${rows[0].first_name} ${rows[0].last_name}` : userId;
 
+    // `module` est un enum source_module — cast explicite requis, et tous les
+    // préfixes de permission n'y existent pas (ex. appointments, patients) :
+    // on retombe sur 'system' quand le label n'existe pas. La permission
+    // complète reste dans la description.
     await pool.query(
       `INSERT INTO user_activity_logs
          (user_id, user_name, user_role, action, module, description, ip)
        SELECT $1, $2, $3,
          'access_denied'::user_activity_action,
-         split_part($4, '.', 1),
+         CASE WHEN EXISTS (
+                SELECT 1 FROM pg_enum
+                WHERE enumtypid = 'source_module'::regtype
+                  AND enumlabel = split_part($4, '.', 1)
+              )
+              THEN split_part($4, '.', 1)::source_module
+              ELSE 'system'::source_module END,
          'Accès refusé : permission manquante ' || $4,
          $5
        WHERE EXISTS (

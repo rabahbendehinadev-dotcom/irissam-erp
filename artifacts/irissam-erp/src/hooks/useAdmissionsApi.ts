@@ -8,7 +8,7 @@ import type { Admission } from '@/types/admission';
 
 // ── Map API response → Admission type ─────────────────────────────────────────
 
-function mapApiAdmission(a: any): Admission {
+export function mapApiAdmission(a: any): Admission {
   return {
     id:                  a.id,
     admissionNumber:     a.admissionNumber ?? '',

@@ -12,15 +12,13 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import {
   CalendarDays, List, Search, Plus, ChevronLeft, ChevronRight,
-  Clock, Stethoscope, X, FileText, RefreshCw, AlertTriangle
+  Clock, Stethoscope, X, FileText, RefreshCw, AlertTriangle, UserCheck
 } from "lucide-react";
 import type { Appointment, AppointmentStatus } from "@/types";
-import {
-  useGetAppointmentsList,
-  useCreateAppointment,
-  useUpdateAppointmentStatus,
-} from "@workspace/api-client-react";
+import { useGetAppointmentsList, useGetPatientsList } from "@workspace/api-client-react";
 import { useAppointmentStore } from "@/store/AppointmentStore";
+import { usePermission } from "@/hooks/usePermission";
+import { apiClient } from "@/services/api/client";
 
 type BadgeVariant = "success" | "warning" | "danger" | "info" | "neutral";
 
@@ -42,6 +40,14 @@ const STATUS_LABEL_KEY: Record<AppointmentStatus, string> = {
   in_progress: "appointments.status.in_progress",
 };
 
+/** Types de RDV — alignés sur l'enum PostgreSQL consultation_type */
+const APPOINTMENT_TYPES: { value: string; label: string }[] = [
+  { value: "consultation_externe", label: "Consultation externe" },
+  { value: "urgence",              label: "Urgence" },
+  { value: "hospitalier",          label: "Hospitalier" },
+  { value: "teleconsultation",     label: "Téléconsultation" },
+];
+
 function buildWeekDays(date: Date): Date[] {
   const monday = new Date(date);
   const day = monday.getDay() || 7;
@@ -55,37 +61,45 @@ function buildWeekDays(date: Date): Date[] {
 
 const WEEK_DAYS_SHORT = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
+type AppointmentFormValues = {
+  patientId: string;
+  patientName: string;
+  doctorId: string;
+  departmentId: string;
+  type: string;
+  date: string;
+  time: string;
+  duration: number;
+  notes: string;
+};
+
 export default function Appointments() {
   const { t } = useLanguage();
+  const { can } = usePermission();
   const [view, setView] = useState<"list" | "calendar">("list");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "all">("all");
   const [deptFilter, setDeptFilter] = useState("all");
   const [calendarDate, setCalendarDate] = useState(new Date());
-  const [editApt, setEditApt] = useState<Appointment | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
+  const [statusBusy, setStatusBusy] = useState<string | null>(null);
+
+  const canCreate = can("appointments.create");
+  const canEdit   = can("appointments.edit");
+  const canCancel = can("appointments.cancel");
 
   // Form state
-  const formRef = useRef<{
-    patientName: string;
-    doctorName: string;
-    departmentName: string;
-    date: string;
-    time: string;
-    duration: number;
-    notes: string;
-  } | null>(null);
+  const formRef = useRef<AppointmentFormValues | null>(null);
 
   // ── Appointment store (shared state, updated by Consultations page) ────────
-  const { appointments: storeAppointments, mergeApiAppointments } = useAppointmentStore();
+  const { appointments: storeAppointments, mergeApiAppointments, updateAppointmentStatus } = useAppointmentStore();
 
   // ── API hooks ──────────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: apiAppointments, isLoading, isError, refetch } = useGetAppointmentsList({} as any);
-  const createMutation = useCreateAppointment();
-  const updateStatusMutation = useUpdateAppointmentStatus();
 
   // ── Auto-refresh every 30 s ────────────────────────────────────────────────
   const { lastUpdatedLabel } = useAutoRefresh({ refetch, data: apiAppointments });
@@ -100,14 +114,14 @@ export default function Appointments() {
   // Use store as the single source of truth; fall through to empty while loading
   const rawAppointments = useMemo((): Appointment[] => {
     if (isLoading) return [];
-    // Store always has data (seeded from mock); reflects both API and local overrides
     return Array.isArray(storeAppointments) ? storeAppointments : [];
   }, [isLoading, storeAppointments]);
 
+  // Filtre départements par NOM (les anciennes lignes n'ont pas de departmentId)
   const departments = useMemo(() => {
-    const map = new Map<string, string>();
-    rawAppointments.forEach((a) => map.set(a.departmentId, a.departmentName));
-    return Array.from(map.entries());
+    const set = new Set<string>();
+    rawAppointments.forEach((a) => { if (a.departmentName) set.add(a.departmentName); });
+    return Array.from(set.values()).sort();
   }, [rawAppointments]);
 
   const filtered = useMemo(() => {
@@ -115,7 +129,7 @@ export default function Appointments() {
       const name = `${a.patient.firstName} ${a.patient.lastName} ${a.doctorName}`.toLowerCase();
       const matchSearch = !search || name.includes(search.toLowerCase());
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
-      const matchDept = deptFilter === "all" || a.departmentId === deptFilter;
+      const matchDept = deptFilter === "all" || a.departmentName === deptFilter;
       return matchSearch && matchStatus && matchDept;
     });
   }, [rawAppointments, search, statusFilter, deptFilter]);
@@ -150,36 +164,62 @@ export default function Appointments() {
 
   const handleSaveForm = async () => {
     const f = formRef.current;
-    if (!f?.doctorName || !f?.date || !f?.time) {
-      setShowForm(false);
-      return;
-    }
+    if (!f) return;
+    if (!f.patientId) { setFormError("Sélectionnez un patient enregistré."); return; }
+    if (!f.doctorId)  { setFormError("Sélectionnez un médecin."); return; }
+    if (!f.departmentId) { setFormError("Sélectionnez un département."); return; }
+    if (!f.date || !f.time) { setFormError("Date et heure sont requises."); return; }
+
     setFormError(null);
+    setSaving(true);
     try {
-      await createMutation.mutateAsync({
-        data: {
-          patientName: f.patientName || "Patient inconnu",
-          doctorName: f.doctorName,
-          departmentName: f.departmentName || undefined,
-          scheduledAt: `${f.date}T${f.time}:00.000Z`,
-          duration: f.duration || 30,
-          notes: f.notes || undefined,
-          status: "pending",
-        },
+      // Heure locale → ISO (corrige l'ancien bug de fuseau `T…Z` naïf)
+      const scheduledAt = new Date(`${f.date}T${f.time}:00`).toISOString();
+      await apiClient.post("/appointments", {
+        patientId:    f.patientId,
+        doctorId:     f.doctorId,
+        departmentId: f.departmentId,
+        type:         f.type,
+        scheduledAt,
+        duration:     f.duration || 30,
+        notes:        f.notes || undefined,
+        status:       "pending",
       });
       await refetch();
       setShowForm(false);
-      setEditApt(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create appointment", err);
-      setFormError("Échec de l'enregistrement – veuillez réessayer");
+      const msg = err?.message ?? "Erreur inconnue";
+      setFormError(`Échec de l'enregistrement : ${msg}`);
       toast({
         variant: "destructive",
         title: "Échec de l'enregistrement",
-        description: "Impossible de créer le rendez-vous. Vérifiez votre connexion et réessayez.",
+        description: msg,
       });
+    } finally {
+      setSaving(false);
     }
   };
+
+  /** Changement de statut (check-in « Patient arrivé », confirmation, clôture, annulation). */
+  const changeStatus = async (apt: Appointment, status: AppointmentStatus) => {
+    setStatusBusy(apt.id);
+    try {
+      await apiClient.patch(`/appointments/${apt.id}`, { status });
+      updateAppointmentStatus(apt.id, status);
+      await refetch();
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Échec du changement de statut",
+        description: err?.message ?? "Erreur inconnue",
+      });
+    } finally {
+      setStatusBusy(null);
+    }
+  };
+
+  const TERMINAL_STATUSES: AppointmentStatus[] = ["cancelled", "completed", "no_show"];
 
   return (
     <DashboardLayout>
@@ -205,25 +245,19 @@ export default function Appointments() {
                   {lastUpdatedLabel}
                 </span>
               )}
-              <button
-                onClick={() => {
-                formRef.current = {
-                  patientName: "",
-                  doctorName: "",
-                  departmentName: "",
-                  date: new Date().toISOString().slice(0, 10),
-                  time: "09:00",
-                  duration: 30,
-                  notes: "",
-                };
-                setEditApt(null);
-                setShowForm(true);
-              }}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                {t("appointments.new" as any)}
-              </button>
+              {canCreate && (
+                <button
+                  onClick={() => {
+                    formRef.current = null;
+                    setFormError(null);
+                    setShowForm(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  {t("appointments.new" as any)}
+                </button>
+              )}
             </div>
           }
         />
@@ -275,8 +309,8 @@ export default function Appointments() {
             className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[160px]"
           >
             <option value="all">{t("appointments.filter.all_depts" as any)}</option>
-            {departments.map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
+            {departments.map((name) => (
+              <option key={name} value={name}>{name}</option>
             ))}
           </select>
         </div>
@@ -310,6 +344,9 @@ export default function Appointments() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">{t("appointments.table.duration" as any)}</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">{t("appointments.table.status" as any)}</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">{t("appointments.table.notes" as any)}</th>
+                    {(canEdit || canCancel) && (
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -323,8 +360,8 @@ export default function Appointments() {
                         </p>
                       </td>
                       <td className="px-4 py-3">
-                        {/* Only open drawer when a real patient record exists (not synthetic db-apt-* IDs) */}
-                        {apt.patientId && !apt.patientId.startsWith("db-apt-") ? (
+                        {/* Only open drawer when a real patient record exists */}
+                        {apt.patientId ? (
                           <button
                             onClick={() => setDrawerPatientId(apt.patientId)}
                             className="flex items-center gap-2 group text-left"
@@ -367,11 +404,57 @@ export default function Appointments() {
                           <span className="text-gray-300">—</span>
                         )}
                       </td>
+                      {(canEdit || canCancel) && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {canEdit && apt.status === "pending" && (
+                              <button
+                                onClick={() => changeStatus(apt, "confirmed")}
+                                disabled={statusBusy === apt.id}
+                                className="px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 disabled:opacity-50 transition-colors"
+                              >
+                                Confirmer
+                              </button>
+                            )}
+                            {canEdit && apt.status === "confirmed" && (
+                              <button
+                                onClick={() => changeStatus(apt, "in_progress")}
+                                disabled={statusBusy === apt.id}
+                                className="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                              >
+                                Patient arrivé
+                              </button>
+                            )}
+                            {canEdit && apt.status === "in_progress" && (
+                              <button
+                                onClick={() => changeStatus(apt, "completed")}
+                                disabled={statusBusy === apt.id}
+                                className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                              >
+                                Terminer
+                              </button>
+                            )}
+                            {canCancel && !TERMINAL_STATUSES.includes(apt.status as AppointmentStatus) && (
+                              <button
+                                title="Annuler le rendez-vous"
+                                onClick={() => changeStatus(apt, "cancelled")}
+                                disabled={statusBusy === apt.id}
+                                className="p-1 text-red-500 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 disabled:opacity-50 transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {TERMINAL_STATUSES.includes(apt.status as AppointmentStatus) && (
+                              <span className="text-gray-300 text-xs">—</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center text-gray-400 text-sm">
+                      <td colSpan={(canEdit || canCancel) ? 8 : 7} className="px-4 py-12 text-center text-gray-400 text-sm">
                         Aucun rendez-vous trouvé.
                       </td>
                     </tr>
@@ -415,7 +498,7 @@ export default function Appointments() {
                         <button
                           key={a.id}
                           onClick={() => {
-                            if (a.patientId && !a.patientId.startsWith("db-apt-")) {
+                            if (a.patientId) {
                               setDrawerPatientId(a.patientId);
                             }
                           }}
@@ -445,14 +528,14 @@ export default function Appointments() {
         )}
       </PageWrapper>
 
-      {/* New/Edit Appointment Modal */}
+      {/* New Appointment Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowForm(false)} />
           <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-6 space-y-5 max-h-[95dvh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">
-                {editApt ? t("appointments.form.title.edit" as any) : t("appointments.form.title.new" as any)}
+                {t("appointments.form.title.new" as any)}
               </h2>
               <button onClick={() => setShowForm(false)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg transition-colors">
                 <X className="w-5 h-5" />
@@ -460,7 +543,6 @@ export default function Appointments() {
             </div>
 
             <AppointmentFormFields
-              apt={editApt}
               onChange={(v) => { formRef.current = v; }}
             />
 
@@ -480,10 +562,10 @@ export default function Appointments() {
               </button>
               <button
                 onClick={handleSaveForm}
-                disabled={createMutation.isPending}
+                disabled={saving}
                 className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
               >
-                {createMutation.isPending
+                {saving
                   ? "Enregistrement…"
                   : formError
                   ? "Réessayer"
@@ -511,57 +593,208 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
+interface DirectoryDoctor {
+  id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  specialty: string;
+}
+
+interface DirectoryDepartment {
+  id: string;
+  name: string;
+}
+
+/**
+ * Formulaire RDV — uniquement des entités réelles :
+ *  - patient : recherche dans le registre (UUID réel requis)
+ *  - médecin / département : listes chargées depuis /directory (PostgreSQL)
+ *  - type : enum consultation_type
+ */
 function AppointmentFormFields({
-  apt,
   onChange,
 }: {
-  apt: Appointment | null;
-  onChange: (v: { patientName: string; doctorName: string; departmentName: string; date: string; time: string; duration: number; notes: string }) => void;
+  onChange: (v: AppointmentFormValues) => void;
 }) {
   const todayStr = new Date().toISOString().slice(0, 10);
-  const [patientName, setPatientName] = useState(apt ? `${apt.patient.firstName} ${apt.patient.lastName}` : "");
-  const [doctorName, setDoctorName] = useState(apt?.doctorName ?? "");
-  const [departmentName, setDepartmentName] = useState(apt?.departmentName ?? "");
-  const [date, setDate] = useState(apt?.scheduledAt.slice(0, 10) ?? todayStr);
-  const [time, setTime] = useState(apt?.scheduledAt.slice(11, 16) ?? "09:00");
-  const [duration, setDuration] = useState(apt?.duration ?? 30);
-  const [notes, setNotes] = useState(apt?.notes ?? "");
   const { t } = useLanguage();
 
-  const emit = (overrides: object = {}) =>
-    onChange({ patientName, doctorName, departmentName, date, time, duration, notes, ...overrides });
+  // Référentiel réel (médecins + départements)
+  const [doctors, setDoctors] = useState<DirectoryDoctor[]>([]);
+  const [departments, setDepartments] = useState<DirectoryDepartment[]>([]);
+  const [dirError, setDirError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      apiClient.get<DirectoryDoctor[]>("/directory/doctors"),
+      apiClient.get<DirectoryDepartment[]>("/directory/departments"),
+    ])
+      .then(([docs, depts]) => {
+        if (cancelled) return;
+        setDoctors(Array.isArray(docs) ? docs : []);
+        setDepartments(Array.isArray(depts) ? depts : []);
+      })
+      .catch(() => { if (!cancelled) setDirError(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Patients réels (recherche locale sur la liste API)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: apiPatients } = useGetPatientsList({} as any);
+  const [patientQuery, setPatientQuery] = useState("");
+  const [selectedPatient, setSelectedPatient] = useState<{ id: string; name: string; mpiId: string } | null>(null);
+
+  const patientResults = useMemo(() => {
+    if (!patientQuery.trim() || selectedPatient) return [];
+    const q = patientQuery.toLowerCase();
+    const list = Array.isArray(apiPatients) ? (apiPatients as any[]) : [];
+    return list
+      .filter((p) => `${p.mpiId ?? ""} ${p.firstName ?? ""} ${p.lastName ?? ""} ${p.phone ?? ""}`.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [patientQuery, apiPatients, selectedPatient]);
+
+  const [doctorId, setDoctorId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
+  const [type, setType] = useState("consultation_externe");
+  const [date, setDate] = useState(todayStr);
+  const [time, setTime] = useState("09:00");
+  const [duration, setDuration] = useState(30);
+  const [notes, setNotes] = useState("");
+
+  const emit = (overrides: Partial<AppointmentFormValues> = {}) =>
+    onChange({
+      patientId:    selectedPatient?.id ?? "",
+      patientName:  selectedPatient?.name ?? "",
+      doctorId,
+      departmentId,
+      type,
+      date,
+      time,
+      duration,
+      notes,
+      ...overrides,
+    });
+
+  const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   return (
     <div className="space-y-4">
       <FormField label={t("appointments.form.patient" as any)}>
-        <input type="text" value={patientName} onChange={(e) => { setPatientName(e.target.value); emit({ patientName: e.target.value }); }}
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nom du patient" />
+        {selectedPatient ? (
+          <div className="flex items-center justify-between gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2 min-w-0">
+              <UserCheck className="w-4 h-4 text-green-600 shrink-0" />
+              <span className="text-sm font-medium text-green-800 truncate">{selectedPatient.name}</span>
+              <span className="text-xs text-green-600 shrink-0">{selectedPatient.mpiId}</span>
+            </div>
+            <button
+              onClick={() => { setSelectedPatient(null); setPatientQuery(""); emit({ patientId: "", patientName: "" }); }}
+              className="text-xs text-green-700 underline shrink-0"
+            >
+              Changer
+            </button>
+          </div>
+        ) : (
+          <div className="relative">
+            <input
+              type="text"
+              value={patientQuery}
+              onChange={(e) => setPatientQuery(e.target.value)}
+              className={inputCls}
+              placeholder="Rechercher (nom, MPI, téléphone)…"
+            />
+            {patientResults.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                {patientResults.map((p: any) => {
+                  const name = `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim();
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        const sel = { id: p.id as string, name, mpiId: (p.mpiId as string) ?? "" };
+                        setSelectedPatient(sel);
+                        emit({ patientId: sel.id, patientName: sel.name });
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors flex items-center justify-between gap-2"
+                    >
+                      <span className="font-medium text-gray-800 truncate">{name}</span>
+                      <span className="text-xs text-gray-400 shrink-0">{p.mpiId}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {patientQuery.trim() && patientResults.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">Aucun patient trouvé dans le registre.</p>
+            )}
+          </div>
+        )}
       </FormField>
+
       <FormField label={t("appointments.form.doctor" as any)}>
-        <input type="text" value={doctorName} onChange={(e) => { setDoctorName(e.target.value); emit({ doctorName: e.target.value }); }}
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nom du médecin" />
+        <select
+          value={doctorId}
+          onChange={(e) => { setDoctorId(e.target.value); emit({ doctorId: e.target.value }); }}
+          className={inputCls}
+        >
+          <option value="">— Sélectionner un médecin —</option>
+          {doctors.map((d) => (
+            <option key={d.id} value={d.id}>
+              Dr {d.fullName}{d.specialty ? ` — ${d.specialty}` : ""}
+            </option>
+          ))}
+        </select>
       </FormField>
+
       <FormField label={t("appointments.table.department" as any)}>
-        <input type="text" value={departmentName} onChange={(e) => { setDepartmentName(e.target.value); emit({ departmentName: e.target.value }); }}
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Service / Département" />
+        <select
+          value={departmentId}
+          onChange={(e) => { setDepartmentId(e.target.value); emit({ departmentId: e.target.value }); }}
+          className={inputCls}
+        >
+          <option value="">— Sélectionner un département —</option>
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>{d.name}</option>
+          ))}
+        </select>
       </FormField>
+
+      <FormField label="Type de consultation">
+        <select
+          value={type}
+          onChange={(e) => { setType(e.target.value); emit({ type: e.target.value }); }}
+          className={inputCls}
+        >
+          {APPOINTMENT_TYPES.map((tp) => (
+            <option key={tp.value} value={tp.value}>{tp.label}</option>
+          ))}
+        </select>
+      </FormField>
+
+      {dirError && (
+        <p className="text-xs text-red-500">
+          Impossible de charger le référentiel (médecins / départements). Réessayez.
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <FormField label={t("appointments.form.date" as any)}>
           <input type="date" value={date} onChange={(e) => { setDate(e.target.value); emit({ date: e.target.value }); }}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className={inputCls} />
         </FormField>
         <FormField label={t("appointments.form.time" as any)}>
           <input type="time" value={time} onChange={(e) => { setTime(e.target.value); emit({ time: e.target.value }); }}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className={inputCls} />
         </FormField>
       </div>
       <FormField label={t("appointments.form.duration" as any)}>
         <input type="number" value={duration} min={5} step={5} onChange={(e) => { setDuration(+e.target.value); emit({ duration: +e.target.value }); }}
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          className={inputCls} />
       </FormField>
       <FormField label={t("appointments.form.notes" as any)}>
         <textarea value={notes} rows={2} onChange={(e) => { setNotes(e.target.value); emit({ notes: e.target.value }); }}
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Notes optionnelles…" />
+          className={`${inputCls} resize-none`} placeholder="Notes optionnelles…" />
       </FormField>
     </div>
   );

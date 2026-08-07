@@ -6,14 +6,31 @@
  *  - patientName: text not null (single field; split on read for firstName/lastName)
  *  - id: UUID (not integer)
  *  - scheduledAt: timestamp with timezone
+ *
+ * Intégrité référentielle (UAT Phase 2) :
+ *  - POST exige un doctorId réel (users.role='doctor'); patientId/departmentId
+ *    optionnels mais vérifiés en base quand fournis; les noms sont résolus
+ *    côté serveur (jamais fournis par le client).
+ *  - PATCH n'accepte que les statuts de l'enum appointment_status;
+ *    l'annulation exige la permission appointments.cancel.
+ *  - RBAC : GET → appointments.view, POST → appointments.create,
+ *    PATCH → appointments.edit (+ .cancel si annulation).
  */
 import { Router } from "express";
+import { pool } from "@workspace/db";
 import { appointmentService } from "../services/appointment";
 import type { AuthenticatedRequest } from "../middleware/requireAuth";
+import { requirePermission } from "../middleware/requirePermission";
 import type { ActorCtx } from "../repositories/types";
 import type { DbAppointment } from "../repositories/appointment";
 
 const router = Router();
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Valeurs autorisées — alignées sur les enums PostgreSQL (migration 001). */
+const APPOINTMENT_STATUSES = ["confirmed", "pending", "cancelled", "completed", "no_show", "in_progress"] as const;
+const APPOINTMENT_TYPES    = ["consultation_externe", "urgence", "hospitalier", "teleconsultation"] as const;
 
 function actor(req: AuthenticatedRequest): ActorCtx {
   return {
@@ -21,6 +38,11 @@ function actor(req: AuthenticatedRequest): ActorCtx {
     userName: req.auth?.userId ?? "system",
     userRole: req.auth?.role   ?? "guest",
   };
+}
+
+function hasPerm(req: AuthenticatedRequest, permission: string): boolean {
+  if (req.auth?.role === "super_admin") return true;
+  return Array.isArray(req.auth?.permissions) && req.auth!.permissions!.includes(permission);
 }
 
 function mapAppointment(a: DbAppointment) {
@@ -31,18 +53,18 @@ function mapAppointment(a: DbAppointment) {
 
   return {
     id:          a.id,
-    patientId:   a.patientId ?? `apt-${a.id}`,
+    patientId:   a.patientId,          // vrai UUID ou null (walk-in) — plus de `apt-…` fabriqué
     patient: {
-      id:        a.patientId ?? `apt-${a.id}`,
+      id:        a.patientId ?? "",
       firstName,
       lastName,
     },
     patientName: a.patientName,
-    doctorId:    a.doctorId ?? "system",
+    doctorId:    a.doctorId,           // vrai UUID ou null
     doctorName:  a.doctorName,
-    departmentId:   deptName,
+    departmentId:   a.departmentId,    // vrai UUID ou null
     departmentName: deptName,
-    service:        deptName,       // legacy alias kept for frontend widgets
+    service:        deptName,          // legacy alias kept for frontend widgets
     scheduledAt: a.scheduledAt.toISOString(),
     duration:    a.duration,
     status:      a.status,
@@ -53,7 +75,7 @@ function mapAppointment(a: DbAppointment) {
 }
 
 /** GET /appointments/upcoming — dashboard widget (today, non-cancelled, limit 5) */
-router.get("/upcoming", async (_req, res, next) => {
+router.get("/upcoming", requirePermission("appointments.view"), async (_req, res, next) => {
   try {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -67,7 +89,7 @@ router.get("/upcoming", async (_req, res, next) => {
         .filter((a) => a.status !== "cancelled")
         .map((a) => ({
           id:          a.id,
-          patientId:   a.patientId ?? `apt-${a.id}`,
+          patientId:   a.patientId,
           patientName: a.patientName,
           service:     a.departmentName,
           doctorName:  a.doctorName,
@@ -81,7 +103,7 @@ router.get("/upcoming", async (_req, res, next) => {
 });
 
 /** GET /appointments — full appointment list */
-router.get("/", async (req, res, next) => {
+router.get("/", requirePermission("appointments.view"), async (req, res, next) => {
   try {
     const { search, status, departmentId, patientId } =
       req.query as Record<string, string | undefined>;
@@ -102,6 +124,8 @@ router.get("/", async (req, res, next) => {
       rows = rows.filter((a) => a.status === status);
     }
     if (departmentId && departmentId !== "all") {
+      // Le filtre frontend envoie le NOM du département (les anciennes lignes
+      // n'ont pas de departmentId) — on matche sur le nom.
       rows = rows.filter((a) => a.departmentName === departmentId);
     }
 
@@ -112,7 +136,7 @@ router.get("/", async (req, res, next) => {
 });
 
 /** GET /appointments/:id — fetch one appointment by UUID */
-router.get("/:id", async (req, res, next) => {
+router.get("/:id", requirePermission("appointments.view"), async (req, res, next) => {
   try {
     const id = String(req.params.id);
     const row = await appointmentService.findById(id);
@@ -123,15 +147,14 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-/** POST /appointments — create a new appointment */
-router.post("/", async (req: AuthenticatedRequest, res, next) => {
+/** POST /appointments — create a new appointment (referential integrity enforced) */
+router.post("/", requirePermission("appointments.create"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const body = req.body as {
-      patientName?: string;
-      patientFirstName?: string;
-      patientLastName?: string;
       patientId?: string;
-      doctorName?: string;
+      patientName?: string;
+      doctorId?: string;
+      departmentId?: string;
       departmentName?: string;
       scheduledAt?: string;
       duration?: number;
@@ -140,26 +163,113 @@ router.post("/", async (req: AuthenticatedRequest, res, next) => {
       type?: string;
     };
 
-    if (!body.doctorName || !body.scheduledAt) {
-      res.status(400).json({ error: "doctorName and scheduledAt are required" });
+    // ── doctorId : obligatoire, UUID, médecin réel ──────────────────────────
+    if (!body.doctorId || !UUID_RE.test(body.doctorId)) {
+      res.status(400).json({ error: "doctorId (UUID) est requis — sélectionnez un médecin réel" });
+      return;
+    }
+    const doctorQ = await pool.query(
+      `SELECT id, first_name, last_name FROM users
+        WHERE id = $1 AND role = 'doctor' AND deleted_at IS NULL`,
+      [body.doctorId],
+    );
+    if (doctorQ.rows.length === 0) {
+      res.status(400).json({ error: "Médecin introuvable" });
+      return;
+    }
+    const doctorName = `${doctorQ.rows[0].first_name} ${doctorQ.rows[0].last_name}`;
+
+    // ── patientId : optionnel (walk-in), mais vérifié quand fourni ─────────
+    let patientId: string | null = null;
+    let patientName: string;
+    let patientMpi: string | null = null;
+    if (body.patientId) {
+      if (!UUID_RE.test(body.patientId)) {
+        res.status(400).json({ error: "patientId invalide (UUID attendu)" });
+        return;
+      }
+      const patientQ = await pool.query(
+        `SELECT id, first_name, last_name, mpi_id FROM patients
+          WHERE id = $1 AND deleted_at IS NULL`,
+        [body.patientId],
+      );
+      if (patientQ.rows.length === 0) {
+        res.status(400).json({ error: "Patient introuvable" });
+        return;
+      }
+      patientId   = patientQ.rows[0].id;
+      patientName = `${patientQ.rows[0].first_name} ${patientQ.rows[0].last_name}`;
+      patientMpi  = patientQ.rows[0].mpi_id ?? null;
+    } else {
+      const name = (body.patientName ?? "").trim();
+      if (!name) {
+        res.status(400).json({ error: "patientId ou patientName est requis" });
+        return;
+      }
+      patientName = name;
+    }
+
+    // ── departmentId : optionnel, vérifié quand fourni ─────────────────────
+    let departmentId: string | null = null;
+    let departmentName = (body.departmentName ?? "").trim() || "Médecine générale";
+    if (body.departmentId) {
+      if (!UUID_RE.test(body.departmentId)) {
+        res.status(400).json({ error: "departmentId invalide (UUID attendu)" });
+        return;
+      }
+      const deptQ = await pool.query(
+        `SELECT id, name FROM departments
+          WHERE id = $1 AND deleted_at IS NULL AND is_active = true`,
+        [body.departmentId],
+      );
+      if (deptQ.rows.length === 0) {
+        res.status(400).json({ error: "Département introuvable" });
+        return;
+      }
+      departmentId   = deptQ.rows[0].id;
+      departmentName = deptQ.rows[0].name;
+    }
+
+    // ── scheduledAt : date ISO valide ───────────────────────────────────────
+    if (!body.scheduledAt) {
+      res.status(400).json({ error: "scheduledAt est requis" });
+      return;
+    }
+    const scheduledAt = new Date(body.scheduledAt);
+    if (isNaN(scheduledAt.getTime())) {
+      res.status(400).json({ error: "scheduledAt invalide (date ISO attendue)" });
       return;
     }
 
-    const patientName =
-      body.patientName ??
-      (`${body.patientFirstName ?? ""} ${body.patientLastName ?? ""}`.trim() || "Patient inconnu");
+    // ── status / type : enum allow-list ────────────────────────────────────
+    const status = body.status ?? "pending";
+    if (!APPOINTMENT_STATUSES.includes(status as any)) {
+      res.status(400).json({ error: `status invalide — valeurs autorisées : ${APPOINTMENT_STATUSES.join(", ")}` });
+      return;
+    }
+    const type = body.type ?? "consultation_externe";
+    if (!APPOINTMENT_TYPES.includes(type as any)) {
+      res.status(400).json({ error: `type invalide — valeurs autorisées : ${APPOINTMENT_TYPES.join(", ")}` });
+      return;
+    }
+
+    const duration = Number.isFinite(body.duration) && body.duration! >= 5 && body.duration! <= 480
+      ? Math.round(body.duration!)
+      : 30;
 
     const created = await appointmentService.create({
-      patientId:      body.patientId ?? null,
+      patientId,
       patientName,
-      patientMpi:     null,
-      doctorName:     body.doctorName,
-      departmentName: body.departmentName ?? "Médecine générale",
-      scheduledAt:    new Date(body.scheduledAt),
-      duration:       body.duration ?? 30,
-      notes:          body.notes ?? null,
-      status:         (body.status as any) ?? "pending",
-      type:           (body.type as any) ?? "consultation_externe",
+      patientMpi,
+      doctorId:       body.doctorId,
+      doctorName,
+      departmentId,
+      departmentName,
+      scheduledAt,
+      duration,
+      notes:          body.notes?.trim() || null,
+      status:         status as any,
+      type:           type as any,
     }, actor(req));
 
     res.status(201).json(mapAppointment(created));
@@ -168,14 +278,23 @@ router.post("/", async (req: AuthenticatedRequest, res, next) => {
   }
 });
 
-/** PATCH /appointments/:id — update appointment status */
-router.patch("/:id", async (req: AuthenticatedRequest, res, next) => {
+/** PATCH /appointments/:id — update appointment status (enum allow-list + RBAC) */
+router.patch("/:id", requirePermission("appointments.edit"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const id = String(req.params.id);
     const { status } = req.body as { status?: string };
 
     if (!status) {
       res.status(400).json({ error: "status is required" });
+      return;
+    }
+    if (!APPOINTMENT_STATUSES.includes(status as any)) {
+      res.status(400).json({ error: `status invalide — valeurs autorisées : ${APPOINTMENT_STATUSES.join(", ")}` });
+      return;
+    }
+    // L'annulation exige la permission dédiée appointments.cancel
+    if (status === "cancelled" && !hasPerm(req, "appointments.cancel")) {
+      res.status(403).json({ message: "Permission refusée", required: "appointments.cancel" });
       return;
     }
 

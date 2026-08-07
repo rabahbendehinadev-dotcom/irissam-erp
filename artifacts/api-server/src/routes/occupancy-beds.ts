@@ -17,6 +17,8 @@ import { safeUuid } from "../repositories/types";
 import { auditService } from "../services/audit";
 import { broadcast } from "./notifications";
 import type { AuthenticatedRequest } from "../middleware/requireAuth";
+import { requirePermission } from "../middleware/requirePermission";
+import { admissionsTable } from "@workspace/db/schema";
 import type { ActorCtx, TxContext } from "../repositories/types";
 import type { DbOccupancyBed } from "../repositories/occupancyBed";
 
@@ -54,7 +56,7 @@ function mapBed(b: DbOccupancyBed) {
 }
 
 /** GET /occupancy-beds */
-router.get("/", async (req, res, next) => {
+router.get("/", requirePermission("admissions.view"), async (req, res, next) => {
   try {
     const { siteId } = req.query as { siteId?: string };
     const targetSite = siteId ?? DEFAULT_SITE;
@@ -64,7 +66,7 @@ router.get("/", async (req, res, next) => {
 });
 
 /** GET /occupancy-beds/available — must be before /:id */
-router.get("/available", async (req, res, next) => {
+router.get("/available", requirePermission("admissions.view"), async (req, res, next) => {
   try {
     const { siteId, type } = req.query as { siteId?: string; type?: string };
     const beds = await repos.occupancyBed.findAvailable(siteId ?? DEFAULT_SITE, type);
@@ -73,7 +75,7 @@ router.get("/available", async (req, res, next) => {
 });
 
 /** GET /occupancy-beds/:id */
-router.get("/:id", async (req, res, next) => {
+router.get("/:id", requirePermission("admissions.view"), async (req, res, next) => {
   try {
     const bed = await repos.occupancyBed.findById(String(req.params.id));
     if (!bed) { res.status(404).json({ error: "Lit introuvable" }); return; }
@@ -82,7 +84,7 @@ router.get("/:id", async (req, res, next) => {
 });
 
 /** POST /occupancy-beds/:id/assign */
-router.post("/:id/assign", async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/assign", requirePermission("admissions.create"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const id   = String(req.params.id);
     const body = req.body as { patientId?: string; patientName?: string; encounterId?: string; admissionId?: string };
@@ -130,11 +132,21 @@ router.post("/:id/assign", async (req: AuthenticatedRequest, res, next) => {
 });
 
 /** POST /occupancy-beds/:id/release */
-router.post("/:id/release", async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/release", requirePermission("admissions.edit"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const id = String(req.params.id);
     const a  = actor(req);
     const ctx: TxContext = { ...a };
+    // Garde d'intégrité : jamais toucher un lit rattaché à une admission active —
+    // ces transitions passent par /admissions/:id/cancel, /discharge ou /transfer.
+    const [activeAdm] = await db.select({ id: admissionsTable.id })
+      .from(admissionsTable)
+      .where(and(eq(admissionsTable.bedId, id), eq(admissionsTable.status, "active"), isNull(admissionsTable.deletedAt)))
+      .limit(1);
+    if (activeAdm) {
+      res.status(409).json({ error: "Lit rattaché à une admission active — utilisez /admissions/:id/cancel, /discharge ou /transfer" });
+      return;
+    }
     const bed = await repos.occupancyBed.free(id, ctx);
     if (!bed) { res.status(404).json({ error: "Lit introuvable" }); return; }
     await auditService.log({
@@ -148,10 +160,20 @@ router.post("/:id/release", async (req: AuthenticatedRequest, res, next) => {
 });
 
 /** POST /occupancy-beds/:id/start-cleaning */
-router.post("/:id/start-cleaning", async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/start-cleaning", requirePermission("admissions.view"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const id = String(req.params.id);
     const a  = actor(req);
+    // Garde d'intégrité : jamais toucher un lit rattaché à une admission active —
+    // ces transitions passent par /admissions/:id/cancel, /discharge ou /transfer.
+    const [activeAdm] = await db.select({ id: admissionsTable.id })
+      .from(admissionsTable)
+      .where(and(eq(admissionsTable.bedId, id), eq(admissionsTable.status, "active"), isNull(admissionsTable.deletedAt)))
+      .limit(1);
+    if (activeAdm) {
+      res.status(409).json({ error: "Lit rattaché à une admission active — utilisez /admissions/:id/cancel, /discharge ou /transfer" });
+      return;
+    }
     const [bed] = await db.update(occupancyBedsTable)
       .set({
         status:          "nettoyage",
@@ -172,7 +194,7 @@ router.post("/:id/start-cleaning", async (req: AuthenticatedRequest, res, next) 
 });
 
 /** POST /occupancy-beds/:id/complete-cleaning */
-router.post("/:id/complete-cleaning", async (req: AuthenticatedRequest, res, next) => {
+router.post("/:id/complete-cleaning", requirePermission("admissions.view"), async (req: AuthenticatedRequest, res, next) => {
   try {
     const id = String(req.params.id);
     const a  = actor(req);
@@ -183,9 +205,9 @@ router.post("/:id/complete-cleaning", async (req: AuthenticatedRequest, res, nex
         updatedAt:           new Date(),
         updatedBy:           safeUuid(a.userId),
       })
-      .where(and(eq(occupancyBedsTable.id, id), isNull(occupancyBedsTable.deletedAt)))
+      .where(and(eq(occupancyBedsTable.id, id), eq(occupancyBedsTable.status, "nettoyage"), isNull(occupancyBedsTable.deletedAt)))
       .returning();
-    if (!bed) { res.status(404).json({ error: "Lit introuvable" }); return; }
+    if (!bed) { res.status(409).json({ error: "Lit introuvable ou non en cours de nettoyage" }); return; }
     await auditService.log({
       module: "hospitalisation", action: "cleaning_completed",
       resourceType: "occupancy_bed", resourceId: id,

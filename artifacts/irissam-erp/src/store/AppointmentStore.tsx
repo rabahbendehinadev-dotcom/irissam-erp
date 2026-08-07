@@ -10,12 +10,11 @@
  *   This ensures an override survives even when the appointment record hasn't been loaded yet
  *   from the API.  Every time appointments are merged, overrides are applied on top.
  *
- * PostgreSQL migration path:
- *   Replace `syncFromConsultation` with `await apiClient.patch('/appointments/:id', { status })`.
+ * Source de vérité : PostgreSQL via l'API. Aucune donnée mock — le store démarre
+ * vide et se remplit exclusivement via mergeApiAppointments.
  */
 
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { MOCK_APPOINTMENTS } from '@/mock';
 import type { Appointment, AppointmentStatus } from '@/types';
 import type { ConsultationStatus } from '@/types/consultation';
 
@@ -68,10 +67,8 @@ export function AppointmentStoreProvider({ children }: { children: React.ReactNo
   // triggering re-renders themselves; the setAppointments call triggers the render.
   const pendingOverrides = useRef<Map<string, AppointmentStatus>>(new Map());
 
-  const [appointments, setAppointments] = useState<Appointment[]>(() =>
-    // Seed from mock; real API data is merged later via mergeApiAppointments
-    MOCK_APPOINTMENTS.map(a => ({ ...a }))
-  );
+  // Démarre vide — la liste réelle arrive de l'API (PostgreSQL) via mergeApiAppointments.
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   const syncFromConsultation = useCallback(
     (appointmentId: string | undefined, consultationStatus: ConsultationStatus) => {
@@ -107,26 +104,10 @@ export function AppointmentStoreProvider({ children }: { children: React.ReactNo
 
   const mergeApiAppointments = useCallback(
     (apiList: Appointment[]) => {
-      setAppointments(prev => {
-        const currentById = new Map(prev.map(a => [a.id, a]));
-        const overrides = pendingOverrides.current;
-
-        const merged: Appointment[] = apiList.map(a => {
-          const override = overrides.get(a.id);
-          if (override !== undefined) {
-            // We have a pending override for this appointment — honour it
-            return { ...a, status: override };
-          }
-          // No override — use whatever we already have in the store (may be mock-seeded)
-          return currentById.get(a.id) ?? a;
-        });
-
-        // Retain mock-only appointments not present in the API list
-        prev.forEach(a => {
-          if (!apiList.some(api => api.id === a.id)) merged.push(a);
-        });
-
-        return applyOverrides(merged, overrides);
+      setAppointments(() => {
+        // L'API est la source de vérité : la liste remplace l'état local.
+        // Seuls les overrides de statut en attente sont ré-appliqués par-dessus.
+        return applyOverrides(apiList.map(a => ({ ...a })), pendingOverrides.current);
       });
     },
     []

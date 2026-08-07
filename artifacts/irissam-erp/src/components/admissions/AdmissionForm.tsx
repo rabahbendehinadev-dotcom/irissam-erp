@@ -1,15 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, Check, Loader2, Search, UserCheck, AlertCircle } from 'lucide-react';
 import { useLanguage } from '@/i18n';
-import { MOCK_SERVICES, MOCK_DOCTORS } from '@/mock';
 import { useGetPatientsList } from '@workspace/api-client-react';
+import { apiClient } from '@/services/api/client';
+import { mapApiAdmission } from '@/hooks/useAdmissionsApi';
 import type { Patient } from '@/types';
 import type { Admission, AdmissionType, AdmissionPriority } from '@/types/admission';
 import type { OccupancyBed } from '@/types/repository';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { PatientSummaryCard } from '@/components/patients/PatientSummaryCard';
 import { BedSelector } from './BedSelector';
-import { formatDate } from '@/utils/format';
 
 // ─── Form state ──────────────────────────────────────────────────────────────
 
@@ -26,9 +26,9 @@ type FormData = {
   notes: string;
 };
 
-function generateAdmNumber() {
-  return `ADM-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000).padStart(4, '0')}`;
-}
+/** Référentiel réel chargé depuis /directory (PostgreSQL). */
+interface DirectoryDoctor { id: string; firstName: string; lastName: string; fullName: string; specialty: string }
+interface DirectoryDepartment { id: string; name: string }
 
 /** Map a raw API patient record to the local Patient type. */
 function apiToPatient(r: Record<string, unknown>): Patient {
@@ -58,7 +58,7 @@ function apiToPatient(r: Record<string, unknown>): Patient {
 }
 
 const inputCls  = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white';
-const selectCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white';
+const selectCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white disabled:bg-gray-50 disabled:text-gray-500';
 const labelCls  = 'block text-xs font-medium text-gray-600 mb-1';
 
 interface Props {
@@ -74,9 +74,30 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const isEdit = !!admission;
+
   // API patient list — used for local search filtering (no mock data)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: apiPatients } = useGetPatientsList({} as any);
+
+  // Référentiel réel : départements (services) + médecins depuis PostgreSQL
+  const [services, setServices] = useState<DirectoryDepartment[]>([]);
+  const [doctors, setDoctors] = useState<DirectoryDoctor[]>([]);
+  const [dirError, setDirError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      apiClient.get<DirectoryDepartment[]>('/directory/departments'),
+      apiClient.get<DirectoryDoctor[]>('/directory/doctors'),
+    ])
+      .then(([depts, docs]) => {
+        if (cancelled) return;
+        setServices(Array.isArray(depts) ? depts : []);
+        setDoctors(Array.isArray(docs) ? docs : []);
+      })
+      .catch(() => { if (!cancelled) setDirError(true); });
+    return () => { cancelled = true; };
+  }, []);
 
   // Step 1 state — patient search
   const [query, setQuery] = useState('');
@@ -90,15 +111,13 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
     const found = list.find((p: any) => p.id === admission.patientId);
     if (found) { setSelectedPatient(apiToPatient(found as any)); return; }
     // Fallback: direct fetch by ID
-    import('@/services/api/client').then(({ apiClient }) =>
-      apiClient.get<Record<string, unknown>>(`/patients/${admission.patientId}`)
-        .then(r => setSelectedPatient(apiToPatient(r)))
-        .catch(() => {})
-    );
+    apiClient.get<Record<string, unknown>>(`/patients/${admission.patientId}`)
+      .then(r => setSelectedPatient(apiToPatient(r)))
+      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [admission?.patientId]);
 
-  // Step 3 state — bed (OccupancyBed from MockRepository)
+  // Step 3 state — bed (OccupancyBed, occupé côté serveur par admit())
   const [selectedBed, setSelectedBed] = useState<OccupancyBed | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -135,8 +154,6 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
     setSearchResults(results);
   };
 
-  const filteredDoctors = MOCK_DOCTORS.filter(d => !form.serviceId || d.serviceId === form.serviceId);
-
   const validate = useCallback((): boolean => {
     const errs: Record<string, string> = {};
     if (step === 0) {
@@ -148,6 +165,9 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
       if (!form.motif.trim()) errs.motif  = t('adm.form.required');
       if (!form.admissionDate)  errs.admissionDate = t('adm.form.required');
       if (!form.admissionTime)  errs.admissionTime = t('adm.form.required');
+      if (form.expectedDischargeDate && form.admissionDate && form.expectedDischargeDate < form.admissionDate) {
+        errs.expectedDischargeDate = 'La date de sortie prévue ne peut pas précéder la date d\'admission.';
+      }
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -158,44 +178,71 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
     setStep(s => s + 1);
   };
 
+  /**
+   * Enregistrement réel :
+   *  - création → POST /admissions (le backend crée l'encounter, occupe le lit
+   *    et écrit l'audit dans la même transaction)
+   *  - édition  → PATCH /admissions/:id (seuls notes / date de sortie prévue
+   *    sont modifiables après création)
+   */
   const handleSave = async () => {
+    if (!selectedPatient) return;
+    if (!isEdit && !selectedBed) {
+      setErrors(e => ({ ...e, bed: 'Sélectionnez un lit — l\'admission occupe un lit réel.' }));
+      return;
+    }
+    if (form.expectedDischargeDate && form.admissionDate && form.expectedDischargeDate < form.admissionDate) {
+      setErrors(e => ({ ...e, expectedDischargeDate: 'La date de sortie prévue ne peut pas précéder la date d\'admission.' }));
+      return;
+    }
     setSaving(true);
-    await new Promise(r => setTimeout(r, 600));
-    const service = MOCK_SERVICES.find(s => s.id === form.serviceId);
-    const doctor  = MOCK_DOCTORS.find(d => d.id === form.doctorId);
-    const now = new Date().toISOString();
-    const result: Admission = {
-      id:              admission?.id ?? `adm-${Date.now()}`,
-      admissionNumber: admission?.admissionNumber ?? generateAdmNumber(),
-      patientId:       selectedPatient!.id,
-      patientMpiId:    selectedPatient!.mpiId,
-      patientName:     `${selectedPatient!.lastName} ${selectedPatient!.firstName}`,
-      type:            form.type,
-      status:          form.type === 'preadmission' ? 'preadmission' : form.type === 'ambulatoire' ? 'ambulatoire' : 'active',
-      priority:        form.priority,
-      serviceId:       form.serviceId,
-      serviceName:     service?.name ?? '',
-      doctorId:        form.doctorId,
-      doctorName:      doctor?.name ?? '',
-      motif:           form.motif,
-      admissionDate:   form.admissionDate,
-      admissionTime:   form.admissionTime,
-      expectedDischargeDate: form.expectedDischargeDate || undefined,
-      preadmissionDate:      form.type === 'preadmission' ? form.preadmissionDate : undefined,
-      notes:           form.notes || undefined,
-      bedId:           selectedBed?.id,
-      bedNumber:       selectedBed?.number,
-      roomNumber:      selectedBed?.roomNumber,
-      floorLabel:      selectedBed?.floorLabel,
-      buildingName:    selectedBed?.buildingName,
-      siteId:          'site-1',
-      createdAt:       admission?.createdAt ?? now,
-      updatedAt:       now,
-      createdById:     'u-1',
-    };
-    log(admission ? 'update' : 'create', 'admission', result.id, `${form.type} — ${selectedPatient!.lastName}`);
+    setErrors(e => ({ ...e, submit: '' }));
+
+    try {
+      if (isEdit && admission) {
+        const updated = await apiClient.patch<Record<string, unknown>>(`/admissions/${admission.id}`, {
+          notes:                 form.notes || undefined,
+          expectedDischargeDate: form.expectedDischargeDate || undefined,
+        });
+        log('update', 'admission', admission.id, `${form.type} — ${selectedPatient.lastName}`);
+        onSave(mapApiAdmission(updated));
+      } else {
+        const service = services.find(s => s.id === form.serviceId);
+        const doctor  = doctors.find(d => d.id === form.doctorId);
+        const created = await apiClient.post<Record<string, unknown>>('/admissions', {
+          patientId:     selectedPatient.id,
+          patientMpiId:  selectedPatient.mpiId,
+          patientName:   `${selectedPatient.lastName} ${selectedPatient.firstName}`,
+          type:          form.type,
+          priority:      form.priority,
+          serviceId:     form.serviceId,
+          serviceName:   service?.name ?? '',
+          doctorId:      form.doctorId,
+          doctorName:    doctor ? `Dr ${doctor.fullName}` : '',
+          motif:         form.motif,
+          admissionDate: form.admissionDate,
+          admissionTime: form.admissionTime,
+          expectedDischargeDate: form.expectedDischargeDate || undefined,
+          notes:         form.notes || undefined,
+          bedId:         selectedBed!.id,
+          bedNumber:     selectedBed!.number,
+        });
+        log('create', 'admission', (created as any).id, `${form.type} — ${selectedPatient.lastName}`);
+        const mapped = mapApiAdmission(created);
+        onSave({
+          ...mapped,
+          bedNumber:    mapped.bedNumber    || selectedBed?.number       || '',
+          roomNumber:   mapped.roomNumber   || selectedBed?.roomNumber   || '',
+          floorLabel:   mapped.floorLabel   || selectedBed?.floorLabel   || '',
+          buildingName: mapped.buildingName || selectedBed?.buildingName || '',
+        });
+      }
+    } catch (err: any) {
+      setErrors(e => ({ ...e, submit: err?.message ?? "Échec de l'enregistrement — réessayez." }));
+      setSaving(false);
+      return;
+    }
     setSaving(false);
-    onSave(result);
   };
 
   const STEPS = [t('adm.form.step1'), t('adm.form.step2'), t('adm.form.step3')];
@@ -270,12 +317,14 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
                     <UserCheck size={14} /> {t('adm.form.search.selected')}
                   </div>
                   <PatientSummaryCard patient={selectedPatient} />
-                  <button
-                    onClick={() => { setSelectedPatient(null); setSearchResults(null); setQuery(''); }}
-                    className="text-xs text-blue-600 underline"
-                  >
-                    {t('adm.form.search.change')}
-                  </button>
+                  {!isEdit && (
+                    <button
+                      onClick={() => { setSelectedPatient(null); setSearchResults(null); setQuery(''); }}
+                      className="text-xs text-blue-600 underline"
+                    >
+                      {t('adm.form.search.change')}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -315,16 +364,33 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
                 </div>
               )}
 
+              {isEdit && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-xs text-amber-700">
+                    Après création, seuls les notes et la date de sortie prévue sont modifiables.
+                    Le changement de lit se fait via l'action « Transfert ».
+                  </p>
+                </div>
+              )}
+
+              {dirError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-xs text-red-600">
+                    Impossible de charger le référentiel (services / médecins). Fermez et réessayez.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <Field k="type" label={t('adm.form.type')} req>
-                  <select value={form.type} onChange={set('type')} className={selectCls}>
+                  <select value={form.type} onChange={set('type')} className={selectCls} disabled={isEdit}>
                     {(['hospitalisation','ambulatoire','preadmission','urgence','maternite','chirurgie'] as const).map(v =>
                       <option key={v} value={v}>{t(`adm.type.${v}` as any)}</option>
                     )}
                   </select>
                 </Field>
                 <Field k="priority" label={t('adm.form.priority')} req>
-                  <select value={form.priority} onChange={set('priority')} className={selectCls}>
+                  <select value={form.priority} onChange={set('priority')} className={selectCls} disabled={isEdit}>
                     {(['normal','urgent','tres_urgent','vital'] as const).map(v =>
                       <option key={v} value={v}>{t(`adm.priority.${v}` as any)}</option>
                     )}
@@ -333,16 +399,20 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
               </div>
 
               <Field k="serviceId" label={t('adm.form.service')} req>
-                <select value={form.serviceId} onChange={e => { set('serviceId')(e); setForm(f => ({ ...f, doctorId: '' })); }} className={selectCls}>
+                <select value={form.serviceId} onChange={set('serviceId')} className={selectCls} disabled={isEdit}>
                   <option value="">— {t('adm.form.service')} —</option>
-                  {MOCK_SERVICES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </Field>
 
               <Field k="doctorId" label={t('adm.form.doctor')} req>
-                <select value={form.doctorId} onChange={set('doctorId')} className={selectCls} disabled={!form.serviceId}>
+                <select value={form.doctorId} onChange={set('doctorId')} className={selectCls} disabled={isEdit}>
                   <option value="">— {t('adm.form.doctor')} —</option>
-                  {filteredDoctors.map(d => <option key={d.id} value={d.id}>{d.name} ({d.speciality})</option>)}
+                  {doctors.map(d => (
+                    <option key={d.id} value={d.id}>
+                      Dr {d.fullName}{d.specialty ? ` (${d.specialty})` : ''}
+                    </option>
+                  ))}
                 </select>
               </Field>
 
@@ -353,15 +423,16 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
                   rows={3}
                   placeholder={t('adm.form.motif.placeholder')}
                   className={`${inputCls} resize-none`}
+                  disabled={isEdit}
                 />
               </Field>
 
               <div className="grid grid-cols-2 gap-4">
                 <Field k="admissionDate" label={t('adm.form.date')} req>
-                  <input type="date" value={form.admissionDate} onChange={set('admissionDate')} className={inputCls} />
+                  <input type="date" value={form.admissionDate} onChange={set('admissionDate')} className={inputCls} disabled={isEdit} />
                 </Field>
                 <Field k="admissionTime" label={t('adm.form.time')} req>
-                  <input type="time" value={form.admissionTime} onChange={set('admissionTime')} className={inputCls} />
+                  <input type="time" value={form.admissionTime} onChange={set('admissionTime')} className={inputCls} disabled={isEdit} />
                 </Field>
               </div>
 
@@ -371,7 +442,7 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
                 </Field>
               ) : (
                 <Field k="expectedDischargeDate" label={t('adm.form.expected_discharge')}>
-                  <input type="date" value={form.expectedDischargeDate} onChange={set('expectedDischargeDate')} className={inputCls} />
+                  <input type="date" min={form.admissionDate || new Date().toISOString().slice(0, 10)} value={form.expectedDischargeDate} onChange={set('expectedDischargeDate')} className={inputCls} />
                 </Field>
               )}
 
@@ -391,10 +462,27 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
           {step === 2 && (
             <div className="space-y-4">
               <h3 className="font-semibold text-gray-800">{t('adm.form.bed.title')}</h3>
-              <BedSelector
-                selectedBedId={selectedBed?.id}
-                onSelect={bed => setSelectedBed(bed)}
-              />
+              {isEdit ? (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-sm text-amber-700">
+                    Lit actuel : <span className="font-semibold">{admission?.bedNumber || '—'}</span>.
+                    Pour changer de lit, utilisez l'action « Transfert » depuis la liste des admissions.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <BedSelector
+                    selectedBedId={selectedBed?.id}
+                    onSelect={bed => setSelectedBed(bed)}
+                  />
+                  {errors.bed && <p className="text-xs text-red-500">{errors.bed}</p>}
+                </>
+              )}
+              {errors.submit && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-xs text-red-600">{errors.submit}</p>
+                </div>
+              )}
             </div>
           )}
         </div>

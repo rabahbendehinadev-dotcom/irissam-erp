@@ -1,17 +1,23 @@
 /**
- * /admissions routes
- * CRUD for admissions — backed by AdmissionService from the DAL layer.
+ * /admissions routes — CRUD backed by AdmissionService (DAL).
  *
- * Schema alignment (admissionsTable):
- *  - status: "active" | "discharged" | "transferred" | "cancelled"
- *  - admissionDate: DATE string YYYY-MM-DD
- *  - admissionTime: TEXT "HH:MM"
- *  - serviceName, doctorName: denormalised TEXT (not FK columns)
- *  - patientName: denormalised TEXT
+ * Intégrité référentielle (UAT Phase 2) :
+ *  - POST exige un patientId réel (patients), un bedId réel (occupé
+ *    atomiquement par admit() dans la même transaction), et un motif non vide.
+ *    doctorId/serviceId optionnels mais vérifiés en base quand fournis —
+ *    les noms sont résolus côté serveur (jamais fournis par le client seul).
+ *  - type/priority validés contre les enums PostgreSQL (drizzle enumValues).
+ *  - admissionDate/admissionTime éventuels du client sont IGNORÉS — le service
+ *    fixe la date/heure réelles côté serveur.
+ *  - PATCH limité à diagnosis/notes/expectedDischargeDate — les transitions de
+ *    statut et changements de lit passent par /cancel, /discharge, /transfer
+ *    (chemins atomiques qui gèrent lit + encounter + audit).
+ *  - RBAC : GET → admissions.view, POST → admissions.create,
+ *    PATCH → admissions.edit, transfer/cancel/discharge → permissions dédiées.
  */
 
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { db } from "@workspace/db";
+import { db, pool } from "@workspace/db";
 import { admissionsTable } from "@workspace/db/schema";
 import { requirePermission } from "../middleware/requirePermission";
 import {
@@ -28,6 +34,13 @@ import type { ActorCtx } from "../repositories/types";
 interface AuthenticatedRequest extends Request {
   auth?: { userId: string; role: string };
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Valeurs autorisées — lues depuis le schéma drizzle (alignées sur PostgreSQL). */
+const ADMISSION_TYPES: readonly string[] = admissionsTable.type.enumValues;
+const ADMISSION_PRIORITIES: readonly string[] = admissionsTable.priority.enumValues;
 
 function actor(req: AuthenticatedRequest): ActorCtx {
   return {
@@ -78,8 +91,8 @@ function mapAdmission(a: typeof admissionsTable.$inferSelect) {
   };
 }
 
-/** GET /admissions */
-router.get("/", async (req: Request, res: Response, next: NextFunction) => {
+/** GET /admissions (requires admissions.view) */
+router.get("/", requirePermission("admissions.view"), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { status, search, date, patientId, type } = req.query as {
       status?: string;
@@ -136,8 +149,8 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-/** GET /admissions/:id */
-router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
+/** GET /admissions/:id (requires admissions.view) */
+router.get("/:id", requirePermission("admissions.view"), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = String(req.params.id);
     const [row] = await db
@@ -153,78 +166,262 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-/** POST /admissions */
-router.post("/", async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+/** POST /admissions (requires admissions.create) — referential integrity enforced */
+router.post("/", requirePermission("admissions.create"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const body = req.body as {
       encounterId?: string;
-      patientId: string;
-      patientName: string;
-      patientMpiId?: string;
-      type: "hospitalisation" | "preadmission" | "transfert_interne" | "transfert_externe";
-      priority?: "normal" | "urgent" | "critique";
+      patientId?: string;
+      type?: string;
+      priority?: string;
       serviceId?: string;
-      serviceName: string;
+      serviceName?: string;
       doctorId?: string;
-      doctorName: string;
-      motif: string;
+      doctorName?: string;
+      motif?: string;
+      diagnosis?: string;
       bedId?: string;
       bedNumber?: string;
-      admissionDate: string;
-      admissionTime: string;
+      roomNumber?: string;
+      floorLabel?: string;
+      buildingName?: string;
       expectedDischargeDate?: string;
       notes?: string;
     };
 
-    const bedId = body.bedId ?? "";   // admit() requires bedId
-    const { admission } = await admissionService.admit(
-      {
-        patientId:            body.patientId,
-        patientName:          body.patientName,
-        patientMpiId:         body.patientMpiId,
-        type:                 body.type,
-        serviceName:          body.serviceName,
-        doctorId:             body.doctorId,
-        doctorName:           body.doctorName,
-        motif:                body.motif,
-        bedId,
-        bedNumber:            body.bedNumber,
-        expectedDischargeDate: body.expectedDischargeDate,
-        notes:                body.notes,
-        encounterId:          body.encounterId, // reuse from Urgences/Consultation
-        siteId:               undefined,
-      },
-      actor(req),
-    );
+    // Alias hérité du module urgences : « critique » ≙ « vital » (absent de l'enum admission_priority)
+    if (body.priority === "critique") body.priority = "vital";
 
-    res.status(201).json(mapAdmission(admission));
+    // ── patientId : obligatoire, UUID, patient réel ─────────────────────────
+    if (!body.patientId || !UUID_RE.test(body.patientId)) {
+      res.status(400).json({ error: "patientId (UUID) est requis — sélectionnez un patient réel" });
+      return;
+    }
+    const patientQ = await pool.query(
+      `SELECT id, first_name, last_name, mpi_id, date_of_birth, phone
+         FROM patients WHERE id = $1 AND deleted_at IS NULL`,
+      [body.patientId],
+    );
+    if (patientQ.rows.length === 0) {
+      res.status(400).json({ error: "Patient introuvable" });
+      return;
+    }
+    const p = patientQ.rows[0];
+    const patientName = `${p.last_name} ${p.first_name}`;
+    const patientDob: string | undefined =
+      p.date_of_birth instanceof Date
+        ? p.date_of_birth.toISOString().slice(0, 10)
+        : (p.date_of_birth ?? undefined);
+
+    // ── motif : obligatoire ─────────────────────────────────────────────────
+    const motif = (body.motif ?? "").trim();
+    if (!motif) {
+      res.status(400).json({ error: "motif est requis" });
+      return;
+    }
+
+    // ── type / priority : enums PostgreSQL ──────────────────────────────────
+    if (body.type !== undefined && !ADMISSION_TYPES.includes(body.type)) {
+      res.status(400).json({ error: `type invalide — valeurs autorisées : ${ADMISSION_TYPES.join(", ")}` });
+      return;
+    }
+    if (body.priority !== undefined && !ADMISSION_PRIORITIES.includes(body.priority)) {
+      res.status(400).json({ error: `priority invalide — valeurs autorisées : ${ADMISSION_PRIORITIES.join(", ")}` });
+      return;
+    }
+
+    // ── bedId : obligatoire (l'admission occupe un lit réel) ────────────────
+    if (!body.bedId || !UUID_RE.test(body.bedId)) {
+      res.status(400).json({ error: "bedId (UUID) est requis — sélectionnez un lit réel" });
+      return;
+    }
+
+    // ── doctorId : optionnel mais vérifié; nom résolu côté serveur ─────────
+    let doctorId: string | undefined;
+    let doctorName = (body.doctorName ?? "").trim();
+    if (body.doctorId) {
+      if (!UUID_RE.test(body.doctorId)) {
+        res.status(400).json({ error: "doctorId invalide (UUID attendu)" });
+        return;
+      }
+      const doctorQ = await pool.query(
+        `SELECT id, first_name, last_name FROM users
+          WHERE id = $1 AND role = 'doctor' AND deleted_at IS NULL`,
+        [body.doctorId],
+      );
+      if (doctorQ.rows.length === 0) {
+        res.status(400).json({ error: "Médecin introuvable" });
+        return;
+      }
+      doctorId   = doctorQ.rows[0].id;
+      doctorName = `Dr ${doctorQ.rows[0].first_name} ${doctorQ.rows[0].last_name}`;
+    } else {
+      // Revue UAT Phase 2 : plus de médecin en texte libre — l'UUID d'un
+      // utilisateur réel est exigé, le nom est toujours résolu côté serveur.
+      res.status(400).json({ error: "doctorId est requis (UUID d'un utilisateur réel)" });
+      return;
+    }
+
+    // ── serviceId : optionnel mais vérifié (departments); nom résolu ───────
+    let serviceId: string | undefined;
+    let serviceName = (body.serviceName ?? "").trim();
+    if (body.serviceId) {
+      if (!UUID_RE.test(body.serviceId)) {
+        res.status(400).json({ error: "serviceId invalide (UUID attendu)" });
+        return;
+      }
+      const deptQ = await pool.query(
+        `SELECT id, name FROM departments
+          WHERE id = $1 AND deleted_at IS NULL AND is_active = true`,
+        [body.serviceId],
+      );
+      if (deptQ.rows.length === 0) {
+        res.status(400).json({ error: "Service/département introuvable" });
+        return;
+      }
+      serviceId   = deptQ.rows[0].id;
+      serviceName = deptQ.rows[0].name;
+    } else if (serviceName) {
+      // Résolution stricte : le nom doit correspondre à un département réel —
+      // aucun service fictif ne doit être persisté (revue UAT Phase 2).
+      const deptByName = await pool.query(
+        `SELECT id, name FROM departments
+          WHERE lower(name) = lower($1) AND deleted_at IS NULL AND is_active = true`,
+        [serviceName],
+      );
+      if (deptByName.rows.length === 0) {
+        res.status(400).json({ error: `Service inconnu : "${serviceName}" ne correspond à aucun département réel` });
+        return;
+      }
+      serviceId   = deptByName.rows[0].id;
+      serviceName = deptByName.rows[0].name;
+    } else {
+      res.status(400).json({ error: "serviceId ou serviceName est requis" });
+      return;
+    }
+
+    // ── encounterId : format + appartenance au même patient ─────────────────
+    if (body.encounterId) {
+      if (!UUID_RE.test(body.encounterId)) {
+        res.status(400).json({ error: "encounterId invalide (UUID attendu)" });
+        return;
+      }
+      const encQ = await pool.query(
+        `SELECT patient_id FROM encounters WHERE id = $1`,
+        [body.encounterId],
+      );
+      if (encQ.rows.length === 0) {
+        res.status(400).json({ error: "Encounter introuvable" });
+        return;
+      }
+      if (encQ.rows[0].patient_id !== body.patientId) {
+        res.status(400).json({ error: "encounterId appartient à un autre patient — rattachement refusé" });
+        return;
+      }
+    }
+
+    // ── expectedDischargeDate : format + cohérence clinique ─────────────────
+    // (bug UAT : une valeur transitoire "0006-02-02" d'un <input type=date>
+    // passait le simple contrôle de format et polluait la base)
+    if (body.expectedDischargeDate) {
+      if (!DATE_RE.test(body.expectedDischargeDate)) {
+        res.status(400).json({ error: "expectedDischargeDate invalide (YYYY-MM-DD attendu)" });
+        return;
+      }
+      const admissionDay = new Date().toISOString().slice(0, 10); // le service fixe admissionDate = aujourd'hui
+      if (body.expectedDischargeDate < admissionDay) {
+        res.status(400).json({ error: "expectedDischargeDate ne peut pas être antérieure à la date d'admission" });
+        return;
+      }
+    }
+
+    try {
+      const { admission } = await admissionService.admit(
+        {
+          patientId:     p.id,
+          patientName,
+          patientMpiId:  p.mpi_id ?? undefined,
+          patientDob,
+          patientPhone:  p.phone ?? undefined,
+          type:          body.type,
+          priority:      body.priority,
+          serviceId,
+          serviceName,
+          doctorId,
+          doctorName,
+          motif,
+          diagnosis:     body.diagnosis?.trim() || undefined,
+          notes:         body.notes?.trim() || undefined,
+          bedId:         body.bedId,
+          bedNumber:     body.bedNumber,
+          roomNumber:    body.roomNumber,
+          floorLabel:    body.floorLabel,
+          buildingName:  body.buildingName,
+          expectedDischargeDate: body.expectedDischargeDate,
+          encounterId:   body.encounterId, // reuse from Urgences/Consultation
+          siteId:        undefined,
+        },
+        actor(req),
+      );
+
+      res.status(201).json(mapAdmission(admission));
+    } catch (err: any) {
+      const msg = String(err?.message ?? "");
+      if (msg.includes("non disponible")) { res.status(409).json({ error: msg }); return; }
+      if (msg.includes("introuvable"))    { res.status(400).json({ error: msg }); return; }
+      throw err;
+    }
   } catch (err) {
     next(err);
   }
 });
 
-/** PATCH /admissions/:id */
-router.patch("/:id", async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+/** PATCH /admissions/:id (requires admissions.edit) — champs administratifs uniquement */
+router.patch("/:id", requirePermission("admissions.edit"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = String(req.params.id);
     const body = req.body as {
-      status?: string;
+      status?: unknown;
+      bedId?: unknown;
+      bedNumber?: unknown;
       diagnosis?: string;
       notes?: string;
-      bedId?: string;
-      bedNumber?: string;
       expectedDischargeDate?: string;
     };
+
+    // Les transitions d'état et changements de lit passent par les endpoints
+    // atomiques dédiés (libération/occupation du lit + encounter + audit).
+    if (body.status !== undefined) {
+      res.status(400).json({ error: "status non modifiable ici — utilisez /cancel, /discharge ou /transfer" });
+      return;
+    }
+    if (body.bedId !== undefined || body.bedNumber !== undefined) {
+      res.status(400).json({ error: "changement de lit non modifiable ici — utilisez /transfer" });
+      return;
+    }
+    if (body.expectedDischargeDate) {
+      if (!DATE_RE.test(body.expectedDischargeDate)) {
+        res.status(400).json({ error: "expectedDischargeDate invalide (YYYY-MM-DD attendu)" });
+        return;
+      }
+      const [current] = await db
+        .select({ admissionDate: admissionsTable.admissionDate })
+        .from(admissionsTable)
+        .where(and(eq(admissionsTable.id, id), isNull(admissionsTable.deletedAt)))
+        .limit(1);
+      if (!current) { res.status(404).json({ message: "Admission not found" }); return; }
+      if (current.admissionDate && body.expectedDischargeDate < current.admissionDate) {
+        res.status(400).json({ error: "expectedDischargeDate ne peut pas être antérieure à la date d'admission" });
+        return;
+      }
+    }
 
     const [updated] = await db
       .update(admissionsTable)
       .set({
-        ...(body.status     && { status:      body.status as "active" | "discharged" | "transferred" | "cancelled" }),
-        ...(body.diagnosis  && { diagnosis:   body.diagnosis }),
-        ...(body.notes      && { notes:       body.notes }),
-        ...(body.bedId      && { bedId:       body.bedId }),
-        ...(body.bedNumber  && { bedNumber:   body.bedNumber }),
-        ...(body.expectedDischargeDate && { expectedDischargeDate: body.expectedDischargeDate }),
+        ...(typeof body.diagnosis === "string" && { diagnosis: body.diagnosis.trim() || null }),
+        ...(typeof body.notes === "string" && { notes: body.notes.trim() || null }),
+        ...(body.expectedDischargeDate !== undefined && { expectedDischargeDate: body.expectedDischargeDate || null }),
         updatedAt: new Date(),
         updatedBy: req.auth?.userId ?? undefined,
       })
@@ -256,14 +453,13 @@ router.post("/:id/transfer", requirePermission("admissions.transfer"), async (re
 router.post("/:id/cancel", requirePermission("admissions.cancel"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = String(req.params.id);
-    const [updated] = await db
-      .update(admissionsTable)
-      .set({ status: "cancelled", updatedAt: new Date(), updatedBy: req.auth?.userId ?? undefined })
-      .where(and(eq(admissionsTable.id, id), isNull(admissionsTable.deletedAt)))
-      .returning();
-    if (!updated) { res.status(404).json({ error: "Admission introuvable" }); return; }
-    res.json(mapAdmission(updated));
-  } catch (err) {
+    // Transaction complète : statut + libération du lit + clôture encounter + audit
+    const cancelled = await admissionService.cancel(id, actor(req));
+    res.json(mapAdmission(cancelled));
+  } catch (err: any) {
+    const msg: string = err?.message ?? "";
+    if (msg.includes("introuvable")) { res.status(404).json({ error: msg }); return; }
+    if (msg.includes("déjà"))        { res.status(409).json({ error: msg }); return; }
     next(err);
   }
 });
