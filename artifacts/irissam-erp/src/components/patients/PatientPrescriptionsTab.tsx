@@ -21,11 +21,12 @@ interface Prescription {
   sourceModule: string;
 }
 
+// Statuts persistés (enum PostgreSQL, en français) : prescrit | prepare | delivre | annule
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  prescribed:  { label: 'Prescrite',  color: 'bg-blue-100 text-blue-700' },
-  prepared:    { label: 'Préparée',   color: 'bg-yellow-100 text-yellow-700' },
-  dispensed:   { label: 'Délivrée',   color: 'bg-green-100 text-green-700' },
-  cancelled:   { label: 'Annulée',    color: 'bg-gray-100 text-gray-500' },
+  prescrit: { label: 'Prescrite',  color: 'bg-blue-100 text-blue-700' },
+  prepare:  { label: 'Préparée',   color: 'bg-yellow-100 text-yellow-700' },
+  delivre:  { label: 'Délivrée',   color: 'bg-green-100 text-green-700' },
+  annule:   { label: 'Annulée',    color: 'bg-gray-100 text-gray-500' },
 };
 
 function fmt(d?: string | null) {
@@ -83,7 +84,7 @@ export function PatientPrescriptionsTab({ patientId }: { patientId: string }) {
     );
   }
 
-  const dispensed = prescriptions.filter(p => p.status === 'dispensed').length;
+  const dispensed = prescriptions.filter(p => p.status === 'delivre').length;
 
   return (
     <div className="space-y-4">

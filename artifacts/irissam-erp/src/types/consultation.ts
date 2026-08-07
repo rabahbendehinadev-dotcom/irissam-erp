@@ -168,6 +168,8 @@ export interface Consultation {
   siteName: string;
   appointmentId?: string;
   admissionId?: string;
+  /** Encounter clinique lié (UUID PostgreSQL) — requis pour prescrire. */
+  encounterId?: string | null;
   date: string;
   scheduledAt: string;
   startedAt?: string;

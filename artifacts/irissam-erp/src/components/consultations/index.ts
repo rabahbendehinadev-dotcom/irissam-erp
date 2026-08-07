@@ -7,4 +7,5 @@ export * from './DiagnosisBuilder';
 export * from './ConsultationSummaryModal';
 export * from './ConsultationHeader';
 export * from './ConsultationHistoryPanel';
+export * from './ConsultationPrescriptionsPanel';
 export * from './ConsultationWorkspace';

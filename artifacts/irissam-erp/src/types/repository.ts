@@ -116,10 +116,13 @@ export interface RepoImagingOrder {
 export interface RepoPrescription {
   id: string;
   encounterId?: string;
+  /** Médicament réel du stock pharmacie (colonne medication_id). */
+  medicationId?: string;
   visitId: string;
   patientId: string;
   patientName: string;
   drug: string;
+  notes?: string;
   dosage: string;
   route: string;
   frequency: string;

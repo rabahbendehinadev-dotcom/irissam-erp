@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  ClipboardList, Activity, Brain, History, Shield,
+  ClipboardList, Activity, Brain, History, Shield, Pill,
 } from 'lucide-react';
 import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import { ConsultationHeader } from './ConsultationHeader';
@@ -8,18 +8,20 @@ import { ConsultationSummaryModal } from './ConsultationSummaryModal';
 import { ConsultationPrintModal } from './ConsultationPrintModal';
 import { DiagnosisBuilder } from './DiagnosisBuilder';
 import { ConsultationHistoryPanel } from './ConsultationHistoryPanel';
+import { ConsultationPrescriptionsPanel } from './ConsultationPrescriptionsPanel';
 import type { Consultation, ConsultationStatus, AuditEntry } from '@/types/consultation';
 import { useAuth } from '@/store/AuthContext';
 
 /**
  * Espace de travail d'une consultation — 100 % données réelles.
  *
- * Onglets affichés : uniquement ceux adossés à des colonnes PostgreSQL
- * (contexte, diagnostic) ou à des états honnêtes (signes vitaux : aucune
- * saisie disponible dans ce module ; historique ; journal de session).
- * Les anciens onglets de démonstration (examen clinique, prescription,
- * analyses, imagerie, documents, suivi) ne persistaient rien : ils sont
- * retirés tant que leurs modules serveur n'existent pas.
+ * Onglets affichés : uniquement ceux adossés à des données PostgreSQL
+ * (contexte, diagnostic, prescriptions) ou à des états honnêtes (signes
+ * vitaux ; historique ; journal de session). Les prescriptions sont créées
+ * sur l'encounter réel de la consultation avec un médicament du stock
+ * pharmacie, puis suivent le flux préparation → délivrance (stock déduit).
+ * Les anciens onglets de démonstration (examen clinique, analyses, imagerie,
+ * documents, suivi) restent retirés tant que leurs modules n'existent pas.
  */
 
 // ─── Libellés type / origine (valeurs enum PostgreSQL + héritées) ────────────
@@ -209,11 +211,12 @@ function SessionJournalTab({ consultationNumber, entries }: {
 // ─── Onglets ──────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'context',   label: 'Contexte',      icon: ClipboardList },
-  { id: 'vitals',    label: 'Signes vitaux', icon: Activity },
-  { id: 'diagnosis', label: 'Diagnostic',    icon: Brain },
-  { id: 'history',   label: 'Historique',    icon: History },
-  { id: 'journal',   label: 'Session',       icon: Shield },
+  { id: 'context',       label: 'Contexte',      icon: ClipboardList },
+  { id: 'vitals',        label: 'Signes vitaux', icon: Activity },
+  { id: 'diagnosis',     label: 'Diagnostic',    icon: Brain },
+  { id: 'prescriptions', label: 'Prescriptions', icon: Pill },
+  { id: 'history',       label: 'Historique',    icon: History },
+  { id: 'journal',       label: 'Session',       icon: Shield },
 ];
 
 // ─── Espace de travail principal ──────────────────────────────────────────────
@@ -320,6 +323,13 @@ export function ConsultationWorkspace({
               onSave={handleSaveDiagnosis}
               saving={diagnosisSaving}
               readOnly={readOnly}
+            />
+          </div>
+          <div className={activeTab === 'prescriptions' ? '' : 'hidden'}>
+            <ConsultationPrescriptionsPanel
+              consultation={consultation}
+              readOnly={readOnly}
+              onLog={pushEntry}
             />
           </div>
           <div className={activeTab === 'history'   ? '' : 'hidden'}>

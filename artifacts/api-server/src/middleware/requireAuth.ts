@@ -8,6 +8,8 @@ export interface AuthenticatedRequest extends Request {
     role: string;
     permissions: string[];
     siteId: string | null;
+    firstName?: string;
+    lastName?: string;
   };
 }
 
@@ -41,6 +43,8 @@ export function requireAuth(
       role:        payload.role,
       permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
       siteId:      payload.siteId ?? null,
+      firstName:   payload.firstName,
+      lastName:    payload.lastName,
     };
     next();
   } catch {

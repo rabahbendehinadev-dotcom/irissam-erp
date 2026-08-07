@@ -260,12 +260,14 @@ router.post("/login", async (req: Request, res: Response) => {
     getUserPermissionRoleName(user.id),
   ]);
 
-  // Issue access token (short-lived, embeds permissions)
+  // Issue access token (short-lived, embeds permissions + display name)
   const payload: JwtPayload = {
     userId: user.id,
     role: rbacRole ?? user.role,
     permissions,
     siteId: user.site_id,
+    firstName: user.first_name,
+    lastName: user.last_name,
   };
   const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 
@@ -357,6 +359,8 @@ router.post("/refresh", async (req: Request, res: Response) => {
     role: rbacRole ?? user.role,
     permissions,
     siteId: user.site_id,
+    firstName: user.first_name,
+    lastName: user.last_name,
   };
   const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 

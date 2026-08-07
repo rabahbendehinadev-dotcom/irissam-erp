@@ -87,6 +87,25 @@ export function requireAllPermissions(permissions: string[]) {
   };
 }
 
+/**
+ * Programmatic permission check for routes whose required permission depends
+ * on the request body (e.g. PATCH /prescriptions/:id/status).
+ */
+export function hasPermission(req: AuthenticatedRequest, permission: string): boolean {
+  if (!req.auth) return false;
+  if (req.auth.role === "super_admin") return true;
+  return req.auth.permissions.includes(permission);
+}
+
+/**
+ * Rejects with 403 AND records the denial in user_activity_logs — same
+ * behaviour as the requirePermission middleware, usable inside a handler.
+ */
+export function denyWithAudit(req: AuthenticatedRequest, res: Response, permission: string): void {
+  if (req.auth) logDenied(req.auth.userId, req.auth.role, permission, req.ip).catch(() => {});
+  res.status(403).json({ message: "Permission insuffisante.", required: permission });
+}
+
 async function logDenied(
   userId: string,
   role: string,

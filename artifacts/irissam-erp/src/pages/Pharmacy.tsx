@@ -5,7 +5,7 @@
  *   - Prescriptions depuis Urgences et Consultations
  *   - Flux : Prescrite → Préparée → Délivrée (PATCH /prescriptions/:id/status)
  *   - Délivrance : POST /prescriptions/:id/dispense
- *   - Alertes stock faible (Adrénaline, Kétamine, Rocuronium)
+ *   - Alertes stock réelles depuis le médicament lié (stock faible / expiré)
  *
  * Onglet Stock : gestion du stock médicamenteux via l'API (CRUD complet).
  */
@@ -54,16 +54,19 @@ const RX_STATUS: Record<RepoPrescription['status'], {
   annule:   { label: 'Annulée',    badge: 'bg-gray-100 text-gray-500 border-gray-200',    row: 'opacity-60' },
 };
 
-// ─── Stock & prescription alerts ─────────────────────────────────────────────
+// ─── Stock & prescription alerts (données réelles du stock) ──────────────────
 
-// Drugs that commonly show low-stock situations; will be replaced by
-// a real stock-level API call when the inventory bridge is wired.
-const LOW_STOCK_DRUGS = ['Adrénaline', 'Kétamine', 'Rocuronium'];
-
-function getAlerts(rx: RepoPrescription): string[] {
+/** Alertes issues du médicament réellement lié à la prescription (medication_id). */
+function getStockAlerts(med?: MedicationItem): string[] {
+  if (!med) return [];
   const alerts: string[] = [];
-  if (LOW_STOCK_DRUGS.some(d => rx.drug.includes(d))) {
-    alerts.push(`📦 Stock faible : ${rx.drug}`);
+  if (med.status === 'expired') {
+    alerts.push(`Expiré : ${med.name}`);
+  } else if (med.status === 'critical' || med.status === 'low') {
+    alerts.push(`Stock faible : ${med.name} (${med.quantity} ${med.unit ?? 'unités'} restants)`);
+  }
+  if (med.expiringSoon && med.status !== 'expired') {
+    alerts.push(`Expire bientôt : ${med.name}`);
   }
   return alerts;
 }
@@ -72,17 +75,34 @@ function getAlerts(rx: RepoPrescription): string[] {
 
 function DispenseModal({
   rx,
+  linkedMed,
+  medications,
   onConfirm,
   onClose,
   pharmacistName,
 }: {
   rx: RepoPrescription;
-  onConfirm: (comment?: string) => void;
+  /** Médicament lié à la prescription (medication_id), si présent. */
+  linkedMed?: MedicationItem;
+  /** Stock complet — pour lier une ancienne prescription saisie en texte libre. */
+  medications: MedicationItem[];
+  onConfirm: (opts: { quantity: number; medicationId?: string; comment?: string }) => void;
   onClose: () => void;
   pharmacistName: string;
 }) {
-  const [comment, setComment] = useState('');
-  const alerts = getAlerts(rx);
+  const [comment, setComment]   = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [selectedMedId, setSelectedMedId] = useState('');
+
+  const med = linkedMed ?? medications.find(m => String(m.id) === selectedMedId);
+  const qty = parseInt(quantity, 10);
+  const qtyValid = Number.isInteger(qty) && qty >= 1;
+  const isExpired = med?.status === 'expired';
+  const insufficient = !!med && qtyValid && qty > med.quantity;
+  const canConfirm = !!med && qtyValid && !insufficient && !isExpired;
+
+  const alerts = getStockAlerts(med);
+  if (insufficient && med) alerts.push(`Quantité demandée (${qty}) > stock disponible (${med.quantity})`);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center sm:p-4">
@@ -119,6 +139,51 @@ function DispenseModal({
           <p className="text-xs text-gray-400">Prescrit par {rx.prescribedBy}</p>
         </div>
 
+        {!linkedMed && (
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Médicament du stock <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selectedMedId}
+              onChange={e => setSelectedMedId(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">— Lier un médicament réel —</option>
+              {medications.map(m => (
+                <option key={m.id} value={m.id} disabled={m.status === 'expired'}>
+                  {m.name} — stock : {m.quantity} {m.unit ?? 'unités'}{m.status === 'expired' ? ' (expiré)' : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-amber-600 mt-1">
+              Prescription saisie en texte libre — la délivrance exige un médicament du stock.
+            </p>
+          </div>
+        )}
+
+        {med && (
+          <div className="mb-3 rounded-xl bg-green-50 border border-green-100 p-3 text-sm">
+            <p className="font-medium text-gray-800">{med.name}</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Stock disponible : <span className="font-mono font-bold">{med.quantity}</span> {med.unit ?? 'unités'}
+              {med.expiryDate && ` · expire le ${new Date(med.expiryDate).toLocaleDateString('fr-FR')}`}
+            </p>
+          </div>
+        )}
+
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Quantité délivrée <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={quantity}
+          onChange={e => setQuantity(e.target.value)}
+          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 mb-3"
+        />
+
         <label className="block text-sm font-medium text-gray-700 mb-1">Commentaire (optionnel)</label>
         <textarea
           rows={2}
@@ -130,6 +195,9 @@ function DispenseModal({
 
         <p className="text-xs text-gray-400 mb-4">
           Délivré par : <span className="font-medium text-gray-600">{pharmacistName}</span>
+          {med && qtyValid && !insufficient && (
+            <> · stock après délivrance : <span className="font-mono">{med.quantity - qty}</span> {med.unit ?? 'unités'}</>
+          )}
         </p>
 
         <div className="flex gap-2">
@@ -137,13 +205,15 @@ function DispenseModal({
             Annuler
           </button>
           <button
-            onClick={() => onConfirm(comment.trim() || undefined)}
-            className={cn(
-              'flex-1 px-4 py-2 text-sm font-semibold rounded-xl text-white transition-colors',
-              alerts.length > 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700',
-            )}
+            onClick={() => canConfirm && onConfirm({
+              quantity: qty,
+              medicationId: linkedMed ? undefined : selectedMedId,
+              comment: comment.trim() || undefined,
+            })}
+            disabled={!canConfirm}
+            className="flex-1 px-4 py-2 text-sm font-semibold rounded-xl text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {alerts.length > 0 ? 'Délivrer malgré alerte' : 'Confirmer la délivrance'}
+            Confirmer la délivrance
           </button>
         </div>
       </div>
@@ -713,6 +783,7 @@ function normalizePrescription(p: Record<string, unknown>): RepoPrescription {
   return {
     id:           String(p.id ?? ''),
     encounterId:  p.encounterId ? String(p.encounterId) : undefined,
+    medicationId: p.medicationId ? String(p.medicationId) : undefined,
     patientId:    String(p.patientId ?? ''),
     patientName:  String(p.patientName ?? ''),
     drug:         String(p.drug ?? ''),
@@ -746,6 +817,15 @@ function PrescriptionsTab() {
 
   // Fetch all prescriptions from PostgreSQL
   const { data: rawData, loading, error, refetch } = useQuery<unknown[]>('/prescriptions?limit=200');
+
+  // Stock réel — alertes et délivrance s'appuient sur le médicament lié
+  const { data: medsRaw, refetch: refetchMeds } = useQuery<{ data: MedicationItem[] }>('/medications?page=1&pageSize=100');
+  const medications = useMemo(() => medsRaw?.data ?? [], [medsRaw]);
+  const medById = useMemo(() => {
+    const map: Record<string, MedicationItem> = {};
+    medications.forEach(m => { map[m.id] = m; });
+    return map;
+  }, [medications]);
   const allRaw = Array.isArray(rawData) ? rawData : [];
   const allRx: RepoPrescription[] = allRaw.map(p => normalizePrescription(p as Record<string, unknown>));
 
@@ -790,21 +870,22 @@ function PrescriptionsTab() {
     }
   };
 
-  const handleDeliver = async (comment?: string) => {
+  const handleDeliver = async (opts: { quantity: number; medicationId?: string; comment?: string }) => {
     if (!delivering) return;
     setActionInProgress(delivering.id);
     try {
       await apiClient.post(`/prescriptions/${delivering.id}/dispense`, {
-        dispensedByName: pharmacistName,
-        dispenserComment: comment ?? null,
+        quantity:         opts.quantity,
+        medicationId:     opts.medicationId,
+        dispensedByName:  pharmacistName,
+        dispenserComment: opts.comment ?? null,
       });
-      const alerts = getAlerts(delivering);
-      if (alerts.length > 0) {
-        toast({ title: 'Délivré avec alerte', description: alerts.join(' · '), variant: 'destructive' });
-      } else {
-        toast({ title: 'Médicament délivré', description: `${delivering.drug} — ${delivering.patientName}` });
-      }
+      toast({
+        title: 'Médicament délivré',
+        description: `${delivering.drug} — ${opts.quantity} unité(s) déduite(s) du stock`,
+      });
       refetch();
+      refetchMeds();
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: string } })?.data?.error ?? 'Impossible de délivrer';
       toast({ title: 'Erreur', description: msg, variant: 'destructive' });
@@ -906,9 +987,13 @@ function PrescriptionsTab() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {prescriptions.map(rx => {
-                  const st     = RX_STATUS[rx.status];
-                  const alerts = rx.status !== 'delivre' && rx.status !== 'annule' ? getAlerts(rx) : [];
-                  const canAct  = can('pharmacy.dispense') && rx.status !== 'delivre' && rx.status !== 'annule';
+                  const st        = RX_STATUS[rx.status];
+                  const linkedMed = rx.medicationId ? medById[rx.medicationId] : undefined;
+                  const alerts    = rx.status !== 'delivre' && rx.status !== 'annule' ? getStockAlerts(linkedMed) : [];
+                  // Préparer exige pharmacy.prepare ; Délivrer exige pharmacy.dispense
+                  const canAct =
+                    (rx.status === 'prescrit' && can('pharmacy.prepare')) ||
+                    (rx.status === 'prepare'  && can('pharmacy.dispense'));
                   const isActing = actionInProgress === rx.id;
 
                   return (
@@ -932,6 +1017,13 @@ function PrescriptionsTab() {
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-800">{rx.drug}</p>
                         <p className="text-xs text-gray-400">{rx.dosage}</p>
+                        {linkedMed ? (
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            Stock : <span className="font-mono">{linkedMed.quantity}</span> {linkedMed.unit ?? 'unités'}
+                          </p>
+                        ) : !rx.medicationId ? (
+                          <p className="text-[10px] text-amber-600 mt-0.5">Non lié au stock</p>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">
                         <p>{rx.route}</p>
@@ -993,6 +1085,8 @@ function PrescriptionsTab() {
       {delivering && (
         <DispenseModal
           rx={delivering}
+          linkedMed={delivering.medicationId ? medById[delivering.medicationId] : undefined}
+          medications={medications}
           pharmacistName={pharmacistName}
           onConfirm={handleDeliver}
           onClose={() => setDelivering(null)}

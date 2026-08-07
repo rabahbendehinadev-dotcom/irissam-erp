@@ -43,7 +43,7 @@ export type Permission =
   // Imaging
   | 'imaging.view' | 'imaging.request'
   // Pharmacy
-  | 'pharmacy.view' | 'pharmacy.dispense' | 'pharmacy.manage_stock'
+  | 'pharmacy.view' | 'pharmacy.prepare' | 'pharmacy.dispense' | 'pharmacy.manage_stock'
   // Blood bank
   | 'blood_bank.view' | 'blood_bank.manage'
   // Medical stock
@@ -94,7 +94,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'operating_room.view', 'operating_room.schedule',
     'laboratory.view', 'laboratory.create', 'laboratory.validate',
     'imaging.view', 'imaging.request',
-    'pharmacy.view', 'pharmacy.dispense', 'pharmacy.manage_stock',
+    'pharmacy.view', 'pharmacy.prepare', 'pharmacy.dispense', 'pharmacy.manage_stock',
     'blood_bank.view', 'blood_bank.manage',
     'medical_stock.view', 'medical_stock.manage',
     'finance.view', 'finance.create_invoice', 'finance.validate',
@@ -179,7 +179,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   pharmacie: [
     'dashboard.view',
     'patients.view',
-    'pharmacy.view', 'pharmacy.dispense', 'pharmacy.manage_stock',
+    'pharmacy.view', 'pharmacy.prepare', 'pharmacy.dispense', 'pharmacy.manage_stock',
     'medical_stock.view', 'medical_stock.manage',
   ],
   finance: [
@@ -224,7 +224,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'operating_room.view', 'operating_room.schedule',
     'laboratory.view', 'laboratory.create', 'laboratory.validate',
     'imaging.view', 'imaging.request',
-    'pharmacy.view', 'pharmacy.dispense', 'pharmacy.manage_stock',
+    'pharmacy.view', 'pharmacy.prepare', 'pharmacy.dispense', 'pharmacy.manage_stock',
     'blood_bank.view', 'blood_bank.manage',
     'medical_stock.view', 'medical_stock.manage',
     'finance.view', 'finance.create_invoice', 'finance.validate',
@@ -262,7 +262,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'operating_room.view', 'operating_room.schedule',
     'laboratory.view', 'laboratory.create', 'laboratory.validate',
     'imaging.view', 'imaging.request',
-    'pharmacy.view', 'pharmacy.dispense', 'pharmacy.manage_stock',
+    'pharmacy.view', 'pharmacy.prepare', 'pharmacy.dispense', 'pharmacy.manage_stock',
     'blood_bank.view', 'blood_bank.manage',
     'medical_stock.view', 'medical_stock.manage',
     'finance.view', 'finance.create_invoice', 'finance.validate',
@@ -324,7 +324,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   pharmacist: [
     'dashboard.view',
     'patients.view',
-    'pharmacy.view', 'pharmacy.dispense', 'pharmacy.manage_stock',
+    'pharmacy.view', 'pharmacy.prepare', 'pharmacy.dispense', 'pharmacy.manage_stock',
     'medical_stock.view', 'medical_stock.manage',
   ],
   laboratory: [

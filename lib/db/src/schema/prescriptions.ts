@@ -12,6 +12,7 @@ import { prescriptionStatusEnum, sourceModuleEnum } from "./enums";
 import { usersTable } from "./users";
 import { patientsTable } from "./patients";
 import { encountersTable } from "./encounters";
+import { medicationsTable } from "./medications";
 
 // ─── Prescriptions ────────────────────────────────────────────────────────────
 
@@ -21,6 +22,9 @@ export const prescriptionsTable = pgTable("prescriptions", {
   patientId:   uuid("patient_id").references(() => patientsTable.id, { onDelete: "restrict" }),
   patientName: text("patient_name").notNull(),
   visitId:     text("visit_id"),
+
+  /** Lien réel vers le stock pharmacie — nullable pour les anciennes lignes texte. */
+  medicationId: uuid("medication_id").references(() => medicationsTable.id, { onDelete: "set null" }),
 
   drug:      text("drug").notNull(),
   dosage:    text("dosage").notNull(),
@@ -57,6 +61,7 @@ export const prescriptionsTable = pgTable("prescriptions", {
 }, (t) => [
   index("rx_encounter_idx").on(t.encounterId),
   index("rx_patient_idx").on(t.patientId),
+  index("rx_medication_idx").on(t.medicationId),
   index("rx_status_idx").on(t.status),
   index("rx_prescribed_at_idx").on(t.prescribedAt),
   index("rx_deleted_at_idx").on(t.deletedAt),

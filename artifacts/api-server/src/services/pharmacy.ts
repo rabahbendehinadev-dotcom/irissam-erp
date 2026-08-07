@@ -2,20 +2,33 @@
  * PharmacyService — medication CRUD + stock deduction on dispense.
  *
  * Dispense flow (atomic transaction):
- *   1. Load prescription → validate status is "prescrit"
- *   2. Deduct stock (one medication per prescription record in this schema)
- *   3. Mark prescription as "delivre" (NOT "dispensée")
- *   4. Audit log
+ *   1. Load prescription → validate status is "prescrit" | "prepare"
+ *   2. Deduct stock (guard SQL atomique : quantity >= demandé, sinon
+ *      InsufficientStockError — jamais de stock négatif)
+ *   3. Mark prescription "delivre" + lien medication_id + nom/commentaire
+ *   4. Audit : prescription "dispensed" (stock avant/après) + médicament "updated"
  *
- * Task #60 compliance: pharmacist-only enforcement is done in route middleware
- * (req.auth.role === "pharmacist"). This service does not check roles.
+ * RBAC (pharmacy.dispense) is enforced in route middleware, not here.
  */
 import { db } from "@workspace/db";
 import { repos } from "../repositories";
 import { auditService } from "./audit";
+import { safeUuid } from "../repositories/types";
 import type { TxContext, ActorCtx } from "../repositories/types";
 import type { DbMedication } from "../repositories/medication";
 import type { DbPrescription } from "../repositories/prescription";
+
+/** Stock insuffisant — le routeur la convertit en 409 (jamais de stock négatif). */
+export class InsufficientStockError extends Error {
+  constructor(
+    public readonly medicationName: string,
+    public readonly available: number,
+    public readonly requested: number,
+  ) {
+    super(`Stock insuffisant pour ${medicationName} : ${available} disponible(s), ${requested} demandé(s)`);
+    this.name = "InsufficientStockError";
+  }
+}
 
 export class PharmacyService {
 
@@ -76,52 +89,86 @@ export class PharmacyService {
   // ── Dispense ─────────────────────────────────────────────────────────────────
 
   /**
-   * Dispense a prescription (single drug record).
-   * Deducts `quantity` units from the linked medication stock.
-   * Marks prescription status as "delivre".
+   * Dispense a prescription (single drug record) — atomic transaction.
+   * Deducts `quantity` units from the linked medication stock, marks the
+   * prescription "delivre" and persists the medication link + dispenser info.
    */
   async dispense(
     prescriptionId: string,
     medicationId: string,
     quantity: number,
     actor: ActorCtx,
+    opts: { dispensedByName?: string | null; dispenserComment?: string | null } = {},
   ): Promise<DbPrescription> {
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new Error("Quantité invalide : entier ≥ 1 requis");
+    }
+
     return db.transaction(async (tx) => {
       const ctx: TxContext = { ...actor, tx };
 
-      // 1. Load prescription
-      const prescription = await repos.prescription.findById(prescriptionId, ctx);
-      if (!prescription) throw new Error(`Prescription ${prescriptionId} introuvable`);
-      if (prescription.status !== "prescrit") {
-        throw new Error(`Prescription déjà ${prescription.status}`);
+      // 1. CLAIM — transition conditionnelle prescrit|prepare → delivre.
+      //    La garde d'état vit dans le WHERE du claim : sous requêtes
+      //    concurrentes, une seule transaction obtient la ligne, l'autre
+      //    reçoit null → 409. Aucune double déduction de stock possible.
+      const now = new Date();
+      const claimed = await repos.prescription.claimForDispense(prescriptionId, {
+        medicationId,
+        dispensedById:    safeUuid(actor.userId),
+        dispensedByName:  opts.dispensedByName?.trim() || actor.userName,
+        dispensedAt:      now,
+        dispenserComment: opts.dispenserComment?.trim() || null,
+      }, ctx);
+      if (!claimed) {
+        const existing = await repos.prescription.findById(prescriptionId, ctx);
+        if (!existing) throw new Error(`Prescription ${prescriptionId} introuvable`);
+        if (existing.status === "annule") throw new Error("Prescription annulée — délivrance impossible");
+        throw new Error("Prescription déjà délivrée");
       }
 
-      // 2. Deduct stock (atomic SQL check: stock >= quantity)
-      if (medicationId && quantity > 0) {
-        const updated = await repos.medication.deductStock(medicationId, quantity, ctx);
-        if (!updated) {
-          throw new Error(
-            `Stock insuffisant pour le médicament ${medicationId} (quantité demandée: ${quantity})`,
-          );
-        }
+      // 2. Stock : lecture puis déduction conditionnelle (quantity >= demandé).
+      //    Toute exception ici annule la transaction — claim compris.
+      const med = await repos.medication.findById(medicationId, ctx);
+      if (!med) throw new Error("Médicament introuvable dans le stock pharmacie");
+      if (med.quantity < quantity) {
+        throw new InsufficientStockError(med.name, med.quantity, quantity);
+      }
+      const updatedMed = await repos.medication.deductStock(medicationId, quantity, ctx);
+      if (!updatedMed) {
+        // Course concurrente : la garde SQL a refusé la déduction.
+        throw new InsufficientStockError(med.name, med.quantity, quantity);
       }
 
-      // 3. Mark as delivered
-      const dispensed = await repos.prescription.markDispensed(prescriptionId, ctx);
-      if (!dispensed) throw new Error("Échec du délivrement");
-
-      // 4. Audit
+      // 4. Audit — prescription délivrée (stock avant/après) + mouvement de stock
       await auditService.log({
         module:       "pharmacie",
         action:       "dispensed",
         resourceType: "prescription",
         resourceId:   prescriptionId,
-        newValue:     { medicationId, quantity, dispensedBy: actor.userId },
-        patientId:    prescription.patientId ?? undefined,
-        encounterId:  prescription.encounterId ?? undefined,
+        newValue:     {
+          status: "delivre",
+          medicationId,
+          medicationName: med.name,
+          quantity,
+          stockBefore: med.quantity,
+          stockAfter:  updatedMed.quantity,
+          dispensedBy: opts.dispensedByName?.trim() || actor.userName,
+        },
+        patientId:    claimed.patientId ?? undefined,
+        encounterId:  claimed.encounterId ?? undefined,
       }, actor, ctx);
 
-      return dispensed;
+      await auditService.log({
+        module:       "pharmacie",
+        action:       "updated",
+        resourceType: "medication",
+        resourceId:   medicationId,
+        oldValue:     { quantity: med.quantity },
+        newValue:     { quantity: updatedMed.quantity, motif: `Délivrance prescription ${prescriptionId}` },
+        siteId:       med.siteId ?? undefined,
+      }, actor, ctx);
+
+      return claimed;
     });
   }
 }

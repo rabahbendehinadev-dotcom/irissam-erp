@@ -11,7 +11,7 @@
  *  - No siteId column
  *  - No deletedBy column
  */
-import { eq, and, isNull, desc, count } from "drizzle-orm";
+import { eq, and, isNull, desc, count, inArray } from "drizzle-orm";
 import {
   db as globalDb, prescriptionsTable, type DbPrescription, type InsertPrescription,
 } from "@workspace/db";
@@ -66,6 +66,29 @@ export class PrescriptionRepository {
       .update(prescriptionsTable)
       .set({ ...data, updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
       .where(and(eq(prescriptionsTable.id, id), isNull(prescriptionsTable.deletedAt)))
+      .returning();
+    return row ?? null;
+  }
+
+  /**
+   * Claim de délivrance — transition conditionnelle prescrit|prepare → delivre.
+   * La garde d'état est DANS le WHERE : sous requêtes concurrentes, une seule
+   * transaction obtient la ligne (l'autre reçoit null → 409), ce qui interdit
+   * toute double déduction de stock.
+   */
+  async claimForDispense(
+    id: string,
+    data: Partial<InsertPrescription>,
+    ctx: TxContext,
+  ): Promise<DbPrescription | null> {
+    const [row] = await qb(this.db, ctx)
+      .update(prescriptionsTable)
+      .set({ ...data, status: "delivre", updatedAt: new Date(), updatedBy: safeUuid(ctx.userId) })
+      .where(and(
+        eq(prescriptionsTable.id, id),
+        inArray(prescriptionsTable.status, ["prescrit", "prepare"]),
+        isNull(prescriptionsTable.deletedAt),
+      ))
       .returning();
     return row ?? null;
   }
