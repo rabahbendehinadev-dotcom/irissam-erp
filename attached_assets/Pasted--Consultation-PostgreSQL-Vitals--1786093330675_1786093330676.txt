@@ -1,0 +1,251 @@
+ممتاز. دك Consultation ولات حقيقية ونظيفة: التشخيص يتحفظ من الواجهة، كلشي من PostgreSQL، والـVitals الوهمية تنحات بلا ما يبنيو نظام ناقص.
+
+الخطوة الجاية الصحيحة هي المرحلة 4: Prescription + Pharmacy على نفس المريض ونفس الاستشارة، لأننا لازم نكمل المسار الطبي الحقيقي قبل أي Portal جديد.
+
+ابعثلو هذا البرومبت:
+
+ممتاز. المرحلة الخاصة بالـ Consultation انتهت بـ PASS.
+لا تبدأ أي Module جديد.
+لا تبدأ Portail Infirmier.
+لا تبدأ Laboratory أو Imaging بعد.
+استعمل نفس المريض ونفس الاستشارة فقط.
+Patient:
+Rabah Bendehina
+Patient ID:
+4410bc4a-317c-4b97-9b2e-7b9557aafe66
+MRN:
+MRN-2026-00016
+Consultation ID:
+7e291123-5f31-446f-9731-49955551bec0
+Consultation Number:
+CONS-2026-00010
+Encounter ID:
+5eb6c34c-4369-4287-819b-3a587a59921a
+Doctor:
+Dr Karim Martin
+==================================================
+UAT PHASE 4 — PRESCRIPTION + PHARMACY
+==================================================
+الهدف:
+اختبار المسار الحقيقي الكامل:
+Consultation
+→ Prescription
+→ Pharmacy
+→ Dispense
+→ Stock
+→ Patient Detail
+→ Audit
+بدون Mock Data وبدون أي بيانات وهمية.
+==================================================
+1. فحص الموجود قبل أي تعديل
+==================================================
+ابحث أولًا داخل المشروع عن الموجود فعليًا:
+- prescriptions table
+- prescription_items
+- medications
+- pharmacy stock
+- batches
+- dispensing
+- stock movements
+- prescription APIs
+- pharmacy APIs
+- existing hooks
+- existing services
+- existing permissions
+لا تنشئ API أو Table جديدة إذا كانت موجودة.
+==================================================
+2. إنشاء Prescription من نفس Consultation
+==================================================
+من واجهة Consultation الحقيقية:
+أنشئ Prescription مرتبطة بـ:
+- نفس patientId
+- نفس consultationId
+- نفس encounterId
+- نفس doctorId
+لا تنشئ Prescription مستقلة عن الاستشارة إذا النظام يدعم الربط.
+استعمل دواء حقيقي موجود في PostgreSQL فقط.
+قبل الاختيار:
+- استعلم عن قائمة الأدوية الحقيقية.
+- اختر Medication موجودًا فعليًا.
+- تحقق من stock الحقيقي.
+- لا تستعمل دواء static أو hard-coded.
+أدخل بيانات UAT فقط:
+Dosage:
+1 comprimé
+Fréquence:
+2 fois par jour
+Durée:
+5 jours
+Instructions:
+Test UAT uniquement
+إذا هذه الحقول موجودة فعليًا في schema.
+==================================================
+3. تحقق من Prescription
+==================================================
+بعد الحفظ تحقق من:
+- Prescription ID حقيقي.
+- patient_id صحيح.
+- consultation_id صحيح.
+- encounter_id صحيح.
+- doctor_id صحيح.
+- medication_id حقيقي.
+- status صحيح.
+- لا توجد قيم عشوائية.
+- لا توجد Static Arrays.
+ثم:
+- F5.
+- إعادة فتح Consultation.
+- Prescription تبقى موجودة.
+- تظهر في Patient Detail → Prescriptions.
+- تظهر في Pharmacy.
+- لا تظهر عند Patient آخر.
+==================================================
+4. Pharmacy
+==================================================
+افتح Module Pharmacie.
+تحقق أن Prescription الخاصة برابح تظهر للصيدلي.
+اختبر:
+- عرض prescription.
+- قراءة الدواء الحقيقي.
+- الجرعة.
+- الكمية المطلوبة.
+- حالة prescription.
+لا تعتمد على اسم دواء نصي فقط إذا عندنا medicationId حقيقي.
+==================================================
+5. Dispense
+==================================================
+نفذ Dispense حقيقي إذا الـ backend يدعم ذلك.
+قبل Dispense:
+تحقق من:
+- كمية stock الحالية.
+- batch الحقيقي.
+- expiry date إن كانت موجودة.
+- FEFO إذا النظام يستعملها.
+بعد Dispense:
+تحقق من:
+- dispensing record حقيقي.
+- quantity dispensed.
+- user الذي نفذ العملية.
+- timestamp.
+- prescription status.
+ثم تحقق من stock:
+Stock Before
+→ Dispense
+→ Stock After
+يجب أن ينقص حسب الكمية الحقيقية.
+==================================================
+6. اختبارات Stock Safety
+==================================================
+اختبر سلبياً:
+- dispense أكبر من stock.
+- medication غير موجود.
+- batch منتهي الصلاحية إن النظام يمنعه.
+- dispense مرتين لنفس الكمية.
+- prescription ملغاة.
+- prescription لمريض آخر.
+النتائج يجب أن تكون:
+- 400 أو 409 حسب الحالة.
+- لا Negative Stock.
+- لا Duplicate Dispense.
+- لا Silent Failure.
+==================================================
+7. RBAC
+==================================================
+اختبر:
+Admin:
+- view + create حسب permission.
+Doctor:
+- ينشئ prescription إذا مسموح.
+- لا يعدل stock مباشرة.
+Pharmacist:
+- يرى prescription.
+- dispense إذا عنده permission.
+Receptionist:
+- لا dispense.
+zero.perm:
+- 403.
+تأكد أن Backend هو الذي يمنع، وليس Frontend فقط.
+==================================================
+8. IDOR
+==================================================
+اختبر:
+- Prescription ID لمريض آخر.
+- تغيير patientId في request.
+- تغيير consultationId.
+- Medication غير تابع للسجل.
+- Dispense على prescription لا يملك المستخدم حق الوصول لها.
+لا توجد Data Leak.
+==================================================
+9. Audit
+==================================================
+يجب تسجيل:
+- prescription created.
+- prescription updated إذا تم تعديلها.
+- dispensed.
+- stock movement.
+- access_denied للاختبارات السلبية.
+كل Audit يجب أن يحتوي على user وpatient/resource IDs الحقيقيين.
+==================================================
+10. البحث عن Demo داخل Prescription/Pharmacy
+==================================================
+ابحث عن:
+- mockPrescriptions
+- mockMedications
+- fakeStock
+- static medication arrays
+- random prescription IDs
+- demo quantities
+- fake batches
+- hard-coded stock
+- local-only prescription state
+أي Runtime Data وهمية يجب إزالتها أو إخفاؤها.
+==================================================
+11. Data Integrity
+==================================================
+راجع:
+- Transactions.
+- Stock locking.
+- Race conditions.
+- Double dispense.
+- Negative quantities.
+- أي COUNT(*)+1 للترقيم.
+- أي query تفقد WHERE condition.
+- أي استخدام pool منفصل داخل transaction يسبب deadlock.
+إذا وجدت Bug:
+توقف.
+أصلحه.
+ثم أعد Phase 4 كاملة.
+==================================================
+12. التقرير المطلوب
+==================================================
+أعطني تقرير Phase 4 فقط:
+1. Prescription ID.
+2. Medication المستعمل.
+3. Medication ID.
+4. Consultation ID.
+5. Encounter ID.
+6. Stock Before.
+7. Quantity Dispensed.
+8. Stock After.
+9. Prescription Status.
+10. Dispense ID.
+11. هل بقيت بعد Refresh؟
+12. هل ظهرت في Patient Detail؟
+13. هل ظهرت في Pharmacy؟
+14. نتيجة RBAC.
+15. نتيجة IDOR.
+16. نتيجة Audit.
+17. هل وجد Mock Data؟
+18. الأخطاء المكتشفة.
+19. الإصلاحات المنفذة.
+20. الملفات المعدلة.
+21. TypeScript.
+22. Production Build.
+23. Commit Hash.
+24. الحكم النهائي PASS أو FAIL.
+لا تبدأ Laboratory.
+لا تبدأ Imaging.
+لا تبدأ Portail Infirmier.
+انتظر موافقتي بعد التقرير.
+
+دك إحنا ماشيين صح: Patient → Appointment → Admission → Consultation → Prescription/Pharmacy. كي هذه تنجح، نروح للمخبر ثم الأشعة ثم الفاتورة والدفع.
