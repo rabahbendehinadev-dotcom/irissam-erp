@@ -13,7 +13,8 @@
 - [Auth + RBAC Architecture](auth-rbac.md) — JWT 15min + HttpOnly refresh cookie 7d; permissions in JWT payload; brute-force lock; 11 roles + 99 permissions in DB; requirePermission middleware
 - [Auth Bootstrap Bugs](auth-bootstrap-bugs.md) — two production bugs: UUID crash on /auth/me + refresh deadlock; fixes: UUID guard + _skipRefresh:true
 - [Auth login loop](auth-login-loop.md) — login form showed loading→blank instead of error; fix: remove isLoading:true from login(), add _skipRefresh:true to login+changePassword
-- [Frontend Stability](frontend-stability.md) — PageErrorBoundary + WidgetErrorBoundary pattern; Array.isArray guards on 8 pages; api-client-react dist rebuild rule; 14 pre-existing TS errors in MockRepository/EmergencyPatientDetail
+- [Frontend Stability](frontend-stability.md) — PageErrorBoundary + WidgetErrorBoundary pattern; Array.isArray guards on 8 pages; api-client-react dist rebuild rule; ERP tsc clean since 2026-08
+- [Consultations Phase 3](consultations-phase3.md) — shared CONS counter: EVERY writer (incl. doctor-portal) must use the counter table; TOCTOU re-check in tx (FOR SHARE→400); staff modules = coarse perms by design
 - [Billing Module](billing-module.md) — Phase 1+2+Task#109: mig 008+009, 5 routes, PDF, billing tabs in PatientDetail (PatientInvoicesTab/PaymentTab/BillingTab), 4 patient billing routes
 - [Insurance Module](insurance-module.md) — mig 010+011: 10 tables, 7 sub-routers, coverage engine; insurer_name nullable; claim_number_seq required; bodies camelCase; plans need coverageType
 - [Responsive PWA Architecture](responsive-pwa.md) — DashboardLayout drawer pattern, Sidebar translate-x classes, Topbar hamburger/search/filters, SW registered, iOS banner 7d dismiss, modals bottom-sheet on mobile

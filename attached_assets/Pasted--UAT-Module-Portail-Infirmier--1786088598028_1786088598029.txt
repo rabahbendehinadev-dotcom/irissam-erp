@@ -1,0 +1,270 @@
+ممتاز. المرحلة الثانية UAT نجحت.
+
+لا تبدأ أي Module جديد.
+لا تبدأ Portail Infirmier.
+استعمل نفس المريض فقط:
+
+Patient ID:
+4410bc4a-317c-4b97-9b2e-7b9557aafe66
+
+MRN:
+MRN-2026-00016
+
+Appointment ID:
+81710c7e-8875-4044-b526-a7ed62845703
+
+Admission ID:
+dcffa4be…
+
+Encounter ID:
+5eb6c34c…
+
+Doctor:
+Dr Karim Martin — Cardiologie
+
+لا تنشئ مريضًا جديدًا.
+
+ابدأ الآن المرحلة الثالثة فقط:
+
+# المرحلة الثالثة — Consultation الطبية الكاملة
+
+## 1. فتح الاستشارة من المسار الحقيقي
+
+ابدأ من نفس المريض ونفس الـAdmission/Encounter الحالي إن كانت Architecture تربط الاستشارة به.
+
+لا تنشئ Encounter جديدًا إذا كان الموجود صالحًا للاستشارة.
+
+تحقق أولًا من العلاقات الموجودة بين:
+
+- patient
+- appointment
+- admission
+- encounter
+- consultation
+
+واستعمل السجلات الحقيقية الموجودة.
+
+## 2. إنشاء Consultation حقيقية
+
+أنشئ Consultation من الواجهة الفعلية.
+
+استعمل:
+
+- Patient ID الحالي.
+- Doctor ID الحقيقي لـ Dr Karim Martin.
+- Encounter ID الحقيقي إن كان مطلوبًا.
+- Department الحقيقي Cardiologie.
+
+أدخل بيانات اختبار واضحة فقط مثل:
+
+Motif:
+Test UAT Phase 3
+
+Symptômes:
+Douleur thoracique légère depuis ce matin
+
+Diagnostic:
+Observation clinique UAT — aucun diagnostic réel
+
+Notes:
+Consultation de test UAT uniquement
+
+مهم:
+هذه بيانات اختبار وليست تشخيصًا طبيًا حقيقيًا.
+
+## 3. التحقق من البيانات السريرية
+
+اختبر الحقول الموجودة فعليًا في النظام مثل:
+
+- Motif
+- Symptômes
+- Diagnostic
+- Notes
+- Antécédents
+- Allergies
+- Vitals إذا كانت موجودة داخل Consultation
+- Instructions
+- Follow-up
+
+لا تضف حقولًا غير موجودة فقط من أجل الاختبار.
+
+تحقق أن كل حقل يحفظ في PostgreSQL الحقيقي.
+
+## 4. حفظ الاستشارة
+
+بعد الحفظ تحقق من:
+
+- Consultation ID حقيقي.
+- Consultation Number حقيقي.
+- patientId صحيح.
+- doctorId صحيح.
+- encounterId صحيح.
+- admissionId إذا كانت العلاقة موجودة.
+- status صحيح.
+
+ثم:
+
+- Refresh كامل.
+- إعادة فتح الاستشارة.
+- التأكد أن كل البيانات بقيت.
+- عدم إنشاء Consultation مكررة.
+
+## 5. ظهور الاستشارة في كل مكان
+
+تحقق أن الاستشارة تظهر في:
+
+- Patient Detail → Consultations
+- Consultations module
+- Doctor Portal إذا كان الطبيب يملك الوصول
+- Timeline / Historique للمريض إذا النظام يدعم ذلك
+
+ولا تظهر عند أي مريض آخر.
+
+## 6. التعديل
+
+عدل حقلًا واحدًا فقط بعد إنشاء الاستشارة.
+
+مثلاً Notes.
+
+احفظ ثم Refresh.
+
+تحقق أن:
+
+- نفس Consultation ID بقي.
+- لم تُنشأ Consultation جديدة.
+- Audit يسجل update.
+- البيانات الجديدة تظهر.
+
+## 7. الصلاحيات
+
+اختبر على الأقل:
+
+### Admin
+- يمكنه فتح ومراجعة الاستشارة حسب الصلاحيات.
+
+### الطبيب المرتبط
+- يمكنه فتح الاستشارة.
+- يمكنه تعديل ما تسمح به صلاحياته.
+
+### طبيب آخر أو مستخدم غير مصرح
+- يجب ألا يرى أو يعدل الاستشارة إذا Scope يمنعه.
+
+### zero.perm
+- GET consultation → 403
+- POST consultation → 403
+- PATCH consultation → 403
+
+تحقق من Audit Log لعمليات access_denied.
+
+## 8. IDOR
+
+نفذ اختبار IDOR حقيقي:
+
+- استعمل Consultation ID الحالية.
+- حاول فتحها بحساب غير مصرح.
+- حاول تغيير patientId أو consultationId في request.
+- حاول ربط Consultation بمريض آخر.
+
+يجب أن يرفض Backend العملية.
+
+لا تعتمد على إخفاء الزر في Frontend فقط.
+
+## 9. حالات الخطأ
+
+اختبر:
+
+- patientId غير موجود.
+- doctorId غير صالح.
+- encounterId يخص مريضًا آخر.
+- consultationId غير موجود.
+- payload ناقص.
+- network/API failure.
+
+النتيجة المطلوبة:
+
+- 400 للبيانات غير الصالحة.
+- 403 للصلاحيات.
+- 404 للسجل غير الموجود.
+- Error State واضح في الواجهة.
+- لا White Screen.
+- لا Silent Failure.
+
+## 10. Audit
+
+تحقق أن Audit Log يسجل على الأقل:
+
+- consultation created
+- consultation updated
+- access_denied عند الاختبارات السلبية
+
+ويجب أن يحتوي على:
+
+- user الحقيقي
+- patientId الصحيح
+- consultationId
+- timestamp
+- action
+
+## 11. تحقق من PostgreSQL
+
+بعد كل عملية تحقق مباشرة من DB:
+
+- consultations
+- encounters
+- audit_logs
+- وأي جدول Clinical مرتبط فعليًا
+
+لا تعتمد فقط على UI.
+
+## 12. مراجعة معمارية بعد نجاح السيناريو
+
+بعد نجاح الاستشارة، راجع الكود الخاص بـConsultations فقط بحثًا عن:
+
+- Mock Data
+- Static Arrays
+- Random IDs
+- Missing patient filter
+- Missing encounter filter
+- Missing permissions
+- Silent catch
+- Full PUT قد يمسح بيانات متزامنة
+- Queries تفقد شروط WHERE
+- Transactions تحتوي queries تستخدم اتصالًا آخر من pool
+- احتمالات Deadlock مشابهة للمشكلة السابقة
+
+إذا وجدت Bug:
+توقف، أصلحه، وأعد اختبار المرحلة الثالثة كاملة.
+
+## التقرير المطلوب
+
+أعطني تقرير المرحلة الثالثة فقط:
+
+1. Patient ID.
+2. Doctor ID.
+3. Admission ID.
+4. Encounter ID.
+5. Consultation ID.
+6. Consultation Number.
+7. البيانات المحفوظة.
+8. نتيجة PostgreSQL.
+9. هل بقيت بعد Refresh؟
+10. هل ظهرت في Patient Detail؟
+11. هل ظهرت في Doctor Portal؟
+12. هل ظهرت عند مريض آخر؟
+13. نتيجة RBAC.
+14. نتيجة IDOR.
+15. نتيجة Audit Log.
+16. الأخطاء المكتشفة.
+17. الإصلاحات المنفذة.
+18. الملفات المعدلة.
+19. TypeScript result.
+20. Production Build result.
+21. Commit Hash.
+22. الحكم النهائي PASS أو FAIL.
+
+لا تبدأ Prescription.
+لا تبدأ Laboratory.
+لا تبدأ Imaging.
+لا تبدأ Portail Infirmier.
+
+انتظر موافقتي بعد تقرير المرحلة الثالثة.
