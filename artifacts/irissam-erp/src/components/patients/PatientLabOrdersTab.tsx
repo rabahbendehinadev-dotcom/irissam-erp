@@ -132,6 +132,11 @@ export function PatientLabOrdersTab({ patientId }: { patientId: string }) {
                       {o.isCritical && (
                         <span className="ml-1.5 text-xs text-red-600 font-bold">⚠</span>
                       )}
+                      {o.result && (
+                        <p className={`mt-1 text-xs font-normal whitespace-pre-wrap max-w-md ${o.isCritical ? 'text-red-700' : 'text-gray-600'}`}>
+                          <span className="font-semibold text-gray-500 uppercase tracking-wide">Résultat :</span> {o.result}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-500">{o.category || '—'}</td>
                     <td className={`px-4 py-3 ${u.color}`}>{u.label}</td>

@@ -75,8 +75,12 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/preview" component={PreviewInit} />
       
-      {/* Fallback to protected layout for everything else */}
-      <Route path="/:rest*">
+      {/* Fallback to protected layout for everything else.
+          NB: pas de path — un <Route> sans path matche toujours (fallback de Switch).
+          L'ancien pattern "/:rest*" ne matchait PAS les chemins multi-segments
+          (ex. /lab-results/:id, /appointments/request) → Switch ne rendait rien
+          → page blanche sans erreur ni requête réseau. */}
+      <Route>
         <ProtectedRoutes />
       </Route>
     </Switch>

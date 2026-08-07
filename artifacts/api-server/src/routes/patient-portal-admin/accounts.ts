@@ -45,13 +45,28 @@ async function auditAction(
   entityId: string,
   meta?: Record<string, unknown>,
 ) {
+  // Écrit dans audit_logs (les colonnes entity_type/entity_id/ip_address n'existent
+  // pas dans user_activity_logs et son enum action ne couvre pas ces actions —
+  // l'ancien INSERT échouait silencieusement).
   try {
+    const userName = [req.auth?.firstName, req.auth?.lastName].filter(Boolean).join(" ").trim()
+      || req.auth?.userId || "system";
     await pool.query(
-      `INSERT INTO user_activity_logs (user_id, action, entity_type, entity_id, metadata, ip_address, timestamp)
-       VALUES ($1,$2,$3,$4,$5,$6,now())`,
-      [req.auth?.userId ?? null, action, entityType, entityId, meta ? JSON.stringify(meta) : null, req.ip ?? null],
+      `INSERT INTO audit_logs (module, action, user_id, user_name, user_role, patient_id, resource_type, resource_id, new_value, severity, ip)
+       VALUES ('system',$1,$2,$3,$4,$5,$6,$7,$8,'info',$9)`,
+      [
+        action,
+        req.auth?.userId ?? null,
+        userName,
+        req.auth?.role ?? "unknown",
+        (meta?.patientId as string | undefined) ?? null,
+        entityType,
+        entityId,
+        meta ? JSON.stringify(meta) : null,
+        req.ip ?? null,
+      ],
     );
-  } catch {}
+  } catch (err) { console.error("[portal-admin/accounts/audit]", err); }
 }
 
 // ── GET /accounts/stats ───────────────────────────────────────────────────────

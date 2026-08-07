@@ -33,7 +33,7 @@ type ApiLabOrder = {
   urgency: 'STAT' | 'urgent' | 'routine';
   requestedByName: string;
   requestedAt: string | null;
-  status: 'demandee' | 'prelevee' | 'en_cours' | 'validee' | 'annulee';
+  status: 'demandee' | 'prelevee' | 'en_cours' | 'validee' | 'critique' | 'annulee';
   result: string | null;
   isCritical: boolean;
   resultAt: string | null;
@@ -52,6 +52,7 @@ const LAB_STATUS: Record<ApiLabOrder['status'], {
   prelevee:  { label: 'Prélevée',  badge: 'bg-yellow-100 text-yellow-700 border-yellow-200', row: '',           next: 'en_cours', nextLabel: 'Analyser',  nextColor: 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' },
   en_cours:  { label: 'En cours',  badge: 'bg-orange-100 text-orange-700 border-orange-200', row: '',          next: 'validee',  nextLabel: 'Valider →', nextColor: 'bg-green-50 text-green-700 hover:bg-green-100' },
   validee:   { label: 'Validée',   badge: 'bg-green-100 text-green-700 border-green-200',  row: '' },
+  critique:  { label: 'Critique',  badge: 'bg-red-100 text-red-700 border-red-200',       row: 'bg-red-50/40' },
   annulee:   { label: 'Annulée',   badge: 'bg-gray-100 text-gray-500 border-gray-200',    row: 'opacity-60' },
 };
 

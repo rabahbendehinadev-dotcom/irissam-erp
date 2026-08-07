@@ -37,22 +37,35 @@ async function notifyPatient(patientId: string, type: string, title: string, bod
   }
 }
 
-// Helper: write to user_activity_logs
+// Helper: écrit dans audit_logs.
+// (L'ancien INSERT vers user_activity_logs échouait silencieusement : les colonnes
+// entity_type/entity_id/ip_address n'existent pas et l'enum user_activity_action
+// ne couvre pas ces actions — toute trace de publication était perdue.)
+const AUDIT_MODULE_BY_ENTITY: Record<string, string> = {
+  lab_order:     "laboratoire",
+  imaging_order: "imagerie",
+};
 async function auditAction(req: AuthenticatedRequest, action: string, entityType: string, entityId: string, meta?: Record<string, unknown>) {
   try {
+    const userName = [req.auth?.firstName, req.auth?.lastName].filter(Boolean).join(" ").trim()
+      || req.auth?.userId || "system";
     await pool.query(
-      `INSERT INTO user_activity_logs (user_id, action, entity_type, entity_id, metadata, ip_address, timestamp)
-       VALUES ($1,$2,$3,$4,$5,$6,now())`,
+      `INSERT INTO audit_logs (module, action, user_id, user_name, user_role, patient_id, resource_type, resource_id, new_value, severity, ip)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'info',$10)`,
       [
-        req.auth?.userId ?? null,
+        AUDIT_MODULE_BY_ENTITY[entityType] ?? "system",
         action,
+        req.auth?.userId ?? null,
+        userName,
+        req.auth?.role ?? "unknown",
+        (meta?.patientId as string | undefined) ?? null,
         entityType,
         entityId,
         meta ? JSON.stringify(meta) : null,
         req.ip ?? null,
       ],
     );
-  } catch {}
+  } catch (err) { console.error("[portal-admin/audit]", err); }
 }
 
 // ─── LAB ORDERS ────────────────────────────────────────────────────────────────
@@ -93,7 +106,7 @@ router.post(
         [userId, note ?? null, id],
       );
 
-      await auditAction(req, "publish_to_patient", "lab_order", id, { test: order.test, note });
+      await auditAction(req, "publish_to_patient", "lab_order", id, { test: order.test, note, patientId: order.patient_id });
       await notifyPatient(
         order.patient_id,
         "lab_result",
@@ -176,7 +189,7 @@ router.post(
         [userId, note ?? null, id],
       );
 
-      await auditAction(req, "publish_to_patient", "imaging_order", id, { studyType: order.study_type, note });
+      await auditAction(req, "publish_to_patient", "imaging_order", id, { studyType: order.study_type, note, patientId: order.patient_id });
       await notifyPatient(
         order.patient_id,
         "imaging_result",
@@ -257,7 +270,7 @@ router.post(
         [userId, note ?? null, id],
       );
 
-      await auditAction(req, "publish_to_patient", "prescription", id, { drug: rx.drug, note });
+      await auditAction(req, "publish_to_patient", "prescription", id, { drug: rx.drug, note, patientId: rx.patient_id });
       await notifyPatient(
         rx.patient_id,
         "prescription",
@@ -353,7 +366,7 @@ router.post(
         [userId, note ?? null, id],
       );
 
-      await auditAction(req, "publish_to_patient", "document", id, { title: doc.title, note });
+      await auditAction(req, "publish_to_patient", "document", id, { title: doc.title, note, patientId: doc.patient_id });
       await notifyPatient(
         doc.patient_id,
         "document",

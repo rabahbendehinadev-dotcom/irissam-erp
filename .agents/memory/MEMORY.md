@@ -37,3 +37,5 @@
 - [Admissions integrity & bed lifecycle](admissions-integrity.md) — POST refuses fictional doctor/service/foreign encounter (critique→vital alias); cancel transactional; beds gated admissions.*; free-only-if-still-linked
 - [Consultation de-mock](consultation-demock.md) — diagnosis/notes = explicit-save narrow-PATCH panels; vitals are Urgences-visit-scoped only (honest empty state elsewhere); demo tabs removed, not hidden
 - [Prescription→Pharmacy chain](prescription-pharmacy-chain.md) — medication_id link (mig 040); dispense = claim-first UPDATE with status guard in WHERE (anti double-délivrance); reads need pharmacy.view; French status enums
+- [wouter fallback multi-segments](wouter-multiseg-fallback.md) — "/:rest*" ne matche pas /a/b → Switch rend null (page blanche sans erreur ni fetch); fallback = Route sans path
+- [Rotation refresh token + StrictMode](portal-auth-refresh.md) — refresh dédupliqué obligatoire côté client; jamais clearCookie sur token inconnu; contrat portail camelCase

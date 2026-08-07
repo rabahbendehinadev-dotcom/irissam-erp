@@ -157,9 +157,9 @@ router.patch("/:id/status", async (req: AuthenticatedRequest, res, next) => {
 router.use("/:encounterId/timeline", timelineRouter);
 
 /** GET /encounters/:encounterId/lab-orders */
-router.get("/:encounterId/lab-orders", async (req, res, next) => {
+router.get("/:encounterId/lab-orders", requirePermission("laboratory.view"), async (req, res, next) => {
   try {
-    const { encounterId } = req.params;
+    const encounterId = String(req.params.encounterId);
     const result = await repos.labOrder.list({ encounterId, limit: 200 });
     res.json(result.data.map(o => ({
       id: o.id, encounterId: o.encounterId, patientId: o.patientId,

@@ -34,6 +34,30 @@ const DUMMY_HASH          = "$2b$12$invalidhashpadding00000000000000000000000000
 function hashToken(raw: string) {
   return crypto.createHash("sha256").update(raw).digest("hex");
 }
+
+/**
+ * Maps a joined account+patient row to the `PatientMe` shape expected by the
+ * portal frontend (AuthContext). The frontend reads `patient` from both the
+ * login response and GET /me — without it, the UI session can never be
+ * established even though the tokens are valid.
+ */
+function toPatientMe(row: Record<string, any>) {
+  return {
+    accountId: row.id,
+    patientId: row.patient_id,
+    email: row.email,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    mrn: row.mpi_id,
+    dateOfBirth: row.date_of_birth,
+    phone: row.phone ?? row.patient_phone ?? "",
+    preferredLanguage: row.preferred_language ?? "fr",
+    notifEmail: true,
+    notifSms: false,
+    notifPush: false,
+    lastLogin: row.last_login_at ?? null,
+  };
+}
 function generateRefreshToken() {
   return crypto.randomBytes(48).toString("base64url");
 }
@@ -246,7 +270,21 @@ router.post("/login", async (req: Request, res: Response) => {
 
     const accessToken = signAccessToken(account.id, account.patient_id);
     await auditLog(account.id, account.patient_id, "login", req.ip, true);
-    res.json({ accessToken, expiresIn: 1800 });
+
+    const meRes = await pool.query(
+      `SELECT a.id, a.email, a.phone, a.preferred_language, a.last_login_at,
+              p.id AS patient_id, p.first_name, p.last_name, p.mpi_id,
+              p.date_of_birth, p.phone AS patient_phone
+       FROM patient_portal_accounts a
+       JOIN patients p ON p.id = a.patient_id
+       WHERE a.id=$1`,
+      [account.id],
+    );
+    res.json({
+      accessToken,
+      expiresIn: 1800,
+      patient: meRes.rows[0] ? toPatientMe(meRes.rows[0]) : null,
+    });
   } catch (err) {
     console.error("[portal/login]", err);
     res.status(500).json({ message: "Erreur serveur." });
@@ -275,7 +313,11 @@ router.post("/refresh", async (req: Request, res: Response) => {
 
     const session = rows[0];
     if (!session) {
-      res.clearCookie(PORTAL_COOKIE, { path: "/" });
+      // PAS de clearCookie ici : avec la rotation des tokens, deux refresh
+      // concurrents (même cookie) arrivent — le perdant tomberait ici et son
+      // clearCookie effacerait la NOUVELLE cookie posée par le gagnant,
+      // détruisant la session à chaque F5. Un token inconnu est sans valeur :
+      // répondre 401 suffit, rien à nettoyer côté client.
       res.status(401).json({ message: "Session invalide ou expirée.", code: "TOKEN_EXPIRED" });
       return;
     }
@@ -344,7 +386,7 @@ router.get("/me", requirePatientAuth, async (req: PatientRequest, res: Response)
       res.status(404).json({ message: "Compte introuvable." });
       return;
     }
-    res.json({ account: rows[0] });
+    res.json({ account: rows[0], patient: toPatientMe(rows[0]) });
   } catch (err) {
     console.error("[portal/me]", err);
     res.status(500).json({ message: "Erreur serveur." });

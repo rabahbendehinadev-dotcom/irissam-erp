@@ -23,18 +23,21 @@ async function auditLog(accountId: string, patientId: string, action: string, re
 router.get("/", requirePatientAuth, async (req: PatientRequest, res: Response) => {
   const { patientId } = req.patient!;
   try {
+    // Aliases camelCase = contrat attendu par le frontend du portail (type LabResult).
+    // NB: pas de colonne order_number sur lab_orders — l'id sert de numéro affiché.
     const { rows } = await pool.query(
-      `SELECT id, test, category, result, result_at, validated_by_name AS medecin,
-              laboratory, published_at, patient_visible_note, is_critical
+      `SELECT id, id AS "orderNumber", test AS "testType", status,
+              published_at AS "publishedAt", patient_visible_note AS "patientVisibleNote",
+              requested_by_name AS "requestingDoctorName"
        FROM lab_orders
        WHERE patient_id=$1
          AND published_to_patient=TRUE
-         AND status IN ('validee','resultat_disponible')
+         AND status IN ('validee','critique')
          AND deleted_at IS NULL
        ORDER BY published_at DESC`,
       [patientId],
     );
-    res.json({ results: rows });
+    res.json({ labResults: rows });
   } catch (err) {
     console.error("[portal/lab-results]", err);
     res.status(500).json({ message: "Erreur serveur." });
@@ -44,14 +47,19 @@ router.get("/", requirePatientAuth, async (req: PatientRequest, res: Response) =
 router.get("/:id", requirePatientAuth, async (req: PatientRequest, res: Response) => {
   const { patientId, accountId } = req.patient!;
   try {
+    // Aliases camelCase = contrat frontend (type LabResultDetail) :
+    // - resultSummary ← result (texte libre, affiché dans « Conclusion / Synthèse »)
+    // - results = NULL (pas de détail tabulaire structuré en base) → le front
+    //   affiche proprement « Détails non disponibles sous format tabulaire. »
     const { rows } = await pool.query(
-      `SELECT id, test, category, result, result_at, validated_by_name AS medecin,
-              laboratory, requested_by_name AS prescripteur, published_at,
-              patient_visible_note, is_critical, urgency
+      `SELECT id, id AS "orderNumber", test AS "testType", status,
+              published_at AS "publishedAt", patient_visible_note AS "patientVisibleNote",
+              requested_by_name AS "requestingDoctorName",
+              NULL AS results, result AS "resultSummary"
        FROM lab_orders
        WHERE id=$1 AND patient_id=$2
          AND published_to_patient=TRUE
-         AND status IN ('validee','resultat_disponible')
+         AND status IN ('validee','critique')
          AND deleted_at IS NULL`,
       [req.params.id, patientId],
     );
@@ -59,8 +67,8 @@ router.get("/:id", requirePatientAuth, async (req: PatientRequest, res: Response
       res.status(404).json({ message: "Résultat introuvable." });
       return;
     }
-    await auditLog(accountId, patientId, "view_lab_result", req.params.id, req.ip);
-    res.json({ result: rows[0] });
+    await auditLog(accountId, patientId, "view_lab_result", String(req.params.id), req.ip);
+    res.json({ labResult: rows[0] });
   } catch (err) {
     console.error("[portal/lab-results/:id]", err);
     res.status(500).json({ message: "Erreur serveur." });

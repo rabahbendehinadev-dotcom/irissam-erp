@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { api, setAccessToken, getAccessToken } from "@/lib/api";
+import { api, setAccessToken, getAccessToken, refreshAccessToken } from "@/lib/api";
 import type { PatientMe } from "@/lib/types";
 
 interface PreviewInfo {
@@ -30,18 +30,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshMe = useCallback(async () => {
     try {
-      // Try to refresh the access token first
-      const res = await fetch("/api/patient-portal/auth/refresh", {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) {
+      // Refresh via le point d'entrée dédupliqué de api.ts : le backend fait
+      // de la rotation du refresh token, donc deux POST concurrents (double
+      // effet StrictMode au boot) invalident la session. refreshAccessToken()
+      // garantit UN SEUL POST partagé par tous les appelants.
+      const accessToken = await refreshAccessToken();
+      if (!accessToken) {
         setPatient(null);
         setAccessToken(null);
         return;
       }
-      const { accessToken } = await res.json();
-      setAccessToken(accessToken);
       // Now fetch /me
       const me = await api.get<{ patient: PatientMe }>("/auth/me");
       setPatient(me.patient);

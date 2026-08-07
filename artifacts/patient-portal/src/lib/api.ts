@@ -49,6 +49,17 @@ async function refreshToken(): Promise<string | null> {
   return _refreshPromise;
 }
 
+/**
+ * Point d'entrée UNIQUE et dédupliqué pour rafraîchir le token (utilisé aussi
+ * par AuthContext). Le backend fait de la rotation de refresh token : deux
+ * POST /auth/refresh concurrents avec le même cookie (ex. double effet
+ * StrictMode au boot) font perdre la session — le perdant reçoit 401.
+ * Toute nouvelle logique de refresh DOIT passer par ici.
+ */
+export function refreshAccessToken(): Promise<string | null> {
+  return refreshToken();
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {},
