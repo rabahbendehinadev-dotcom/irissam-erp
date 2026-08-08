@@ -40,6 +40,8 @@ type ApiLabOrder = {
   validatedByName: string | null;
   laboratory: string | null;
   sourceModule: string;
+  isPublished: boolean;
+  publishedAt: string | null;
 };
 
 // ─── Status / urgency config ──────────────────────────────────────────────────
@@ -405,8 +407,10 @@ export default function LaboratoryPage() {
                           <PublishToPortalButton
                             entityType="lab-orders"
                             entityId={order.id}
-                            isPublished={false} /* TODO: hook up to order.isPublished when added to store */
+                            isPublished={order.isPublished}
+                            publishedAt={order.publishedAt}
                             status={order.status}
+                            onSuccess={refetch}
                           />
                         </td>
                         <td className="px-4 py-3 text-right">

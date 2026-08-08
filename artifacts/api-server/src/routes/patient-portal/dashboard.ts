@@ -1,6 +1,10 @@
 /**
  * Patient Portal — Dashboard
  * GET /patient-portal/dashboard
+ *
+ * Contrat frontend (DashboardData dans patient-portal/src/lib/types.ts) :
+ * réponse camelCase, clés { nextAppointment, lastLabResult, lastImaging,
+ * lastPrescription, balance, insurance, unreadNotifications }.
  */
 import { Router } from "express";
 import type { Response } from "express";
@@ -14,7 +18,6 @@ router.get("/", requirePatientAuth, async (req: PatientRequest, res: Response) =
 
   try {
     const [
-      patientRes,
       nextApptRes,
       lastLabRes,
       lastImagingRes,
@@ -23,14 +26,10 @@ router.get("/", requirePatientAuth, async (req: PatientRequest, res: Response) =
       insuranceRes,
       unreadRes,
     ] = await Promise.all([
-      // Patient name
-      pool.query(
-        `SELECT first_name, last_name, mpi_id FROM patients WHERE id=$1`,
-        [patientId],
-      ),
       // Next upcoming appointment
       pool.query(
-        `SELECT id, scheduled_at, department_name, doctor_name, status, notes
+        `SELECT id, scheduled_at AS "scheduledAt", doctor_name AS "doctorName",
+                department_name AS "departmentName", status
          FROM appointments
          WHERE patient_id=$1 AND scheduled_at > now()
            AND status IN ('pending','confirmed')
@@ -40,7 +39,8 @@ router.get("/", requirePatientAuth, async (req: PatientRequest, res: Response) =
       ),
       // Last published lab result
       pool.query(
-        `SELECT id, test, category, result, result_at, validated_by_name, laboratory, patient_visible_note
+        `SELECT id, id AS "orderNumber", published_at AS "publishedAt",
+                test AS "testType", status
          FROM lab_orders
          WHERE patient_id=$1 AND published_to_patient=TRUE AND deleted_at IS NULL
          ORDER BY published_at DESC LIMIT 1`,
@@ -48,34 +48,39 @@ router.get("/", requirePatientAuth, async (req: PatientRequest, res: Response) =
       ),
       // Last published imaging report
       pool.query(
-        `SELECT id, exam, region, report, reported_by_name, reported_at, patient_visible_note
+        `SELECT id, id AS "orderNumber", published_at AS "publishedAt",
+                exam AS "studyType", status
          FROM imaging_orders
          WHERE patient_id=$1 AND published_to_patient=TRUE AND deleted_at IS NULL
          ORDER BY published_at DESC LIMIT 1`,
         [patientId],
       ),
-      // Last prescription
+      // Last published prescription.
+      // NB schéma réel : la table est UNE LIGNE PAR MÉDICAMENT (colonne `drug`),
+      // le prescripteur est `prescribed_by_name` — il n'existe NI `doctor_name`
+      // NI `items` (cause du 500 précédent).
       pool.query(
-        `SELECT id, created_at, doctor_name, items
+        `SELECT id, drug, prescribed_at AS "prescribedAt", published_at AS "publishedAt"
          FROM prescriptions
          WHERE patient_id=$1 AND published_to_patient=TRUE AND deleted_at IS NULL
-         ORDER BY created_at DESC LIMIT 1`,
+         ORDER BY published_at DESC LIMIT 1`,
         [patientId],
       ),
       // Financial balance
       pool.query(
         `SELECT
-           COALESCE(SUM(total_amount),0)    AS total,
-           COALESCE(SUM(patient_share),0)   AS patient_total,
-           COALESCE(SUM(paid_amount),0)     AS paid,
-           COALESCE(SUM(due_amount),0)      AS balance
+           COALESCE(SUM(total_amount),0)::text  AS total,
+           COALESCE(SUM(patient_share),0)::text AS "patientTotal",
+           COALESCE(SUM(paid_amount),0)::text   AS paid,
+           COALESCE(SUM(due_amount),0)::text    AS balance
          FROM invoices
          WHERE patient_id=$1 AND deleted_at IS NULL`,
         [patientId],
       ),
       // Active insurance
       pool.query(
-        `SELECT insurer_name, coverage_percent, valid_until AS expiry_date, is_active AS active
+        `SELECT insurer_name AS "insurerName", coverage_percent AS "coveragePercent",
+                valid_until AS "expiryDate", is_active AS active
          FROM insurance_policies
          WHERE patient_id=$1 AND is_active=TRUE
          ORDER BY created_at DESC LIMIT 1`,
@@ -92,13 +97,12 @@ router.get("/", requirePatientAuth, async (req: PatientRequest, res: Response) =
     ]);
 
     res.json({
-      patient:      patientRes.rows[0] ?? null,
-      nextAppointment: nextApptRes.rows[0] ?? null,
-      lastLabResult:   lastLabRes.rows[0] ?? null,
-      lastImaging:     lastImagingRes.rows[0] ?? null,
+      nextAppointment:  nextApptRes.rows[0] ?? null,
+      lastLabResult:    lastLabRes.rows[0] ?? null,
+      lastImaging:      lastImagingRes.rows[0] ?? null,
       lastPrescription: lastRxRes.rows[0] ?? null,
-      balance:         balanceRes.rows[0] ?? { total: 0, patient_total: 0, paid: 0, balance: 0 },
-      insurance:       insuranceRes.rows[0] ?? null,
+      balance:          balanceRes.rows[0] ?? { total: "0", patientTotal: "0", paid: "0", balance: "0" },
+      insurance:        insuranceRes.rows[0] ?? null,
       unreadNotifications: unreadRes.rows[0]?.count ?? 0,
     });
   } catch (err) {

@@ -50,6 +50,8 @@ function mapLabOrder(o: DbLabOrder) {
     validatedByName:  o.validatedByName ?? null,
     laboratory:       o.laboratory ?? null,
     sourceModule:     o.sourceModule,
+    isPublished:      o.publishedToPatient ?? false,
+    publishedAt:      o.publishedAt?.toISOString() ?? null,
     updatedAt:        o.updatedAt.toISOString(),
   };
 }

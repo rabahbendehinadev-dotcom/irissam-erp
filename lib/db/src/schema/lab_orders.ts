@@ -39,6 +39,11 @@ export const labOrdersTable = pgTable("lab_orders", {
   laboratory:      text("laboratory"),
   sourceModule:    sourceModuleEnum("source_module").notNull(),
 
+  // Publication portail patient — colonnes déjà présentes en base (migration SQL
+  // antérieure) ; on ne fait que les mapper ici. PAS de nouvelle colonne.
+  publishedToPatient: boolean("published_to_patient").default(false).notNull(),
+  publishedAt:        timestamp("published_at", { withTimezone: true }),
+
   // Audit
   updatedAt:  timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   createdAt:  timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
