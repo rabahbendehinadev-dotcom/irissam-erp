@@ -142,8 +142,9 @@ export interface MockRepositoryContextType {
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
-
-const MockRepositoryContext = createContext<MockRepositoryContextType | null>(null);
+// Exported so ApiRepositoryProvider can publish into the same context slot,
+// allowing all useMockRepository() consumers to work with either provider.
+export const MockRepositoryContext = createContext<MockRepositoryContextType | null>(null);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

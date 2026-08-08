@@ -233,7 +233,6 @@ export default function LaboratoryPage() {
     }
   }, [validating, toast, refetch]);
 
-  // ── Permission gate ────────────────────────────────────────────────────────
   // ── Loading / error states ─────────────────────────────────────────────────
   if (loading) {
     return (

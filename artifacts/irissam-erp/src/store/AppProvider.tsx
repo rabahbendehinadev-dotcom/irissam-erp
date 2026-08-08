@@ -8,8 +8,19 @@ import { ThemeProvider } from './ThemeContext';
 import { NotificationsProvider } from './NotificationsContext';
 import { AdmissionsProvider } from './AdmissionsContext';
 import { MockRepositoryProvider } from './MockRepository';
+import { ApiRepositoryProvider } from './ApiRepository';
 import { AppointmentStoreProvider } from './AppointmentStore';
 import { QUERY_STALE_TIME, QUERY_CACHE_TIME } from '@/config/constants';
+
+/**
+ * When VITE_USE_API_REPOSITORY=true the ApiRepositoryProvider is used.
+ * Clinical records (lab orders, imaging orders, prescriptions, encounters) are then
+ * persisted to PostgreSQL via the API server and survive page refresh.
+ *
+ * Set VITE_USE_API_REPOSITORY=false (or omit) to keep the in-memory MockRepository
+ * for local development without a running API server.
+ */
+const USE_API_REPOSITORY = import.meta.env.VITE_USE_API_REPOSITORY === 'true';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +33,8 @@ const queryClient = new QueryClient({
   },
 });
 
+const RepositoryProvider = USE_API_REPOSITORY ? ApiRepositoryProvider : MockRepositoryProvider;
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
@@ -32,12 +45,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               <NotificationsProvider>
                 <AdmissionsProvider>
                   <AppointmentStoreProvider>
-                    <MockRepositoryProvider>
+                    <RepositoryProvider>
                       <TooltipProvider>
                         {children}
                         <Toaster />
                       </TooltipProvider>
-                    </MockRepositoryProvider>
+                    </RepositoryProvider>
                   </AppointmentStoreProvider>
                 </AdmissionsProvider>
               </NotificationsProvider>
