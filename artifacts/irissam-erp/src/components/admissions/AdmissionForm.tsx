@@ -63,11 +63,13 @@ const labelCls  = 'block text-xs font-medium text-gray-600 mb-1';
 
 interface Props {
   admission?: Admission;
+  /** Pré-sélectionne le patient en mode création (Actions rapides du dossier patient) */
+  initialPatientId?: string;
   onSave: (data: Admission) => void;
   onCancel: () => void;
 }
 
-export function AdmissionForm({ admission, onSave, onCancel }: Props) {
+export function AdmissionForm({ admission, initialPatientId, onSave, onCancel }: Props) {
   const { t } = useLanguage();
   const { log } = useAuditLog();
   const [step, setStep] = useState(0);
@@ -104,18 +106,20 @@ export function AdmissionForm({ admission, onSave, onCancel }: Props) {
   const [searchResults, setSearchResults] = useState<Patient[] | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
-  // When editing an existing admission, fetch the patient from the real API
+  // Patient imposé : édition d'une admission existante OU pré-sélection
+  // depuis « Actions rapides » du dossier patient (initialPatientId)
+  const presetPatientId = admission?.patientId ?? initialPatientId;
   useEffect(() => {
-    if (!admission?.patientId) return;
+    if (!presetPatientId) return;
     const list = Array.isArray(apiPatients) ? apiPatients : [];
-    const found = list.find((p: any) => p.id === admission.patientId);
+    const found = list.find((p: any) => p.id === presetPatientId);
     if (found) { setSelectedPatient(apiToPatient(found as any)); return; }
     // Fallback: direct fetch by ID
-    apiClient.get<Record<string, unknown>>(`/patients/${admission.patientId}`)
+    apiClient.get<Record<string, unknown>>(`/patients/${presetPatientId}`)
       .then(r => setSelectedPatient(apiToPatient(r)))
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [admission?.patientId]);
+  }, [presetPatientId]);
 
   // Step 3 state — bed (OccupancyBed, occupé côté serveur par admit())
   const [selectedBed, setSelectedBed] = useState<OccupancyBed | null>(null);

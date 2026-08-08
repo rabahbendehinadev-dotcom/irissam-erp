@@ -42,11 +42,16 @@ const QUICK_ACTIONS = [
   { icon: Calendar,    label: 'Nouveau rendez-vous',      key: 'appointment' },
   { icon: Bed,         label: 'Nouvelle admission',       key: 'admission' },
   { icon: Bed,         label: 'Nouvelle hospitalisation', key: 'hospitalization' },
-  { icon: AlertCircle, label: 'Nouvelle urgence',         key: 'emergency' },
-  { icon: Pill,        label: 'Nouvelle ordonnance',      key: 'prescription' },
-  { icon: Microscope,  label: 'Nouvelle analyse',         key: 'analysis' },
-  { icon: Scan,        label: 'Nouvelle imagerie',        key: 'imaging' },
   { icon: Receipt,     label: 'Nouvelle facture',         key: 'invoice' },
+  // Masqués temporairement — aucun workflow de création autonome n'existe encore :
+  //  - 'emergency'    : pas d'UI d'enregistrement d'arrivée aux Urgences
+  //  - 'prescription' : les ordonnances se créent dans l'espace consultation
+  //  - 'analysis'     : les demandes d'analyse se créent via consultation/dossier urgence
+  //  - 'imaging'      : idem analyse
+  // { icon: AlertCircle, label: 'Nouvelle urgence',    key: 'emergency' },
+  // { icon: Pill,        label: 'Nouvelle ordonnance', key: 'prescription' },
+  // { icon: Microscope,  label: 'Nouvelle analyse',    key: 'analysis' },
+  // { icon: Scan,        label: 'Nouvelle imagerie',   key: 'imaging' },
 ];
 
 interface Props {

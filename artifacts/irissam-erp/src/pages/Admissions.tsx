@@ -254,6 +254,20 @@ export default function AdmissionsPage() {
   const [cancelling,      setCancelling]      = useState<Admission | null>(null);
   const [cancelError,      setCancelError]      = useState('');
   const [drawerPatientId, setDrawerPatientId] = useState<string | null>(null);
+  const [prefillPatientId, setPrefillPatientId] = useState<string | null>(null);
+
+  // Ouverture directe depuis « Actions rapides » du dossier patient (?new=1&patientId=…)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') !== '1') return;
+    window.history.replaceState({}, '', window.location.pathname);
+    if (!can('admissions.create')) return;
+    const pid = params.get('patientId');
+    if (pid) setPrefillPatientId(pid);
+    setEditing(null);
+    setShowForm(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSort = (field: string) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -403,6 +417,7 @@ export default function AdmissionsPage() {
       {showForm && (
         <AdmissionForm
           admission={editing ?? undefined}
+          initialPatientId={prefillPatientId ?? undefined}
           onSave={(data) => {
             // Le formulaire a déjà enregistré via l'API (POST/PATCH /admissions).
             // Le lit est occupé côté serveur dans la même transaction (admit()) —

@@ -349,8 +349,18 @@ export default function PatientDetailPage() {
   const handleQuickAction = (key: string) => {
     if (key === 'consultation') {
       setShowNewConsultation(true);
+      return;
     }
-    // Other quick actions handled by their respective tabs/modals
+    // Navigation vers le workflow de création existant, patient pré-sélectionné
+    const pid = encodeURIComponent(patient.id);
+    if (key === 'appointment') {
+      setLocation(`/appointments?new=1&patientId=${pid}`);
+    } else if (key === 'admission' || key === 'hospitalization') {
+      // L'hospitalisation se crée via le formulaire d'admission (type par défaut : hospitalisation)
+      setLocation(`/admissions?new=1&patientId=${pid}`);
+    } else if (key === 'invoice') {
+      setLocation(`/finance?new=1&patientId=${pid}`);
+    }
   };
 
   const fullName = `${patient.lastName} ${patient.firstName}`;

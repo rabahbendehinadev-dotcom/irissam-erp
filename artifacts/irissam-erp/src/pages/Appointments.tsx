@@ -93,6 +93,21 @@ export default function Appointments() {
 
   // Form state
   const formRef = useRef<AppointmentFormValues | null>(null);
+  const [prefillPatientId, setPrefillPatientId] = useState<string | null>(null);
+
+  // Ouverture directe depuis « Actions rapides » du dossier patient (?new=1&patientId=…)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") !== "1") return;
+    window.history.replaceState({}, "", window.location.pathname);
+    if (!canCreate) return;
+    const pid = params.get("patientId");
+    if (pid) setPrefillPatientId(pid);
+    formRef.current = null;
+    setFormError(null);
+    setShowForm(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Appointment store (shared state, updated by Consultations page) ────────
   const { appointments: storeAppointments, mergeApiAppointments, updateAppointmentStatus } = useAppointmentStore();
@@ -544,6 +559,7 @@ export default function Appointments() {
 
             <AppointmentFormFields
               onChange={(v) => { formRef.current = v; }}
+              initialPatientId={prefillPatientId ?? undefined}
             />
 
             {formError && (
@@ -614,8 +630,10 @@ interface DirectoryDepartment {
  */
 function AppointmentFormFields({
   onChange,
+  initialPatientId,
 }: {
   onChange: (v: AppointmentFormValues) => void;
+  initialPatientId?: string;
 }) {
   const todayStr = new Date().toISOString().slice(0, 10);
   const { t } = useLanguage();
@@ -675,6 +693,22 @@ function AppointmentFormFields({
       notes,
       ...overrides,
     });
+
+  // Pré-sélection du patient (arrivée via « Actions rapides » du dossier patient)
+  useEffect(() => {
+    if (!initialPatientId || selectedPatient) return;
+    const list = Array.isArray(apiPatients) ? (apiPatients as any[]) : [];
+    const p = list.find((x) => x.id === initialPatientId);
+    if (!p) return;
+    const sel = {
+      id: p.id as string,
+      name: `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim(),
+      mpiId: (p.mpiId as string) ?? "",
+    };
+    setSelectedPatient(sel);
+    emit({ patientId: sel.id, patientName: sel.name });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPatientId, apiPatients, selectedPatient]);
 
   const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
 

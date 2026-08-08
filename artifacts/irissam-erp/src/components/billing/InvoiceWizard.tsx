@@ -41,6 +41,8 @@ interface WizardProps {
   onClose:   () => void;
   onCreate:  (input: CreateInvoiceInput, issue: boolean) => Promise<void>;
   loading:   boolean;
+  /** Pré-sélectionne le patient (Actions rapides du dossier patient) */
+  initialPatientId?: string;
 }
 
 // ── Coverage types ────────────────────────────────────────────────────────────
@@ -104,7 +106,7 @@ const STEPS = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function InvoiceWizard({ onClose, onCreate, loading }: WizardProps) {
+export function InvoiceWizard({ onClose, onCreate, loading, initialPatientId }: WizardProps) {
   const [step, setStep] = useState(0);
 
   // Step 1
@@ -199,6 +201,24 @@ export function InvoiceWizard({ onClose, onCreate, loading }: WizardProps) {
       if (Array.isArray(data)) setEncounters(data);
     } catch { /* no encounters */ }
   }, []);
+
+  // Pré-sélection du patient (arrivée via « Actions rapides » du dossier patient)
+  useEffect(() => {
+    if (!initialPatientId) return;
+    apiClient.get<Record<string, unknown>>(`/patients/${initialPatientId}`)
+      .then((r) => {
+        const obj = r as { id?: string; firstName?: string; lastName?: string; mpiId?: string; mrn?: string } | null;
+        if (!obj?.id) return;
+        selectPatient({
+          id:        obj.id,
+          firstName: obj.firstName ?? "",
+          lastName:  obj.lastName ?? "",
+          mrn:       obj.mpiId ?? obj.mrn,
+        });
+      })
+      .catch(() => { /* patient introuvable — sélection manuelle possible */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPatientId]);
 
   // ── Toggle event selection ────────────────────────────────────────────────
 

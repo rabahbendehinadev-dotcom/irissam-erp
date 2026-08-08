@@ -87,6 +87,17 @@ export default function Facturation() {
 
   // UI state
   const [showWizard,   setShowWizard]   = useState(false);
+  const [prefillPatientId, setPrefillPatientId] = useState<string | null>(null);
+
+  // Ouverture directe depuis « Actions rapides » du dossier patient (?new=1&patientId=…)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") !== "1") return;
+    window.history.replaceState({}, "", window.location.pathname);
+    const pid = params.get("patientId");
+    if (pid) setPrefillPatientId(pid);
+    setShowWizard(true);
+  }, []);
   const [selected,     setSelected]     = useState<Invoice | null>(null);
   const [payingFor,    setPayingFor]    = useState<Invoice | null>(null);
   const [cancelId,     setCancelId]     = useState<string | null>(null);
@@ -506,6 +517,7 @@ export default function Facturation() {
           onClose={() => setShowWizard(false)}
           onCreate={handleCreate}
           loading={billing.loading}
+          initialPatientId={prefillPatientId ?? undefined}
         />
       )}
 
