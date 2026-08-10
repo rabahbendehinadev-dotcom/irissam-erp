@@ -64,6 +64,7 @@ const MIGRATIONS = [
   "038_patient_vaccinations.sql",
   "039_consultation_number_counter.sql",
   "040_prescription_medication_link.sql",
+  "041_main_admin_super_admin_role.sql",
 ];
 
 async function ensureTrackingTable(client: PoolClient): Promise<void> {
