@@ -94,11 +94,15 @@ async function loadPermissions(userId: string): Promise<string[]> {
 }
 
 async function getUserPermissionRoleName(userId: string): Promise<string | null> {
+  // Un utilisateur peut détenir plusieurs rôles RBAC (ex. compte principal :
+  // administrator + super_admin). Les created_at des rôles seed sont identiques,
+  // donc ORDER BY created_at seul était non déterministe (le rôle affiché/JWT
+  // pouvait alterner entre deux connexions). Priorité explicite à super_admin.
   const { rows } = await pool.query<{ name: string }>(
     `SELECT r.name FROM user_roles ur
      JOIN roles r ON r.id = ur.role_id
      WHERE ur.user_id = $1
-     ORDER BY r.created_at LIMIT 1`,
+     ORDER BY (r.name = 'super_admin') DESC, r.created_at LIMIT 1`,
     [userId],
   );
   return rows[0]?.name ?? null;
