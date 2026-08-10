@@ -148,6 +148,7 @@ Usage : `const { can } = usePermission(); if (can('patients.create')) { ... }`
 
 ## User preferences
 - Reports/deliverables (UAT reports, summaries): ALWAYS provide inside a single fenced code block so the user can copy them in one tap (explicit user request, 2026-08-07). User is on iOS.
+- STOP all comprehensive UAT rounds and general reviews (full-app test passes, architect/code-review rounds) — explicit user directive, 2026-08-10. Only targeted verification strictly scoped to the exact change of the current fix round, unless the user explicitly requests more.
 
 - Reproduire la maquette de référence avec fidélité maximale
 - Pas de texte hardcodé — tout passe par useLanguage() / t()
