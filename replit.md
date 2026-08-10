@@ -148,7 +148,7 @@ Usage : `const { can } = usePermission(); if (can('patients.create')) { ... }`
 
 ## User preferences
 - Reports/deliverables (UAT reports, summaries): ALWAYS provide inside a single fenced code block so the user can copy them in one tap (explicit user request, 2026-08-07). User is on iOS.
-- STOP all comprehensive UAT rounds and general reviews (full-app test passes, architect/code-review rounds) — explicit user directive, 2026-08-10. Only targeted verification strictly scoped to the exact change of the current fix round, unless the user explicitly requests more.
+- Bug-fix workflow (explicit user directive, 2026-08-10 — supersedes earlier testing rules): NO browser-agent / visual / E2E testing and NO UI exploration or page navigation unless the user explicitly requests it. Per bug: analyze code only → identify root cause → fix only that → run tsc/build if needed → report modified files + commit hash → STOP. The user tests manually after deploy. Also forbidden: architecture reviews, comprehensive code reviews, refactoring, hunting for additional bugs, creating tasks, unrequested improvements. If a fix genuinely requires visual testing, state it in the report and wait for permission — never start it unprompted.
 
 - Reproduire la maquette de référence avec fidélité maximale
 - Pas de texte hardcodé — tout passe par useLanguage() / t()
