@@ -39,3 +39,4 @@
 - [Prescription→Pharmacy chain](prescription-pharmacy-chain.md) — medication_id link (mig 040); dispense = claim-first UPDATE with status guard in WHERE (anti double-délivrance); reads need pharmacy.view; French status enums
 - [wouter fallback multi-segments](wouter-multiseg-fallback.md) — "/:rest*" ne matche pas /a/b → Switch rend null (page blanche sans erreur ni fetch); fallback = Route sans path
 - [Rotation refresh token + StrictMode](portal-auth-refresh.md) — refresh dédupliqué obligatoire côté client; jamais clearCookie sur token inconnu; contrat portail camelCase
+- [UAT data reset](uat-data-reset.md) — dev DB wiped 2026-08-11 on user order (empty lists are normal, no re-seed); FK-ordered self-verifying script in scripts/; nullable patient links = partial delete

@@ -1,0 +1,113 @@
+عندي مهمة واحدة فقط:
+
+RESET DATA — تنظيف بيانات UAT/Demo من النظام مع الحفاظ على النظام نفسه.
+
+مهم جدًا:
+CODE/DB OPERATION ONLY — NO BROWSER TESTING.
+
+الهدف:
+أريد أن أرجع النظام فارغًا من بيانات المرضى والعمليات الطبية/المالية التي أُنشئت للاختبار، ثم أبدأ أنا من الصفر بمريض واحد حقيقي للاختبار اليدوي.
+
+لا تحذف:
+- users
+- user_roles
+- roles
+- permissions
+- system settings
+- migrations
+- departments/services
+- doctors/employees
+- medication catalog
+- bed definitions
+- rooms
+- buildings
+- insurance configuration
+- Super Admin configuration
+- audit schema/config
+- أي master/reference data أساسية يحتاجها النظام للعمل
+
+احذف فقط بيانات المرضى والعمليات المرتبطة بهم، مثل:
+- patients
+- appointments
+- consultations
+- encounters
+- admissions / preadmissions
+- emergency visits
+- hospitalisations
+- lab orders/results
+- imaging orders/results
+- prescriptions
+- patient documents
+- consents
+- vaccinations
+- invoices
+- payments
+- insurance claims المرتبطة بالمرضى
+- patient portal accounts/data المرتبطة بالمرضى
+- audit logs المرتبطة بعمليات هؤلاء المرضى إن كانت UAT/Demo فقط
+- أي patient-linked records أخرى موجودة فعليًا في schema
+
+قبل الحذف:
+
+1. اعمل inventory للجداول المرتبطة بالـ patient_id أو encounter_id.
+2. حدد ترتيب الحذف الصحيح حسب Foreign Keys.
+3. لا تستعمل CASCADE بشكل أعمى.
+4. لا تحذف أي master data أو configuration.
+5. أعطني counts قبل الحذف لكل جدول رئيسي.
+6. أنشئ backup أو export SQL للبيانات التشغيلية الحالية قبل الحذف إذا كان ذلك متاحًا داخل المشروع.
+7. لا تبدأ الحذف إذا وجدت جدولًا غير واضح هل هو master data أم patient data — سجله فقط وانتظر.
+
+بعد التأكد:
+
+- نفذ التنظيف داخل transaction إن أمكن.
+- أعد عدادات المرضى فقط إذا كان ذلك آمنًا ومقصودًا.
+- لا تعيد ضبط migration history.
+- لا تعيد إنشاء schema.
+- لا تعمل DROP TABLE.
+- لا تعدل migrations القديمة.
+
+بعد الحذف تحقق أن:
+
+- عدد المرضى = 0
+- appointments = 0
+- consultations = 0
+- admissions = 0
+- encounters = 0
+- urgences = 0
+- lab patient orders = 0
+- imaging patient orders = 0
+- prescriptions = 0
+- invoices/payments = 0
+- patient documents = 0
+
+وفي نفس الوقت:
+
+- المستخدم admin مازال موجود
+- الأطباء والموظفون مازالوا موجودين
+- الأقسام مازالت موجودة
+- الأسرّة والغرف مازالت موجودة
+- الصلاحيات مازالت موجودة
+- الإعدادات مازالت موجودة
+- النظام يقدر ينشئ مريض جديد مباشرة بعد التنظيف
+
+في النهاية أعطني فقط:
+
+- counts قبل
+- counts بعد
+- الجداول التي تم تنظيفها
+- الجداول التي تم الحفاظ عليها
+- هل تم أخذ backup؟
+- هل النظام جاهز لإنشاء أول مريض جديد؟
+- SQL/script المستعمل أو الملف المعدل
+- Commit Hash إذا تم تعديل كود
+- PASS / FAIL
+
+ثم STOP.
+
+ممنوع:
+- Browser Agent
+- E2E
+- Login testing
+- Architecture Review
+- Refactoring
+- إنشاء بيانات test جديدة
