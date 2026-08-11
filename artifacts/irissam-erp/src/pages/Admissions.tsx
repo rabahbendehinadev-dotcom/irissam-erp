@@ -302,7 +302,7 @@ export default function AdmissionsPage() {
         const cmp = val(a).localeCompare(val(b));
         return sortDir === 'asc' ? cmp : -cmp;
       });
-  }, [filters, sortField, sortDir]);
+  }, [admissions, filters, sortField, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
 
