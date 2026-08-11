@@ -1,0 +1,100 @@
+Je veux ajouter une fonction de suppression MANUELLE des patients depuis l'administration.
+
+IMPORTANT :
+Ne lance aucun Browser Agent.
+Ne fais aucun test visuel/E2E.
+Ne crée aucune donnée de test.
+Travaille uniquement sur le code.
+
+OBJECTIF :
+
+Dans la liste Patients, ajouter une action :
+
+"Supprimer définitivement"
+
+Cette action doit être réservée uniquement au Super Administrateur.
+
+Quand je clique dessus :
+
+1. Afficher une confirmation claire avec :
+   - Nom du patient
+   - MPI/IPP
+   - N° dossier
+
+2. Demander une deuxième confirmation avant suppression définitive.
+
+3. La suppression doit être faite côté BACKEND dans une transaction PostgreSQL atomique.
+
+4. Avant de coder, analyse toutes les FK et toutes les tables liées directement ou indirectement au patient.
+
+La suppression doit nettoyer correctement les données patient liées, notamment selon le schéma réel existant :
+- encounters
+- admissions
+- consultations
+- appointments
+- emergency visits
+- hospitalisations
+- ICU
+- bloc opératoire
+- laboratoire
+- imagerie
+- prescriptions
+- factures
+- paiements
+- assurance liée au patient
+- documents patient
+- notifications/alertes patient
+- portail patient
+- données cliniques liées
+- historiques/mouvements liés au patient
+- toute autre table ayant une FK ou référence vers patient/encounter/admission/consultation.
+
+IMPORTANT :
+Ne suppose pas les noms de tables.
+Inspecte d'abord le schéma réel PostgreSQL et le code existant.
+
+5. Libérer également les ressources utilisées par ce patient :
+   - lit → disponible
+   - box urgence → libre
+   - ressources bloc/réanimation liées → libérées si nécessaire
+
+6. NE JAMAIS supprimer :
+   - users administratifs
+   - médecins/employés
+   - rôles/permissions
+   - départements/services
+   - définitions des lits/chambres
+   - médicaments/catalogues
+   - stock global
+   - paramètres système
+   - configuration ERP
+
+7. Ne pas utiliser DROP TABLE, TRUNCATE ou reset global de la DB.
+
+8. Endpoint protégé par permission Super Admin uniquement.
+
+9. Ajouter également une option Super Admin :
+   "Supprimer toutes les données patients UAT/Demo"
+
+ATTENTION :
+Cette deuxième option doit réutiliser la logique sécurisée du script
+scripts/reset-uat-data.sql existant et ne doit jamais supprimer les données structurelles du système.
+
+Elle doit avoir une confirmation très forte avant exécution.
+
+IMPORTANT :
+Avant toute modification, vérifie si une fonction de suppression patient existe déjà afin de ne pas reconstruire quelque chose qui existe.
+
+À la fin donne-moi uniquement :
+- fichiers modifiés
+- endpoint créé/réutilisé
+- tables concernées
+- protections ajoutées
+- résultat TypeScript/build
+- commit hash
+
+Pas de Browser Agent.
+Pas de login.
+Pas de Preview.
+Pas de test E2E.
+Je testerai moi-même sur irissamhospital.com après déploiement.
