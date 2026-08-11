@@ -21,6 +21,7 @@ import {
   appointmentsTable,
   admissionsTable,
   dailyStatsTable,
+  occupancyBedsTable,
 } from "@workspace/db/schema";
 import { count, isNull, eq, gte, lt, and, desc } from "drizzle-orm";
 
@@ -50,6 +51,7 @@ router.get("/stats", async (_req, res, next) => {
       [{ admissionsToday }],
       [{ appointmentsToday }],
       todayStat,
+      bedStatusRows,
     ] = await Promise.all([
       db.select({ totalPatients: count() })
         .from(patientsTable)
@@ -89,11 +91,21 @@ router.get("/stats", async (_req, res, next) => {
         .from(dailyStatsTable)
         .where(eq(dailyStatsTable.statDate, today))
         .limit(1),
+
+      // Occupation réelle des lits — occupancy_beds (même source que le module
+      // Admissions), convention occupe / total. Remplace le dénominateur 420 codé en dur.
+      db.select({ status: occupancyBedsTable.status, n: count() })
+        .from(occupancyBedsTable)
+        .groupBy(occupancyBedsTable.status),
     ]);
 
     const stats = todayStat[0];
+    const occupiedBeds = bedStatusRows
+      .filter((r) => r.status === "occupe")
+      .reduce((acc, r) => acc + Number(r.n), 0);
+    const totalBeds = bedStatusRows.reduce((acc, r) => acc + Number(r.n), 0);
     const bedOccupancyPercent =
-      hospitalized > 0 ? Math.round((hospitalized / 420) * 100) : 0;
+      totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
 
     res.json({
       totalPatients,

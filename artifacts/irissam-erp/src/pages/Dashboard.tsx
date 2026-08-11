@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from "react";
+import { useState, lazy, Suspense } from "react";
 import React, { Component, type ReactNode } from "react";
 import { useLanguage } from "@/i18n";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -26,7 +26,6 @@ const MiniWidgets = lazy(() =>
 
 import { formatNumber } from "@/utils/format";
 import { useGetDashboardStats } from "@workspace/api-client-react";
-import { useAdmissions } from "@/store/AdmissionsContext";
 import { useQuery } from "@/hooks/useQuery";
 
 import { Users, Calendar, Bed, ClipboardList, AlertTriangle, Stethoscope, FlaskConical, Scan, Receipt, TrendingUp } from "lucide-react";
@@ -34,10 +33,6 @@ import { Users, Calendar, Bed, ClipboardList, AlertTriangle, Stethoscope, FlaskC
 function fmtN(n: number | undefined): string {
   if (n === undefined) return "—";
   return formatNumber(n);
-}
-
-function todayDateString(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 // ── Widget-level error boundary ───────────────────────────────────────────────
@@ -77,20 +72,6 @@ export default function Dashboard() {
   const { data: apiStats } = useGetDashboardStats({ query: { refetchInterval: 30_000 } });
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
-  // ── Live admission data from AdmissionsContext ────────────────────────────
-  const { admissions } = useAdmissions();
-  const today = todayDateString();
-
-  const hospitalized = useMemo(
-    () => admissions.filter(a => a.status === 'active').length,
-    [admissions],
-  );
-
-  const admissionsToday = useMemo(
-    () => admissions.filter(a => a.admissionDate === today).length,
-    [admissions, today],
-  );
-
   // ── Live bed occupancy from real API ─────────────────────────────────────
   const { data: bedSummary } = useQuery<{ occupancyPercent: number }>('/beds/summary');
   const bedOccupancyPercent = bedSummary?.occupancyPercent ?? 0;
@@ -117,11 +98,11 @@ export default function Dashboard() {
           />
           <StatsCard 
             icon={<Bed className="w-5 h-5" />} iconBgColor="bg-teal-100" iconColor="text-teal-600"
-            title={t("stat.hospitalized")} value={fmtN(hospitalized)} trend={0} trendText={t("stat.hospitalized.trend")}
+            title={t("stat.hospitalized")} value={fmtN(apiStats?.hospitalized)} trend={0} trendText={t("stat.hospitalized.trend")}
           />
           <StatsCard 
             icon={<ClipboardList className="w-5 h-5" />} iconBgColor="bg-orange-100" iconColor="text-orange-500"
-            title={t("stat.admissions.today")} value={fmtN(admissionsToday)} trend={0} trendText={t("stat.admissions.trend")}
+            title={t("stat.admissions.today")} value={fmtN(apiStats?.admissionsToday)} trend={0} trendText={t("stat.admissions.trend")}
           />
           <StatsCard 
             icon={<AlertTriangle className="w-5 h-5" />} iconBgColor="bg-red-100" iconColor="text-red-500"

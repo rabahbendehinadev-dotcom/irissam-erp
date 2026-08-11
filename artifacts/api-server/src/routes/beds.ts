@@ -1,19 +1,29 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { bedsTable } from "@workspace/db/schema";
+import { bedsTable, occupancyBedsTable } from "@workspace/db/schema";
+import { count } from "drizzle-orm";
 
 const router = Router();
 
-/** GET /beds/summary */
+/**
+ * GET /beds/summary — agrégat live des lits d'hospitalisation.
+ * Source de vérité : occupancy_beds (la même que le module Admissions via
+ * useOccupancyBedsApi), et NON l'ancienne table statique `beds`.
+ * Convention identique au module Admissions : occupancyPercent = occupe / total.
+ */
 router.get("/summary", async (_req, res, next) => {
   try {
-    const rows = await db.select().from(bedsTable);
+    const rows = await db
+      .select({ status: occupancyBedsTable.status, n: count() })
+      .from(occupancyBedsTable)
+      .groupBy(occupancyBedsTable.status);
 
-    const occupied = rows.reduce((acc, r) => acc + r.occupiedBeds, 0);
-    const cleaning = rows.reduce((acc, r) => acc + r.cleaningBeds, 0);
-    const outOfService = rows.reduce((acc, r) => acc + r.outOfServiceBeds, 0);
-    const total = rows.reduce((acc, r) => acc + r.totalBeds, 0);
-    const free = total - occupied - cleaning - outOfService;
+    const by = new Map<string, number>(rows.map((r) => [r.status as string, Number(r.n)]));
+    const occupied     = by.get("occupe") ?? 0;
+    const free         = by.get("disponible") ?? 0;
+    const cleaning     = by.get("nettoyage") ?? 0;
+    const outOfService = (by.get("hors_service") ?? 0) + (by.get("maintenance") ?? 0);
+    const total        = rows.reduce((acc, r) => acc + Number(r.n), 0);
     const occupancyPercent = total > 0 ? Math.round((occupied / total) * 100) : 0;
 
     res.json({ occupied, free, cleaning, outOfService, total, occupancyPercent });
