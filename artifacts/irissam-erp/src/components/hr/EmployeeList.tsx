@@ -8,9 +8,11 @@ import { apiClient } from "@/lib/api-client";
 import {
   Plus, Search, Filter, Download, Users, UserCheck, UserX,
   Timer, Plane, Clock, FileText, Eye, Edit2, Calendar,
-  MoreVertical, ChevronDown, AlertTriangle
+  MoreVertical, ChevronDown, AlertTriangle, Trash2
 } from "lucide-react";
 import { EmployeeWizard } from "./EmployeeWizard";
+import { EmployeeDeleteDialog } from "./EmployeeDeleteDialog";
+import { usePermission } from "@/hooks/usePermission";
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   actif:        { label: "Actif",         cls: "bg-green-100 text-green-700" },
@@ -46,6 +48,9 @@ export default function EmployeeList() {
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
   const [showWizard, setShowWizard] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const { can } = usePermission();
+  const canDelete = can("hr.employees.archive" as any);
   const limit = 25;
 
   const params = new URLSearchParams({
@@ -233,6 +238,12 @@ export default function EmployeeList() {
                           <Calendar className="w-3.5 h-3.5"/>
                         </span>
                       </Link>
+                      {canDelete && (
+                        <button onClick={() => setDeleteTarget(emp)}
+                          className="p-1.5 rounded hover:bg-red-50 text-red-500 transition-colors cursor-pointer" title="Supprimer">
+                          <Trash2 className="w-3.5 h-3.5"/>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -294,6 +305,15 @@ export default function EmployeeList() {
 
       {/* Wizard */}
       {showWizard && <EmployeeWizard onClose={() => setShowWizard(false)} onCreated={() => { setShowWizard(false); refetch(); }}/>}
+
+      {/* Suppression / Désactivation */}
+      {deleteTarget && (
+        <EmployeeDeleteDialog
+          employee={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDone={() => { setDeleteTarget(null); refetch(); }}
+        />
+      )}
     </div>
   );
 }

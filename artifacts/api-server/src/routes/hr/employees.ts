@@ -453,6 +453,108 @@ router.delete("/:id", requirePermission("hr.employees.archive"), async (req: Aut
   } catch (err) { next(err); }
 });
 
+// DELETE /hr/employees/:id/permanent — suppression définitive (fiches de test / erreurs de saisie)
+// Refusée (409 + suggestion Désactiver/Archiver) si l'employé possède un historique
+// opérationnel ou financier : pointage, absences, congés, planning, badge, paie.
+// Sinon : purge transactionnelle des lignes satellites de création (profil, contacts,
+// contrat, soldes…) puis de la fiche employé. Fonctionne aussi sur une fiche déjà archivée.
+router.delete("/:id/permanent", requirePermission("hr.employees.archive"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    const id = String(req.params.id ?? "");
+    const act = actor(req);
+    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
+      res.status(400).json({ error: "Identifiant employé invalide" });
+      return;
+    }
+
+    await client.query("BEGIN");
+    const empQ = await client.query(
+      `SELECT id, matricule, first_name, last_name FROM employees WHERE id=$1::uuid FOR UPDATE`, [id]);
+    if (!empQ.rows[0]) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Employé non trouvé" });
+      return;
+    }
+    const emp = empQ.rows[0];
+
+    // Historique opérationnel / financier → suppression définitive interdite
+    const chk = await client.query(`
+      SELECT
+        (SELECT COUNT(*) FROM attendance_records          WHERE employee_id=$1::uuid) AS pointages,
+        (SELECT COUNT(*) FROM attendance_events           WHERE employee_id=$1::uuid) AS evenements_pointage,
+        (SELECT COUNT(*) FROM late_records                WHERE employee_id=$1::uuid) AS retards,
+        (SELECT COUNT(*) FROM absence_records             WHERE employee_id=$1::uuid) AS absences,
+        (SELECT COUNT(*) FROM overtime_records            WHERE employee_id=$1::uuid) AS heures_sup,
+        (SELECT COUNT(*) FROM leave_requests              WHERE employee_id=$1::uuid) AS demandes_conge,
+        (SELECT COUNT(*) FROM employee_shifts             WHERE employee_id=$1::uuid) AS gardes_planning,
+        (SELECT COUNT(*) FROM badge_events                WHERE employee_id=$1::uuid) AS evenements_badge,
+        (SELECT COUNT(*) FROM payroll_employee_runs       WHERE employee_id=$1::uuid) AS calculs_paie,
+        (SELECT COUNT(*) FROM payroll_payslips            WHERE employee_id=$1::uuid) AS bulletins_paie,
+        (SELECT COUNT(*) FROM payroll_payment_order_items WHERE employee_id=$1::uuid) AS ordres_paiement,
+        (SELECT COUNT(*) FROM payroll_advances            WHERE employee_id=$1::uuid) AS acomptes,
+        (SELECT COUNT(*) FROM payroll_loans               WHERE employee_id=$1::uuid) AS prets,
+        (SELECT COUNT(*) FROM payroll_bonuses             WHERE employee_id=$1::uuid) AS primes,
+        (SELECT COUNT(*) FROM payroll_adjustments         WHERE employee_id=$1::uuid) AS ajustements_paie,
+        (SELECT COUNT(*) FROM payroll_anomalies           WHERE employee_id=$1::uuid) AS anomalies_paie
+    `, [id]);
+    const LABELS: Record<string, string> = {
+      pointages: "Pointages", evenements_pointage: "Événements de pointage", retards: "Retards",
+      absences: "Absences", heures_sup: "Heures supplémentaires", demandes_conge: "Demandes de congé",
+      gardes_planning: "Gardes / planning", evenements_badge: "Événements badge",
+      calculs_paie: "Calculs de paie", bulletins_paie: "Bulletins de paie",
+      ordres_paiement: "Ordres de paiement", acomptes: "Acomptes", prets: "Prêts",
+      primes: "Primes", ajustements_paie: "Ajustements de paie", anomalies_paie: "Anomalies de paie",
+    };
+    const blockers = Object.entries(chk.rows[0])
+      .filter(([, v]) => Number(v) > 0)
+      .map(([k, v]) => ({ type: LABELS[k] ?? k, count: Number(v) }));
+
+    if (blockers.length > 0) {
+      await client.query("ROLLBACK");
+      res.status(409).json({
+        error: "Suppression définitive impossible : cet employé possède des données RH / Paie / Pointage liées. Désactivez-le ou archivez-le à la place.",
+        blockers,
+      });
+      return;
+    }
+
+    // Fiche propre (test / erreur de saisie) → détacher les références manager,
+    // purger les lignes satellites de création, puis la fiche employé.
+    await client.query(`UPDATE employee_profiles SET manager_id=NULL WHERE manager_id=$1::uuid`, [id]);
+    await client.query(`UPDATE hr_departments   SET manager_id=NULL WHERE manager_id=$1::uuid`, [id]);
+    await client.query(`UPDATE leave_requests   SET manager_id=NULL WHERE manager_id=$1::uuid`, [id]);
+    await client.query(`UPDATE leave_requests   SET replacement_employee_id=NULL WHERE replacement_employee_id=$1::uuid`, [id]);
+    for (const table of [
+      "hr_audit_events", "hr_notes", "hr_alerts", "badge_assignments", "leave_balances",
+      "employee_schedules", "employee_contracts", "employee_documents",
+      "employee_emergency_contacts", "employee_contacts", "employee_profiles",
+    ]) {
+      await client.query(`DELETE FROM ${table} WHERE employee_id=$1::uuid`, [id]);
+    }
+    await client.query(`DELETE FROM employees WHERE id=$1::uuid`, [id]);
+
+    await client.query(`
+      INSERT INTO hr_audit_events (employee_id, actor_id, actor_name, action, entity_type, entity_id, new_values)
+      VALUES (NULL, $1::uuid, $2, 'delete_employee_permanent', 'employee', $3::uuid, $4::jsonb)`,
+      [act.userId, act.userName, id,
+       JSON.stringify({ matricule: emp.matricule, nom: `${emp.first_name} ${emp.last_name}` })]);
+
+    await client.query("COMMIT");
+    res.json({ ok: true, deleted: { id, matricule: emp.matricule } });
+  } catch (err: any) {
+    await client.query("ROLLBACK").catch(() => {});
+    if (err?.code === "23503") {
+      res.status(409).json({
+        error: "Suppression définitive impossible : des données liées ont été détectées dans un autre module. Désactivez ou archivez l'employé à la place.",
+        blockers: [],
+      });
+      return;
+    }
+    next(err);
+  } finally { client.release(); }
+});
+
 // GET /hr/employees/:id/attendance — attendance list for employee
 router.get("/:id/attendance", requirePermission("hr.attendance.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {

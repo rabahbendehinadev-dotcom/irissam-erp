@@ -3,14 +3,17 @@
  * Planning and Historique hidden (no per-employee API endpoints).
  */
 import { useState } from "react";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { useQuery } from "@/hooks/useQuery";
 import { apiClient } from "@/lib/api-client";
 import { ScrollableTabBar } from "@/components/ui/ScrollableTabBar";
+import { usePermission } from "@/hooks/usePermission";
+import { EmployeeDeleteDialog } from "./EmployeeDeleteDialog";
 import {
   ArrowLeft, User, MapPin, FileText, Clock, Timer,
   AlertCircle, Plane, TrendingUp, FolderOpen, CreditCard,
-  MessageSquare, Shield, Edit2, Check, X, RefreshCw
+  MessageSquare, Shield, Edit2, Check, X, RefreshCw,
+  Trash2, UserX, UserCheck
 } from "lucide-react";
 
 const TABS = [
@@ -41,6 +44,10 @@ export default function EmployeeDetail() {
   const [, params] = useRoute("/hr/employees/:id");
   const id = params?.id ?? "";
   const [tab, setTab] = useState(0);
+  const [, setLocation] = useLocation();
+  const { can } = usePermission();
+  const [showDelete, setShowDelete] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
 
   // Core employee data
   const { data, loading, error, refetch } = useQuery<any>(`/hr/employees/${id}`);
@@ -85,6 +92,27 @@ export default function EmployeeDetail() {
   const balances  = data.leave_balances ?? [];
   const st = STATUS_BADGE[emp.status] ?? "bg-gray-100 text-gray-500";
 
+  const canDeactivate = can("hr.employees.update" as any);
+  const canDelete = can("hr.employees.archive" as any);
+  const isSuspended = emp.status === "suspendu";
+
+  const toggleStatus = async () => {
+    const msg = isSuspended
+      ? "Réactiver cet employé ? Il repassera au statut « Actif »."
+      : "Désactiver cet employé ? Il passera au statut « Suspendu » ; toutes ses données restent conservées.";
+    if (!window.confirm(msg)) return;
+    setStatusBusy(true);
+    try {
+      await apiClient.patch(`/hr/employees/${id}/status`, {
+        status: isSuspended ? "actif" : "suspendu",
+        reason: "Via fiche employé",
+      });
+      refetch();
+    } catch (e: any) {
+      window.alert(e?.data?.error ?? e?.message ?? "Erreur lors du changement de statut");
+    } finally { setStatusBusy(false); }
+  };
+
   // Derived
   const lateRecords    = Array.isArray(lateResult?.data) ? lateResult.data : [];
   const absenceRecords = Array.isArray(absResult?.data)  ? absResult.data  : [];
@@ -106,8 +134,39 @@ export default function EmployeeDetail() {
             <p className="text-xs text-gray-500">{emp.matricule} · {profile.position_name ?? "—"}</p>
           </div>
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${st}`}>{emp.status}</span>
+          {canDeactivate && emp.status !== "archive" && (
+            <button onClick={toggleStatus} disabled={statusBusy}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-50 ${
+                isSuspended
+                  ? "border-green-200 text-green-700 hover:bg-green-50"
+                  : "border-orange-200 text-orange-700 hover:bg-orange-50"}`}
+              title={isSuspended ? "Réactiver" : "Désactiver"}>
+              {isSuspended ? <UserCheck className="w-3.5 h-3.5"/> : <UserX className="w-3.5 h-3.5"/>}
+              <span className="hidden sm:inline">{isSuspended ? "Réactiver" : "Désactiver"}</span>
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={() => setShowDelete(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+              title="Supprimer">
+              <Trash2 className="w-3.5 h-3.5"/>
+              <span className="hidden sm:inline">Supprimer</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {showDelete && (
+        <EmployeeDeleteDialog
+          employee={{ ...emp, id }}
+          onClose={() => setShowDelete(false)}
+          onDone={(action) => {
+            setShowDelete(false);
+            if (action === "deactivated") refetch();
+            else setLocation("/hr/employees");
+          }}
+        />
+      )}
 
       {/* Profile Hero */}
       <div className="mx-4 sm:mx-6 mt-4 bg-gradient-to-r from-[#1B2A4A] to-[#0e3460] rounded-2xl p-5 text-white">
