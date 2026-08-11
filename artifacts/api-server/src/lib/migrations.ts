@@ -67,6 +67,7 @@ const MIGRATIONS = [
   "041_main_admin_super_admin_role.sql",
   "042_free_orphan_care_resources.sql",
   "043_purge_demo_alerts.sql",
+  "044_purge_orphan_appointments.sql",
 ];
 
 async function ensureTrackingTable(client: PoolClient): Promise<void> {

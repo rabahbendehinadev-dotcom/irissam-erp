@@ -179,35 +179,27 @@ router.post("/", requirePermission("appointments.create"), async (req: Authentic
     }
     const doctorName = `${doctorQ.rows[0].first_name} ${doctorQ.rows[0].last_name}`;
 
-    // ── patientId : optionnel (walk-in), mais vérifié quand fourni ─────────
-    let patientId: string | null = null;
-    let patientName: string;
-    let patientMpi: string | null = null;
-    if (body.patientId) {
-      if (!UUID_RE.test(body.patientId)) {
-        res.status(400).json({ error: "patientId invalide (UUID attendu)" });
-        return;
-      }
-      const patientQ = await pool.query(
-        `SELECT id, first_name, last_name, mpi_id FROM patients
-          WHERE id = $1 AND deleted_at IS NULL`,
-        [body.patientId],
-      );
-      if (patientQ.rows.length === 0) {
-        res.status(400).json({ error: "Patient introuvable" });
-        return;
-      }
-      patientId   = patientQ.rows[0].id;
-      patientName = `${patientQ.rows[0].first_name} ${patientQ.rows[0].last_name}`;
-      patientMpi  = patientQ.rows[0].mpi_id ?? null;
-    } else {
-      const name = (body.patientName ?? "").trim();
-      if (!name) {
-        res.status(400).json({ error: "patientId ou patientName est requis" });
-        return;
-      }
-      patientName = name;
+    // ── patientId : obligatoire, UUID, patient réel ─────────────────────────
+    // Un rendez-vous sans lien patient_id est invisible pour la suppression
+    // définitive d'un patient (collecte par patient_id) et devient une ligne
+    // fantôme impossible à purger — cf. migration 044. Le formulaire ERP
+    // exige déjà un patient enregistré.
+    if (!body.patientId || !UUID_RE.test(body.patientId)) {
+      res.status(400).json({ error: "patientId (UUID) est requis — sélectionnez un patient enregistré" });
+      return;
     }
+    const patientQ = await pool.query(
+      `SELECT id, first_name, last_name, mpi_id FROM patients
+        WHERE id = $1 AND deleted_at IS NULL`,
+      [body.patientId],
+    );
+    if (patientQ.rows.length === 0) {
+      res.status(400).json({ error: "Patient introuvable" });
+      return;
+    }
+    const patientId: string = patientQ.rows[0].id;
+    const patientName: string = `${patientQ.rows[0].first_name} ${patientQ.rows[0].last_name}`;
+    const patientMpi: string | null = patientQ.rows[0].mpi_id ?? null;
 
     // ── departmentId : optionnel, vérifié quand fourni ─────────────────────
     let departmentId: string | null = null;
