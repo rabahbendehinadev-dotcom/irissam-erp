@@ -2,7 +2,6 @@ export * from './sites';
 export * from './patients';
 export * from './admissions';
 export * from './appointments';
-export * from './alerts';
 export * from './dashboard';
 export * from './inventory';
 export * from './emergency';

@@ -1,0 +1,22 @@
+-- ============================================================================
+-- 043 — Purge des alertes de démonstration obsolètes
+-- ============================================================================
+-- Contexte : le panneau "Alertes critiques" du Dashboard lit la table alerts
+-- via GET /alerts (aucun mock côté frontend). Or la table alerts de production
+-- contient encore des alertes de démonstration héritées de l'ère legacy
+-- ("Résultat d'analyse critique – Fatima Zahra", "Réanimation saturée 24/24",
+-- "Intervention chirurgicale en retard"…).
+--
+-- Pourquoi elles ont survécu : la suppression individuelle d'un patient ne
+-- supprime que les alertes liées aux entités de CE patient
+-- (entity_id = ANY(...)). Les alertes de démo ont un entity_id NULL ou
+-- fictif → aucune suppression par patient ne peut les atteindre.
+-- Le script de remise à zéro UAT (reset-uat-data.sql) fait un
+-- DELETE FROM alerts complet — mais il n'a jamais été exécuté en production.
+--
+-- Traitement identique au script UAT validé : vider la table. Aucune
+-- génération d'alertes runtime n'existe encore côté serveur, donc toutes les
+-- lignes présentes sont par définition des reliquats de démo/UAT.
+-- Idempotent : ne fait rien si la table est déjà vide.
+
+DELETE FROM alerts;
