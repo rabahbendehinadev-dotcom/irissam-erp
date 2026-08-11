@@ -160,11 +160,11 @@ export async function deletePatientPermanently(
        )
        UPDATE emergency_rooms er SET
          occupied = GREATEST(er.occupied - d.n, 0),
-         status = CASE
+         status = (CASE
                     WHEN GREATEST(er.occupied - d.n, 0) = 0 THEN 'libre'
                     WHEN GREATEST(er.occupied - d.n, 0) >= er.capacity THEN 'occupee'
                     ELSE 'partielle'
-                  END,
+                  END)::er_room_status,
          updated_at = now()
        FROM d WHERE er.id = d.room_id`,
       [patientId, encIds]);
