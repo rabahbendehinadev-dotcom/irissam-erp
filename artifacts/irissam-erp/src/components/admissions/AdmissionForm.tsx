@@ -61,6 +61,19 @@ const inputCls  = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 fo
 const selectCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white disabled:bg-gray-50 disabled:text-gray-500';
 const labelCls  = 'block text-xs font-medium text-gray-600 mb-1';
 
+/**
+ * Field est defini au niveau module (et non dans le corps d'AdmissionForm) :
+ * une definition inline cree un nouveau type de composant a chaque render,
+ * ce qui demonte/remonte les champs et fait perdre le focus a chaque frappe.
+ */
+const Field = ({ k, label, req, errors, children }: { k: string; label: string; req?: boolean; errors: Record<string, string>; children: React.ReactNode }) => (
+  <div>
+    <label className={labelCls}>{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
+    {children}
+    {errors[k] && <p className="text-xs text-red-500 mt-0.5">{errors[k]}</p>}
+  </div>
+);
+
 interface Props {
   admission?: Admission;
   /** Pré-sélectionne le patient en mode création (Actions rapides du dossier patient) */
@@ -251,14 +264,6 @@ export function AdmissionForm({ admission, initialPatientId, onSave, onCancel }:
 
   const STEPS = [t('adm.form.step1'), t('adm.form.step2'), t('adm.form.step3')];
 
-  const Field = ({ k, label, req, children }: { k: string; label: string; req?: boolean; children: React.ReactNode }) => (
-    <div>
-      <label className={labelCls}>{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      {children}
-      {errors[k] && <p className="text-xs text-red-500 mt-0.5">{errors[k]}</p>}
-    </div>
-  );
-
   return (
     <div className="fixed inset-0 z-40 flex">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
@@ -295,7 +300,7 @@ export function AdmissionForm({ admission, initialPatientId, onSave, onCancel }:
                 </p>
               </div>
 
-              <Field k="patient" label={t('adm.form.search.label')} req>
+              <Field k="patient" errors={errors} label={t('adm.form.search.label')} req>
                 <div className="flex gap-2">
                   <input
                     value={query}
@@ -386,14 +391,14 @@ export function AdmissionForm({ admission, initialPatientId, onSave, onCancel }:
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                <Field k="type" label={t('adm.form.type')} req>
+                <Field k="type" errors={errors} label={t('adm.form.type')} req>
                   <select value={form.type} onChange={set('type')} className={selectCls} disabled={isEdit}>
                     {(['hospitalisation','ambulatoire','preadmission','urgence','maternite','chirurgie'] as const).map(v =>
                       <option key={v} value={v}>{t(`adm.type.${v}` as any)}</option>
                     )}
                   </select>
                 </Field>
-                <Field k="priority" label={t('adm.form.priority')} req>
+                <Field k="priority" errors={errors} label={t('adm.form.priority')} req>
                   <select value={form.priority} onChange={set('priority')} className={selectCls} disabled={isEdit}>
                     {(['normal','urgent','tres_urgent','vital'] as const).map(v =>
                       <option key={v} value={v}>{t(`adm.priority.${v}` as any)}</option>
@@ -402,14 +407,14 @@ export function AdmissionForm({ admission, initialPatientId, onSave, onCancel }:
                 </Field>
               </div>
 
-              <Field k="serviceId" label={t('adm.form.service')} req>
+              <Field k="serviceId" errors={errors} label={t('adm.form.service')} req>
                 <select value={form.serviceId} onChange={set('serviceId')} className={selectCls} disabled={isEdit}>
                   <option value="">— {t('adm.form.service')} —</option>
                   {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </Field>
 
-              <Field k="doctorId" label={t('adm.form.doctor')} req>
+              <Field k="doctorId" errors={errors} label={t('adm.form.doctor')} req>
                 <select value={form.doctorId} onChange={set('doctorId')} className={selectCls} disabled={isEdit}>
                   <option value="">— {t('adm.form.doctor')} —</option>
                   {doctors.map(d => (
@@ -420,7 +425,7 @@ export function AdmissionForm({ admission, initialPatientId, onSave, onCancel }:
                 </select>
               </Field>
 
-              <Field k="motif" label={t('adm.form.motif')} req>
+              <Field k="motif" errors={errors} label={t('adm.form.motif')} req>
                 <textarea
                   value={form.motif}
                   onChange={set('motif')}
@@ -432,25 +437,25 @@ export function AdmissionForm({ admission, initialPatientId, onSave, onCancel }:
               </Field>
 
               <div className="grid grid-cols-2 gap-4">
-                <Field k="admissionDate" label={t('adm.form.date')} req>
+                <Field k="admissionDate" errors={errors} label={t('adm.form.date')} req>
                   <input type="date" value={form.admissionDate} onChange={set('admissionDate')} className={inputCls} disabled={isEdit} />
                 </Field>
-                <Field k="admissionTime" label={t('adm.form.time')} req>
+                <Field k="admissionTime" errors={errors} label={t('adm.form.time')} req>
                   <input type="time" value={form.admissionTime} onChange={set('admissionTime')} className={inputCls} disabled={isEdit} />
                 </Field>
               </div>
 
               {form.type === 'preadmission' ? (
-                <Field k="preadmissionDate" label={t('adm.form.preadmission_date')}>
+                <Field k="preadmissionDate" errors={errors} label={t('adm.form.preadmission_date')}>
                   <input type="date" value={form.preadmissionDate} onChange={set('preadmissionDate')} className={inputCls} />
                 </Field>
               ) : (
-                <Field k="expectedDischargeDate" label={t('adm.form.expected_discharge')}>
+                <Field k="expectedDischargeDate" errors={errors} label={t('adm.form.expected_discharge')}>
                   <input type="date" min={form.admissionDate || new Date().toISOString().slice(0, 10)} value={form.expectedDischargeDate} onChange={set('expectedDischargeDate')} className={inputCls} />
                 </Field>
               )}
 
-              <Field k="notes" label={t('adm.form.notes')}>
+              <Field k="notes" errors={errors} label={t('adm.form.notes')}>
                 <textarea
                   value={form.notes}
                   onChange={set('notes')}
