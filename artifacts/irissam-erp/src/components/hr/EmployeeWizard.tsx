@@ -5,8 +5,9 @@
  */
 import { useState } from "react";
 import { apiClient } from "@/lib/api-client";
-import { X, ChevronRight, ChevronLeft, Check, User, CreditCard, Phone, Building2, FileText, Calendar, AlertCircle, FolderOpen, CheckCircle } from "lucide-react";
+import { X, ChevronRight, ChevronLeft, Check, User, CreditCard, Phone, Building2, FileText, Calendar, AlertCircle, FolderOpen, CheckCircle, KeyRound } from "lucide-react";
 import { useQuery } from "@/hooks/useQuery";
+import { usePermission } from "@/hooks/usePermission";
 
 const STEPS = [
   { title: "Identité",         icon: User },
@@ -17,8 +18,15 @@ const STEPS = [
   { title: "Planning",         icon: Calendar },
   { title: "Urgence",          icon: AlertCircle },
   { title: "Documents",        icon: FolderOpen },
+  { title: "Accès ERP",        icon: KeyRound },
   { title: "Résumé",           icon: CheckCircle },
 ];
+
+function genPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  return Array.from(bytes).map(b => chars[b % chars.length]).join("");
+}
 
 const CONTRACT_TYPES = ["CDI","CDD","vacataire","garde","stage","prestataire","convention"];
 const CATEGORIES = ["medical","paramedical","administratif","technique","support"];
@@ -43,10 +51,14 @@ export function EmployeeWizard({ onClose, onCreated }: Props) {
     schedule: { workDays: [1,2,3,4,5], startTime: "08:00", endTime: "16:00", breakMinutes: 60, rotation: false, nightWork: false, onCall: false },
     emergency: { name: "", relation: "", phone: "", address: "" },
     documents: { types: [] as string[], notes: "" },
+    account: { create: false, email: "", roleId: "", tempPassword: "" },
   });
 
+  const { can } = usePermission();
+  const canCreateAccount = can("admin.users");
   const { data: positions } = useQuery<any[]>("/hr/positions");
   const { data: departments } = useQuery<any[]>("/hr/positions/departments");
+  const { data: roles } = useQuery<any[]>(canCreateAccount ? "/system/users/roles" : null);
 
   function set(section: keyof typeof data, field: string, value: any) {
     setData(d => ({ ...d, [section]: { ...(d[section] as any), [field]: value } }));
@@ -61,7 +73,14 @@ export function EmployeeWizard({ onClose, onCreated }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const result = await apiClient.post<{ employee: any }>("/hr/employees", data);
+      const { account, ...rest } = data;
+      const payload = {
+        ...rest,
+        account: account.create
+          ? { create: true, email: account.email.trim(), roleId: account.roleId, tempPassword: account.tempPassword }
+          : undefined,
+      };
+      const result = await apiClient.post<{ employee: any }>("/hr/employees", payload);
       onCreated(result.employee);
     } catch (e: any) {
       setError(e.message ?? "Erreur lors de la création");
@@ -73,6 +92,9 @@ export function EmployeeWizard({ onClose, onCreated }: Props) {
   const canGoNext = () => {
     if (step === 0) return data.identity.firstName.trim() && data.identity.lastName.trim();
     if (step === 4) return data.contract.type && data.contract.startDate;
+    if (step === 8) return !data.account.create || (
+      /\S+@\S+\.\S+/.test(data.account.email.trim()) && !!data.account.roleId && data.account.tempPassword.length >= 8
+    );
     return true;
   };
 
@@ -269,8 +291,63 @@ export function EmployeeWizard({ onClose, onCreated }: Props) {
             </div>
           )}
 
-          {/* Step 8 — Résumé */}
+          {/* Step 8 — Accès ERP */}
           {step === 8 && (
+            <div className="space-y-4">
+              {!canCreateAccount ? (
+                <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-100 rounded-xl text-sm text-gray-500">
+                  <KeyRound className="w-5 h-5 shrink-0 text-gray-400"/>
+                  <p>La création de comptes ERP est réservée à l'administration (permission admin.users).
+                     Vous pouvez terminer la création de l'employé ; un administrateur pourra créer
+                     le compte plus tard depuis la fiche employé.</p>
+                </div>
+              ) : (
+                <>
+                  <label className="flex items-center gap-3 p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
+                    <input type="checkbox" checked={data.account.create}
+                      onChange={e => {
+                        const create = e.target.checked;
+                        setData(d => ({ ...d, account: { ...d.account, create,
+                          email: create && !d.account.email ? d.contacts.emailProfessional : d.account.email,
+                          tempPassword: create && !d.account.tempPassword ? genPassword() : d.account.tempPassword } }));
+                      }}
+                      className="w-4 h-4 rounded border-gray-300"/>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Créer un compte ERP pour cet employé</p>
+                      <p className="text-xs text-gray-400">L'employé se connectera sous sa propre identité ; toutes ses actions seront tracées à son nom.</p>
+                    </div>
+                  </label>
+                  {data.account.create && (
+                    <div className="grid grid-cols-1 gap-4">
+                      <Field label="Email de connexion *" type="email" value={data.account.email} onChange={v => set("account","email",v)}/>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Rôle (permissions) *</label>
+                        <select value={data.account.roleId} onChange={e => set("account","roleId",e.target.value)}
+                          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                          <option value="">— Sélectionner un rôle —</option>
+                          {Array.isArray(roles) && roles.map((r: any) => <option key={r.id} value={r.id}>{r.display_name}</option>)}
+                        </select>
+                        <p className="text-[11px] text-gray-400 mt-1">Le rôle détermine les permissions (ex. un médecin ne crée pas de dossiers patients : le dossier reste unique, créé par l'accueil).</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Mot de passe provisoire * (min. 8 caractères)</label>
+                        <div className="flex gap-2">
+                          <input value={data.account.tempPassword} onChange={e => set("account","tempPassword",e.target.value)}
+                            className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20"/>
+                          <button type="button" onClick={() => set("account","tempPassword",genPassword())}
+                            className="px-3 py-2 text-xs border border-gray-200 rounded-lg hover:bg-gray-50">Générer</button>
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-1">Communiquez-le à l'employé : changement obligatoire à la première connexion.</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Step 9 — Résumé */}
+          {step === 9 && (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3 text-sm">
                 <h3 className="font-semibold text-blue-800">Récapitulatif</h3>
@@ -281,8 +358,18 @@ export function EmployeeWizard({ onClose, onCreated }: Props) {
                   <SummaryRow label="Téléphone" value={data.contacts.phonePrimary || "—"}/>
                   <SummaryRow label="Type contrat" value={data.contract.type || "—"}/>
                   <SummaryRow label="Date début" value={data.contract.startDate || "—"}/>
+                  <SummaryRow label="Compte ERP" value={data.account.create
+                    ? `Oui — ${(Array.isArray(roles) && roles.find((r: any) => r.id === data.account.roleId)?.display_name) || "rôle à choisir"}`
+                    : "Non"}/>
                 </div>
               </div>
+              {data.account.create && (
+                <div className="flex items-center gap-3 p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-800">
+                  <KeyRound className="w-5 h-5 shrink-0"/>
+                  <p>Un compte ERP sera créé et lié à cette fiche ({data.account.email || "email ?"}).
+                     Mot de passe provisoire à communiquer ; changement obligatoire au premier login.</p>
+                </div>
+              )}
               <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-800">
                 <AlertCircle className="w-5 h-5 shrink-0"/>
                 <p>En enregistrant, vous créez simultanément le dossier employé, le profil, les coordonnées, le contrat et le planning dans une seule transaction.</p>

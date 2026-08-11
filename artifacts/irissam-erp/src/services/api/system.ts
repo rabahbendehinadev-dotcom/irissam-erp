@@ -251,3 +251,21 @@ export const getRateLimits = () =>
 
 export const updateRateLimit = (id: string, data: Record<string, unknown>) =>
   apiClient.patch<any>(`${BASE}/rate-limits/${id}`, data);
+
+// ─── Comptes ERP (console admin.users) ────────────────────────────────────────
+export const getErpUsers = (params?: Record<string, string>) => {
+  const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params)}` : "";
+  return apiClient.get<any>(`${BASE}/users${qs}`);
+};
+export const getErpRoles = () =>
+  apiClient.get<any>(`${BASE}/users/roles`);
+export const getLinkCandidates = (q?: string) =>
+  apiClient.get<any>(`${BASE}/users/link-candidates${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+export const updateErpUser = (id: string, data: { roleId?: string; linkedEmployeeId?: string | null }) =>
+  apiClient.patch<any>(`${BASE}/users/${id}`, data);
+export const setErpUserStatus = (id: string, action: "activate" | "suspend", reason?: string) =>
+  apiClient.post<any>(`${BASE}/users/${id}/status`, { action, reason });
+export const resetErpUserPassword = (id: string, tempPassword: string) =>
+  apiClient.post<any>(`${BASE}/users/${id}/reset-password`, { tempPassword });
+export const getErpUserActivity = (id: string, limit = 50) =>
+  apiClient.get<any>(`${BASE}/users/${id}/activity?limit=${limit}`);

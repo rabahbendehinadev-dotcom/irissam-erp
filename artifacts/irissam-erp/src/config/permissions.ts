@@ -125,7 +125,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   medecin: [
     'dashboard.view',
-    'patients.view', 'patients.create', 'patients.edit', 'patients.view_sensitive',
+    'patients.view', 'patients.edit', 'patients.view_sensitive',
     'appointments.view', 'appointments.create', 'appointments.edit', 'appointments.cancel',
     'admissions.view', 'admissions.create', 'admissions.edit',
     'admissions.discharge', 'admissions.transfer', 'admissions.cancel',
@@ -289,7 +289,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   doctor: [
     'dashboard.view',
-    'patients.view', 'patients.create', 'patients.edit', 'patients.view_sensitive',
+    'patients.view', 'patients.edit', 'patients.view_sensitive',
     'appointments.view', 'appointments.create', 'appointments.edit',
     'admissions.view', 'admissions.create',
     'emergencies.view', 'emergencies.create', 'emergencies.triage',

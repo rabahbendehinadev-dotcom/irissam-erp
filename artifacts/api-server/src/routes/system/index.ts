@@ -19,6 +19,7 @@ import versionRouter from "./version.js";
 import settingsRouter from "./settings.js";
 import releaseNotesRouter from "./release-notes.js";
 import rateLimitsRouter from "./rate-limits.js";
+import usersRouter from "./users.js";
 
 const router = Router();
 
@@ -46,5 +47,6 @@ router.use("/version", versionRouter);
 router.use("/settings", settingsRouter);
 router.use("/release-notes", releaseNotesRouter);
 router.use("/rate-limits", rateLimitsRouter);
+router.use("/users", usersRouter);
 
 export default router;

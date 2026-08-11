@@ -7,6 +7,7 @@ import { Shield } from "lucide-react";
 
 // ── Lazy-loaded tab components ─────────────────────────────────────────────────
 const OverviewTab      = lazy(() => import("@/components/super-admin/OverviewTab"));
+const UsersTab         = lazy(() => import("@/components/super-admin/UsersTab"));
 const HealthTab        = lazy(() => import("@/components/super-admin/HealthTab"));
 const DatabaseTab      = lazy(() => import("@/components/super-admin/DatabaseTab"));
 const MigrationsTab    = lazy(() => import("@/components/super-admin/MigrationsTab"));
@@ -27,6 +28,7 @@ const VersionTab       = lazy(() => import("@/components/super-admin/VersionTab"
 // ── Tab definitions ────────────────────────────────────────────────────────────
 const TABS = [
   { id: "overview",      label: "Vue d'ensemble" },
+  { id: "users",         label: "Comptes ERP" },
   { id: "health",        label: "Santé système" },
   { id: "database",      label: "Base de données" },
   { id: "migrations",    label: "Migrations" },
@@ -112,6 +114,7 @@ export default function SuperAdminPage() {
           <div className="flex-1 min-h-0">
             <Suspense fallback={<TabSpinner />}>
               {activeTab === "overview"      && <OverviewTab />}
+              {activeTab === "users"         && <UsersTab />}
               {activeTab === "health"        && <HealthTab />}
               {activeTab === "database"      && <DatabaseTab />}
               {activeTab === "migrations"    && <MigrationsTab />}

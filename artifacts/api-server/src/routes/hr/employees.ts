@@ -3,10 +3,12 @@
  * Wizard creation: employees + profiles + contacts + emergency + contract + schedule (transaction)
  */
 import { Router } from "express";
+import bcrypt from "bcryptjs";
 import { pool } from "@workspace/db";
 import { requirePermission } from "../../middleware/requirePermission";
 import { auditService } from "../../services/audit";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
+import { legacyEnumForRole } from "../system/users";
 
 const router = Router();
 
@@ -44,6 +46,92 @@ function pgErrorResponse(err: any, res: any): boolean {
     return true;
   }
   return false;
+}
+
+/* ─── Compte ERP lié (création réservée à l'administration) ────────────────────
+ * La fiche employé RH est la source maîtresse ; le compte utilisateur (users)
+ * est optionnel et rattaché via employees.linked_user_id (index unique partiel,
+ * migration 045). Mot de passe provisoire (bcrypt 12) + force_password_change :
+ * changement obligatoire au premier login. Les permissions réelles viennent de
+ * user_roles → role_permissions ; users.role n'est que la valeur héritée. */
+
+type ErpAccountInput = { email?: string; roleId?: string; tempPassword?: string; phone?: string | null };
+type ErpAccountResult =
+  | { ok: true; userId: string; email: string; roleName: string; roleDisplay: string }
+  | { ok: false; status: number; error: string };
+
+function canManageAccounts(req: AuthenticatedRequest): boolean {
+  return req.auth?.role === "super_admin" || (req.auth?.permissions ?? []).includes("admin.users");
+}
+
+async function createErpAccount(
+  client: any,
+  emp: { id: string; matricule: string; first_name: string; last_name: string },
+  account: ErpAccountInput,
+  act: { userId: string; userName: string },
+): Promise<ErpAccountResult> {
+  const email = String(account.email ?? "").trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(email)) return { ok: false, status: 400, error: "Adresse email invalide pour le compte ERP." };
+  const tempPassword = String(account.tempPassword ?? "");
+  if (tempPassword.length < 8) return { ok: false, status: 400, error: "Le mot de passe provisoire doit contenir au moins 8 caractères." };
+  if (!account.roleId) return { ok: false, status: 400, error: "Rôle du compte ERP obligatoire." };
+  const roleQ = await client.query(`SELECT id, name, display_name FROM roles WHERE id=$1::uuid`, [account.roleId]);
+  if (!roleQ.rows[0]) return { ok: false, status: 400, error: "Rôle sélectionné invalide." };
+  const role = roleQ.rows[0];
+
+  const dup = await client.query(`SELECT id FROM users WHERE lower(email)=$1 AND deleted_at IS NULL`, [email]);
+  if (dup.rows[0]) return { ok: false, status: 409, error: `Un compte ERP existe déjà avec l'email ${email}.` };
+
+  // users.employee_number est unique : ne le renseigner que s'il est libre
+  const numTaken = await client.query(`SELECT id FROM users WHERE employee_number=$1 AND deleted_at IS NULL`, [emp.matricule]);
+  const employeeNumber = numTaken.rows[0] ? null : emp.matricule;
+
+  const hash = await bcrypt.hash(tempPassword, 12);
+  const uRes = await client.query(`
+    INSERT INTO users (first_name, last_name, email, role, hashed_password,
+      employee_number, phone, language, account_status, force_password_change,
+      created_by, updated_by)
+    VALUES ($1,$2,$3,$4::user_role,$5,$6,$7,'fr','active',TRUE,$8::uuid,$8::uuid)
+    RETURNING id, email`,
+    [emp.first_name, emp.last_name, email, legacyEnumForRole(role.name), hash,
+     employeeNumber, nn(account.phone), act.userId]);
+  const user = uRes.rows[0];
+
+  await client.query(
+    `INSERT INTO user_roles (user_id, role_id, granted_by) VALUES ($1::uuid,$2::uuid,$3::uuid)`,
+    [user.id, role.id, act.userId]);
+  await client.query(
+    `UPDATE employees SET linked_user_id=$1::uuid, updated_at=NOW(), version=version+1 WHERE id=$2::uuid`,
+    [user.id, emp.id]);
+  await client.query(`
+    INSERT INTO hr_audit_events (employee_id, actor_id, actor_name, action, entity_type, entity_id, new_values)
+    VALUES ($1::uuid,$2::uuid,$3,'create_erp_account','user',$4::uuid,$5::jsonb)`,
+    [emp.id, act.userId, act.userName, user.id, JSON.stringify({ email, role: role.name })]);
+
+  return { ok: true, userId: user.id, email: user.email, roleName: role.name, roleDisplay: role.display_name };
+}
+
+/** Suspend le compte ERP lié (désactivation / archivage de l'employé).
+ *  La réactivation du compte reste une décision MANUELLE de l'administration. */
+async function suspendLinkedAccount(
+  q: { query: (...a: any[]) => Promise<any> },
+  employeeId: string,
+  act: { userId: string; userName: string },
+  reason: string,
+): Promise<string | null> {
+  const r = await q.query(`
+    UPDATE users u SET account_status='suspended', updated_at=NOW(), version=u.version+1
+    FROM employees e
+    WHERE e.id=$1::uuid AND e.linked_user_id=u.id AND u.deleted_at IS NULL AND u.account_status='active'
+    RETURNING u.id, u.email`, [employeeId]);
+  const acc = r.rows[0];
+  if (!acc) return null;
+  await q.query(`UPDATE user_sessions SET revoked_at=now() WHERE user_id=$1::uuid AND revoked_at IS NULL`, [acc.id]);
+  await q.query(`
+    INSERT INTO hr_audit_events (employee_id, actor_id, actor_name, action, entity_type, entity_id, new_values)
+    VALUES ($1::uuid,$2::uuid,$3,'suspend_erp_account','user',$4::uuid,$5::jsonb)`,
+    [employeeId, act.userId, act.userName, acc.id, JSON.stringify({ email: acc.email, reason })]);
+  return acc.email;
 }
 
 // GET /hr/employees — list with filters
@@ -153,7 +241,7 @@ router.get("/", requirePermission("hr.employees.view"), async (req: Authenticate
 router.get("/:id", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
     const { id } = req.params;
-    const [empRow, profileRow, contactRow, emergRow, contractRow, docsRow, leaveBal] = await Promise.all([
+    const [empRow, profileRow, contactRow, emergRow, contractRow, docsRow, leaveBal, accountRow] = await Promise.all([
       pool.query(`SELECT * FROM employees WHERE id=$1::uuid AND deleted_at IS NULL`, [id]),
       pool.query(`SELECT ep.*, pos.name AS position_name, dep.name AS department_name,
                     mgr.first_name || ' ' || mgr.last_name AS manager_name
@@ -167,6 +255,16 @@ router.get("/:id", requirePermission("hr.employees.view"), async (req: Authentic
       pool.query(`SELECT * FROM employee_contracts WHERE employee_id=$1::uuid AND deleted_at IS NULL ORDER BY start_date DESC`, [id]),
       pool.query(`SELECT * FROM employee_documents WHERE employee_id=$1::uuid AND deleted_at IS NULL ORDER BY created_at DESC`, [id]),
       pool.query(`SELECT * FROM leave_balances WHERE employee_id=$1::uuid ORDER BY year DESC`, [id]),
+      pool.query(`SELECT u.id, u.email, u.account_status, u.last_login_at, u.force_password_change,
+                    r.role_name, r.role_display
+                  FROM employees e
+                  JOIN users u ON u.id = e.linked_user_id AND u.deleted_at IS NULL
+                  LEFT JOIN LATERAL (
+                    SELECT ro.name AS role_name, ro.display_name AS role_display
+                    FROM user_roles ur JOIN roles ro ON ro.id = ur.role_id
+                    WHERE ur.user_id = u.id ORDER BY ur.granted_at DESC LIMIT 1
+                  ) r ON TRUE
+                  WHERE e.id=$1::uuid LIMIT 1`, [id]),
     ]);
 
     if (!empRow.rows[0]) return void res.status(404).json({ error: "Employé non trouvé" });
@@ -179,6 +277,7 @@ router.get("/:id", requirePermission("hr.employees.view"), async (req: Authentic
       contracts: contractRow.rows,
       documents: docsRow.rows,
       leave_balances: leaveBal.rows,
+      account: accountRow.rows[0] ?? null,
     });
   } catch (err) { next(err); }
 });
@@ -327,8 +426,30 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
       [emp.id, act.userId, act.userName, JSON.stringify({ matricule, firstName: emp.first_name, lastName: emp.last_name })]
     );
 
+    // Step 9 (optionnel) — Compte ERP lié, dans la même transaction
+    let accountResult: ErpAccountResult | null = null;
+    const account = req.body?.account;
+    if (account?.create) {
+      if (!canManageAccounts(req)) {
+        await client.query("ROLLBACK");
+        return void res.status(403).json({ error: "La création d'un compte ERP nécessite la permission d'administration des utilisateurs (admin.users)." });
+      }
+      accountResult = await createErpAccount(client, emp,
+        { ...account, phone: contacts?.phonePrimary ?? null }, act);
+      if (!accountResult.ok) {
+        await client.query("ROLLBACK");
+        return void res.status(accountResult.status).json({ error: accountResult.error });
+      }
+    }
+
     await client.query("COMMIT");
-    res.status(201).json({ employee: emp, contract: contractRecord });
+    res.status(201).json({
+      employee: emp,
+      contract: contractRecord,
+      account: accountResult && accountResult.ok
+        ? { userId: accountResult.userId, email: accountResult.email, role: accountResult.roleDisplay }
+        : null,
+    });
   } catch (err: any) {
     await client.query("ROLLBACK").catch(() => {});
     if (pgErrorResponse(err, res)) return;
@@ -426,6 +547,10 @@ router.patch("/:id", requirePermission("hr.employees.update"), async (req: Authe
          JSON.stringify({ status: oldRow.rows[0].status }),
          JSON.stringify({ status, reason: statusReason })]
       );
+      // Employé suspendu / archivé → suspension automatique du compte ERP lié
+      if (status === "suspendu" || status === "archive") {
+        await suspendLinkedAccount(client, String(id), act, `Statut employé → ${status}`);
+      }
     }
 
     await client.query("COMMIT");
@@ -456,8 +581,55 @@ router.patch("/:id/status", requirePermission("hr.employees.update"), async (req
       VALUES ($1::uuid,$2::uuid,$3,'change_status','employee',$1::uuid,$4::jsonb)`,
       [id, act.userId, act.userName, JSON.stringify({ status, reason })]);
 
-    res.json({ ok: true });
+    // Employé suspendu / archivé → suspension automatique du compte ERP lié
+    let accountSuspended: string | null = null;
+    if (status === "suspendu" || status === "archive") {
+      accountSuspended = await suspendLinkedAccount(pool, String(id), act, `Statut employé → ${status}`);
+    }
+
+    res.json({ ok: true, accountSuspended: !!accountSuspended });
   } catch (err) { next(err); }
+});
+
+// POST /hr/employees/:id/account — créer un compte ERP pour un employé existant
+router.post("/:id/account", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    const id = String(req.params.id ?? "");
+    const act = actor(req);
+    if (!canManageAccounts(req)) {
+      client.release();
+      return void res.status(403).json({ error: "La création d'un compte ERP nécessite la permission d'administration des utilisateurs (admin.users)." });
+    }
+
+    await client.query("BEGIN");
+    const empQ = await client.query(
+      `SELECT id, matricule, first_name, last_name, status, linked_user_id
+       FROM employees WHERE id=$1::uuid AND deleted_at IS NULL FOR UPDATE`, [id]);
+    if (!empQ.rows[0]) { await client.query("ROLLBACK"); return void res.status(404).json({ error: "Employé non trouvé" }); }
+    const emp = empQ.rows[0];
+    if (emp.linked_user_id) {
+      await client.query("ROLLBACK");
+      return void res.status(409).json({ error: "Cet employé a déjà un compte ERP lié." });
+    }
+
+    const contactQ = await client.query(
+      `SELECT phone_primary FROM employee_contacts WHERE employee_id=$1::uuid AND deleted_at IS NULL LIMIT 1`, [id]);
+
+    const result = await createErpAccount(client, emp,
+      { ...req.body, phone: contactQ.rows[0]?.phone_primary ?? null }, act);
+    if (!result.ok) {
+      await client.query("ROLLBACK");
+      return void res.status(result.status).json({ error: result.error });
+    }
+
+    await client.query("COMMIT");
+    res.status(201).json({ userId: result.userId, email: result.email, role: result.roleDisplay });
+  } catch (err: any) {
+    await client.query("ROLLBACK").catch(() => {});
+    if (pgErrorResponse(err, res)) return;
+    next(err);
+  } finally { client.release(); }
 });
 
 // DELETE (archive) /hr/employees/:id
@@ -465,6 +637,8 @@ router.delete("/:id", requirePermission("hr.employees.archive"), async (req: Aut
   try {
     const { id } = req.params;
     const act = actor(req);
+    // Suspension du compte ERP AVANT le soft-delete (le helper joint employees sans deleted_at)
+    const accountSuspended = await suspendLinkedAccount(pool, String(id), act, "Archivage de l'employé");
     await pool.query(`
       UPDATE employees SET status='archive'::employee_status, deleted_at=NOW(),
         deleted_by=$1::uuid, updated_at=NOW(), version=version+1
@@ -473,7 +647,7 @@ router.delete("/:id", requirePermission("hr.employees.archive"), async (req: Aut
       INSERT INTO hr_audit_events (employee_id, actor_id, actor_name, action, entity_type, entity_id)
       VALUES ($1::uuid,$2::uuid,$3,'archive_employee','employee',$1::uuid)`,
       [id, act.userId, act.userName]);
-    res.json({ ok: true });
+    res.json({ ok: true, accountSuspended: !!accountSuspended });
   } catch (err) { next(err); }
 });
 
@@ -543,6 +717,10 @@ router.delete("/:id/permanent", requirePermission("hr.employees.archive"), async
       return;
     }
 
+    // Compte ERP lié : le capturer avant la purge pour le suspendre ensuite
+    const linkedQ = await client.query(`SELECT linked_user_id FROM employees WHERE id=$1::uuid`, [id]);
+    const linkedUserId: string | null = linkedQ.rows[0]?.linked_user_id ?? null;
+
     // Fiche propre (test / erreur de saisie) → détacher les références manager,
     // purger les lignes satellites de création, puis la fiche employé.
     await client.query(`UPDATE employee_profiles SET manager_id=NULL WHERE manager_id=$1::uuid`, [id]);
@@ -558,11 +736,23 @@ router.delete("/:id/permanent", requirePermission("hr.employees.archive"), async
     }
     await client.query(`DELETE FROM employees WHERE id=$1::uuid`, [id]);
 
+    // Suspension du compte ERP orphelin (le lien est parti avec la fiche)
+    let suspendedEmail: string | null = null;
+    if (linkedUserId) {
+      const sQ = await client.query(`
+        UPDATE users SET account_status='suspended', updated_at=NOW(), version=version+1
+        WHERE id=$1::uuid AND deleted_at IS NULL AND account_status='active'
+        RETURNING email`, [linkedUserId]);
+      suspendedEmail = sQ.rows[0]?.email ?? null;
+      await client.query(`UPDATE user_sessions SET revoked_at=now() WHERE user_id=$1::uuid AND revoked_at IS NULL`, [linkedUserId]);
+    }
+
     await client.query(`
       INSERT INTO hr_audit_events (employee_id, actor_id, actor_name, action, entity_type, entity_id, new_values)
       VALUES (NULL, $1::uuid, $2, 'delete_employee_permanent', 'employee', $3::uuid, $4::jsonb)`,
       [act.userId, act.userName, id,
-       JSON.stringify({ matricule: emp.matricule, nom: `${emp.first_name} ${emp.last_name}` })]);
+       JSON.stringify({ matricule: emp.matricule, nom: `${emp.first_name} ${emp.last_name}`,
+                        compteSuspendu: suspendedEmail })]);
 
     await client.query("COMMIT");
     res.json({ ok: true, deleted: { id, matricule: emp.matricule } });

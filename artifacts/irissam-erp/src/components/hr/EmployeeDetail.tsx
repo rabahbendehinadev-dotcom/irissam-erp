@@ -9,6 +9,7 @@ import { apiClient } from "@/lib/api-client";
 import { ScrollableTabBar } from "@/components/ui/ScrollableTabBar";
 import { usePermission } from "@/hooks/usePermission";
 import { EmployeeDeleteDialog } from "./EmployeeDeleteDialog";
+import { EmployeeAccountCard } from "./EmployeeAccountCard";
 import {
   ArrowLeft, User, MapPin, FileText, Clock, Timer,
   AlertCircle, Plane, TrendingUp, FolderOpen, CreditCard,
@@ -229,6 +230,13 @@ export default function EmployeeDetail() {
               { label: "Email pro",    value: contacts.email_professional ?? "—" },
               { label: "Adresse",      value: contacts.address ?? "—" },
             ]}/>
+            <EmployeeAccountCard
+              employeeId={id}
+              employeeStatus={emp.status ?? ""}
+              account={data.account ?? null}
+              defaultEmail={contacts.email_professional ?? ""}
+              onChanged={refetch}
+            />
             {emergency[0] && (
               <InfoCard title="Contact d'urgence" items={[
                 { label: "Nom",        value: emergency[0].name },
