@@ -1,0 +1,122 @@
+أريد منك الآن تحليل ومقارنة فقط.
+
+ممنوع تعديل أي ملف.
+ممنوع كتابة أي كود.
+ممنوع إنشاء Module جديد.
+ممنوع Refactoring.
+ممنوع إصلاح Bugs في هذه المهمة.
+
+عندي متطلبات جديدة من مالك المستشفى تخص:
+
+- Accueil / Bureau des entrées
+- IPP unique
+- DPI unique
+- Orientation
+- Consultation externe par spécialité
+- Urgences
+- Hospitalisation / ADT
+- Gestion des lits
+- Continuité du dossier patient
+- Facturation centralisée
+- RBAC par profil
+- HL7 / FHIR
+
+أريد منك مقارنة هذه المتطلبات مع المشروع الحالي IRISSAM ERP.
+
+راجع فقط الكود الحالي والـDatabase والـRoutes والـAPIs الموجودة.
+
+لكل نقطة أعطني واحدًا من هذه الأحكام فقط:
+
+✅ موجود ومكتمل
+🟡 موجود لكن ناقص أو يحتاج تعديل
+❌ غير موجود
+
+راجع بالتحديد:
+
+1. هل يوجد Identifiant Patient Permanent واحد؟
+   - ما هو الحقل المستخدم حاليًا؟
+   - UUID؟
+   - MRN؟
+   - MPI؟
+   - File Number؟
+   - هل واحد منهم يمكن اعتباره IPP الرسمي؟
+
+2. هل Patient Detail يمثل DPI واحدًا فعليًا لكل المريض؟
+   - وهل كل Consultations / Admissions / Urgences / Hospitalisations / Lab / Imaging / Prescriptions / Billing مرتبطة بنفس patientId؟
+
+3. هل يوجد Search قبل إنشاء المريض + Duplicate Detection حقيقي؟
+
+4. هل يوجد Workflow Orientation بعد الاستقبال:
+   - Consultation programmée
+   - Hospitalisation programmée
+   - Urgence
+
+5. هل Rendez-vous منظم فعليًا حسب:
+   - spécialité
+   - service
+   - médecin
+   - agenda
+
+6. هل Consultation externe مرتبطة بنفس DPI بدون إنشاء dossier جديد؟
+
+7. هل Urgences تحتوي فعليًا على:
+   - triage
+   - box / déchocage
+   - décision médicale
+   - sortie
+   - hospitalisation
+   - انتقال إلى admission بدون إعادة saisie
+
+8. هل Hospitalisation تحتوي ADT كامل:
+   - Admission
+   - Movement
+   - Transfer
+   - Discharge
+   - Bed management real-time
+
+9. هل الأسرّة مربوطة حسب:
+   - service
+   - chambre
+   - statut
+   - occupé
+   - disponible
+   - nettoyage
+
+10. هل Consultation → Hospitalisation تحفظ نفس:
+   - patientId
+   - encounter
+   - données cliniques
+   بدون إعادة إدخال يدوي؟
+
+11. هل Facturation مركزية على نفس dossier patient؟
+
+12. هل RBAC موجود لكل Profil:
+   - Accueil
+   - Médecin
+   - Infirmier
+   - Facturation
+   - Admin
+
+13. هل يوجد فعليًا HL7 أو FHIR implementation؟
+   لا تعتبر وجود أسماء أو TODO كتنفيذ.
+   أريد فقط implementation حقيقي إن وجد.
+
+14. هل يوجد أي جزء في المشروع يخالف مبدأ:
+   "مريض واحد = DPI واحد طوال حياته"؟
+
+في النهاية أعطني جدول مختصر:
+
+Exigence | État actuel | Fichiers/API/DB المستخدمة | ما ينقص فقط
+
+ثم أعطني:
+
+A. الأشياء الموجودة أصلًا ولا يجب إعادة بنائها.
+B. الأشياء الموجودة جزئيًا وتحتاج إكمالًا فقط.
+C. الأشياء غير الموجودة فعلًا.
+D. ترتيب الأولويات الذي تنصح به حسب متطلبات مالك المستشفى.
+
+مهم:
+لا تبدأ أي تعديل.
+لا تصلح أي شيء.
+لا تنشئ Task جديدة.
+أريد التقرير فقط ثم توقف.
