@@ -25,6 +25,27 @@ async function nextContractNumber(client: any): Promise<string> {
   return `CTR-${new Date().getFullYear()}-${String(rows[0].n).padStart(4, "0")}`;
 }
 
+/** "" → NULL : les formulaires envoient des chaînes vides pour les champs non remplis
+ *  (PostgreSQL rejette "" pour les colonnes date / uuid / numeric / enum) */
+const nn = (v: unknown) => (v === "" || v === undefined || v === null ? null : v);
+
+/** Traduit les erreurs PostgreSQL de format/doublon en réponses françaises claires. Retourne true si gérée. */
+function pgErrorResponse(err: any, res: any): boolean {
+  if (err?.code === "22007" || err?.code === "22008") {
+    res.status(400).json({ error: "Format de date invalide — vérifiez les champs date saisis." });
+    return true;
+  }
+  if (err?.code === "22P02") {
+    res.status(400).json({ error: "Format de données invalide (nombre, identifiant ou valeur de liste) — vérifiez les champs saisis." });
+    return true;
+  }
+  if (err?.code === "23505") {
+    res.status(409).json({ error: "Doublon : un enregistrement identique existe déjà (matricule ou identifiant unique)." });
+    return true;
+  }
+  return false;
+}
+
 // GET /hr/employees — list with filters
 router.get("/", requirePermission("hr.employees.view"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   try {
@@ -194,19 +215,19 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
         matricule,
         identity?.firstName ?? identifiers?.firstName ?? "",
         identity?.lastName  ?? identifiers?.lastName  ?? "",
-        identity?.gender    ?? null,
-        identity?.dateOfBirth ?? null,
-        identity?.placeOfBirth ?? null,
-        identity?.nationality ?? "Algérienne",
-        identity?.maritalStatus ?? null,
-        identity?.photoUrl ?? null,
-        identifiers?.idDocumentNumber ?? null,
-        identifiers?.socialSecurityNumber ?? null,
-        identifiers?.professionalOrderNumber ?? null,
-        identifiers?.linkedUserId ?? null,
-        assignment?.status ?? "actif",
-        assignment?.category ?? null,
-        contract?.startDate ?? null,
+        nn(identity?.gender),
+        nn(identity?.dateOfBirth),
+        nn(identity?.placeOfBirth),
+        nn(identity?.nationality) ?? "Algérienne",
+        nn(identity?.maritalStatus),
+        nn(identity?.photoUrl),
+        nn(identifiers?.idDocumentNumber),
+        nn(identifiers?.socialSecurityNumber),
+        nn(identifiers?.professionalOrderNumber),
+        nn(identifiers?.linkedUserId),
+        nn(assignment?.status) ?? "actif",
+        nn(assignment?.category),
+        nn(contract?.startDate),
         act.userId,
       ]
     );
@@ -219,10 +240,10 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
           (employee_id, position_id, department_id, site_id, building, floor,
            service, team, manager_id, salary_base, created_by, updated_by)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::uuid,$11::uuid)`,
-        [emp.id, assignment.positionId ?? null, assignment.departmentId ?? null,
-         assignment.siteId ?? null, assignment.building ?? null, assignment.floor ?? null,
-         assignment.service ?? null, assignment.team ?? null, assignment.managerId ?? null,
-         contract?.salaryBase ?? null, act.userId]
+        [emp.id, nn(assignment.positionId), nn(assignment.departmentId),
+         nn(assignment.siteId), nn(assignment.building), nn(assignment.floor),
+         nn(assignment.service), nn(assignment.team), nn(assignment.managerId),
+         nn(contract?.salaryBase), act.userId]
       );
     }
 
@@ -233,10 +254,10 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
           (employee_id, phone_primary, phone_secondary, email_professional, email_personal,
            address, commune, wilaya, country, created_by, updated_by)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::uuid,$10::uuid)`,
-        [emp.id, contacts.phonePrimary ?? null, contacts.phoneSecondary ?? null,
-         contacts.emailProfessional ?? null, contacts.emailPersonal ?? null,
-         contacts.address ?? null, contacts.commune ?? null, contacts.wilaya ?? null,
-         contacts.country ?? "Algérie", act.userId]
+        [emp.id, nn(contacts.phonePrimary), nn(contacts.phoneSecondary),
+         nn(contacts.emailProfessional), nn(contacts.emailPersonal),
+         nn(contacts.address), nn(contacts.commune), nn(contacts.wilaya),
+         nn(contacts.country) ?? "Algérie", act.userId]
       );
     }
 
@@ -246,8 +267,8 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
         INSERT INTO employee_emergency_contacts
           (employee_id, name, relation, phone, address, is_primary, created_by, updated_by)
         VALUES ($1,$2,$3,$4,$5,TRUE,$6::uuid,$6::uuid)`,
-        [emp.id, emergency.name, emergency.relation ?? null,
-         emergency.phone ?? null, emergency.address ?? null, act.userId]
+        [emp.id, emergency.name, nn(emergency.relation),
+         nn(emergency.phone), nn(emergency.address), act.userId]
       );
     }
 
@@ -265,10 +286,10 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
           $5,$6,$7,COALESCE($8,TRUE),$9,$10,$11,$12::uuid,$12::uuid)
         RETURNING *`,
         [contractNumber, emp.id, contract.type,
-         contract.status ?? "actif", contract.startDate, contract.endDate ?? null,
-         contract.trialEndDate ?? null, contract.isFullTime ?? true,
-         contract.weeklyHours ?? 40, contract.salaryBase ?? null,
-         contract.notes ?? null, act.userId]
+         nn(contract.status) ?? "actif", nn(contract.startDate), nn(contract.endDate),
+         nn(contract.trialEndDate), contract.isFullTime ?? true,
+         nn(contract.weeklyHours) ?? 40, nn(contract.salaryBase),
+         nn(contract.notes), act.userId]
       );
       contractRecord = cRes.rows[0];
     }
@@ -280,8 +301,8 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
           (employee_id, work_days, start_time, end_time, break_minutes,
            rotation, night_work, on_call, created_by, updated_by)
         VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9::uuid,$9::uuid)`,
-        [emp.id, JSON.stringify(schedule.workDays), schedule.startTime ?? null,
-         schedule.endTime ?? null, schedule.breakMinutes ?? 0,
+        [emp.id, JSON.stringify(schedule.workDays), nn(schedule.startTime),
+         nn(schedule.endTime), schedule.breakMinutes ?? 0,
          schedule.rotation ?? false, schedule.nightWork ?? false,
          schedule.onCall ?? false, act.userId]
       );
@@ -310,6 +331,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     res.status(201).json({ employee: emp, contract: contractRecord });
   } catch (err: any) {
     await client.query("ROLLBACK").catch(() => {});
+    if (pgErrorResponse(err, res)) return;
     next(err);
   } finally { client.release(); }
 });
@@ -342,7 +364,8 @@ router.patch("/:id", requirePermission("hr.employees.update"), async (req: Authe
     for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
       if (src[jsKey] !== undefined) {
         updateFields.push(`${dbCol} = $${pi++}`);
-        updateVals.push(src[jsKey]);
+        // Ne jamais vider le nom/prénom ; les autres champs vides deviennent NULL (date/uuid/enum)
+        updateVals.push(jsKey === "firstName" || jsKey === "lastName" ? src[jsKey] : nn(src[jsKey]));
       }
     }
     if (status) {
@@ -369,9 +392,9 @@ router.patch("/:id", requirePermission("hr.employees.update"), async (req: Authe
           building=$5, floor=$6, service=$7, team=$8, manager_id=$9,
           updated_at=NOW(), updated_by=$10::uuid, version=employee_profiles.version+1
         WHERE employee_profiles.deleted_at IS NULL`,
-        [id, assignment.positionId ?? null, assignment.departmentId ?? null,
-         assignment.siteId ?? null, assignment.building ?? null, assignment.floor ?? null,
-         assignment.service ?? null, assignment.team ?? null, assignment.managerId ?? null,
+        [id, nn(assignment.positionId), nn(assignment.departmentId),
+         nn(assignment.siteId), nn(assignment.building), nn(assignment.floor),
+         nn(assignment.service), nn(assignment.team), nn(assignment.managerId),
          act.userId]
       );
     }
@@ -387,10 +410,10 @@ router.patch("/:id", requirePermission("hr.employees.update"), async (req: Authe
           email_personal=$5, address=$6, commune=$7, wilaya=$8, country=$9,
           updated_at=NOW(), updated_by=$10::uuid
         WHERE employee_contacts.deleted_at IS NULL`,
-        [id, contacts.phonePrimary ?? null, contacts.phoneSecondary ?? null,
-         contacts.emailProfessional ?? null, contacts.emailPersonal ?? null,
-         contacts.address ?? null, contacts.commune ?? null, contacts.wilaya ?? null,
-         contacts.country ?? "Algérie", act.userId]
+        [id, nn(contacts.phonePrimary), nn(contacts.phoneSecondary),
+         nn(contacts.emailProfessional), nn(contacts.emailPersonal),
+         nn(contacts.address), nn(contacts.commune), nn(contacts.wilaya),
+         nn(contacts.country) ?? "Algérie", act.userId]
       );
     }
 
@@ -410,6 +433,7 @@ router.patch("/:id", requirePermission("hr.employees.update"), async (req: Authe
     res.json(updated.rows[0]);
   } catch (err: any) {
     await client.query("ROLLBACK").catch(() => {});
+    if (pgErrorResponse(err, res)) return;
     next(err);
   } finally { client.release(); }
 });

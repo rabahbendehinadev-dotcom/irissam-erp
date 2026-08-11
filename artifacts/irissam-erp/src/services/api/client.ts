@@ -81,7 +81,7 @@ class ApiClient {
           return retryResponse.json() as Promise<T>;
         }
         const errRetry = await retryResponse.json().catch(() => ({ message: retryResponse.statusText }));
-        throw Object.assign(new Error(errRetry.message || 'API Error'), {
+        throw Object.assign(new Error(errRetry.error || errRetry.message || 'API Error'), {
           status: retryResponse.status,
           data: errRetry,
         });
@@ -89,7 +89,7 @@ class ApiClient {
       // Refresh failed — emit logout event
       window.dispatchEvent(new CustomEvent('auth:logout'));
       const err = await response.json().catch(() => ({ message: 'Session expirée.' }));
-      throw Object.assign(new Error(err.message || 'Session expirée.'), {
+      throw Object.assign(new Error(err.error || err.message || 'Session expirée.'), {
         status: 401,
         data: err,
       });
@@ -97,7 +97,7 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: response.statusText }));
-      throw Object.assign(new Error(error.message || 'API Error'), {
+      throw Object.assign(new Error(error.error || error.message || 'API Error'), {
         status: response.status,
         data: error,
       });
