@@ -116,6 +116,9 @@ COPY --from=api-builder /workspace/node_modules/                    ./node_modul
 COPY --from=api-builder /workspace/artifacts/api-server/node_modules/ ./artifacts/api-server/node_modules/
 COPY --from=api-builder /workspace/lib/                             ./lib/
 
+# Script SQL de purge UAT/Demo (exécuté par POST /api/system/maintenance/purge-uat-data)
+COPY scripts/reset-uat-data.sql ./scripts/reset-uat-data.sql
+
 # Frontend static assets
 # Express serves /workspace/public/erp/   → GET /
 # Express serves /workspace/public/portal → GET /patient-portal/

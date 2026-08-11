@@ -18,7 +18,8 @@ import { db, patientsTable, pool } from "@workspace/db";
 import { patientService } from "../services/patient";
 import { repos } from "../repositories";
 import type { AuthenticatedRequest } from "../middleware/requireAuth";
-import { requirePermission } from "../middleware/requirePermission";
+import { requirePermission, requireSuperAdmin } from "../middleware/requirePermission";
+import { deletePatientPermanently } from "../services/patientPurge";
 import { auditService } from "../services/audit";
 import type { ActorCtx } from "../repositories/types";
 import type { DbPatient } from "../repositories/patient";
@@ -1182,6 +1183,32 @@ router.get("/:id/timeline", requirePermission("patients.view"), async (req: Auth
     events.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     res.json(events.slice(0, 300));
   } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /patients/:id/permanent — suppression DÉFINITIVE (Super Admin UNIQUEMENT)
+// Transaction PostgreSQL atomique : toutes les données liées (FK directes et
+// indirectes) sont supprimées, les ressources (lits, box urgences, salles de
+// bloc, ambulances) sont libérées. Périmètre exact : services/patientPurge.ts.
+const PERMANENT_DELETE_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+router.delete("/:id/permanent", requireSuperAdmin, async (req: AuthenticatedRequest, res, next) => {
+  const id = String(req.params.id ?? "");
+  if (!PERMANENT_DELETE_UUID_RE.test(id)) {
+    res.status(400).json({ message: "Identifiant patient invalide." });
+    return;
+  }
+  try {
+    const result = await deletePatientPermanently(id, req.auth!.userId, req.ip);
+    if (!result) {
+      res.status(404).json({ message: "Patient introuvable." });
+      return;
+    }
+    res.json({ message: "Patient supprimé définitivement.", ...result });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

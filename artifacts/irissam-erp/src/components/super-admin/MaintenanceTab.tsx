@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { Wrench, AlertTriangle, CheckCircle, Shield } from "lucide-react";
-import { getMaintenanceModeConfig, updateMaintenanceMode } from "@/services/api/system";
+import { Wrench, AlertTriangle, CheckCircle, Shield, Trash2 } from "lucide-react";
+import { getMaintenanceModeConfig, updateMaintenanceMode, purgeUatPatientData } from "@/services/api/system";
+import { useAuth } from "@/store/AuthContext";
 import StepUpDialog from "./StepUpDialog";
 
 function Spinner() { return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"/></div>; }
@@ -9,6 +10,7 @@ interface MaintenanceConfig { id?: string; enabled: boolean; message: string; me
 
 const ROLES = ["super_admin","system_administrator","doctor","nurse"];
 const CONFIRM_PHRASE = "MAINTENANCE";
+const PURGE_PHRASE = "SUPPRIMER PATIENTS";
 
 export default function MaintenanceTab() {
   const [config, setConfig] = useState<MaintenanceConfig|null>(null);
@@ -20,6 +22,31 @@ export default function MaintenanceTab() {
   const [confirmInput, setConfirmInput] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const [editing, setEditing] = useState(false);
+
+  // ── Purge des données patients UAT/Demo (Super Admin uniquement) ────────────
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
+  const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false);
+  const [purgeInput, setPurgeInput] = useState("");
+  const [purgeStepUpOpen, setPurgeStepUpOpen] = useState(false);
+  const [purgeBusy, setPurgeBusy] = useState(false);
+  const [purgeCounts, setPurgeCounts] = useState<Record<string, number> | null>(null);
+
+  const handlePurgeStepUp = async (token: string) => {
+    setPurgeStepUpOpen(false);
+    setPurgeBusy(true);
+    setError(null);
+    setPurgeCounts(null);
+    try {
+      const r = await purgeUatPatientData(token);
+      setPurgeCounts(r?.counts ?? null);
+      setSuccess(r?.message ?? "Purge UAT/Demo terminée.");
+    } catch (e) {
+      setError((e as { message?: string })?.message || "Erreur lors de la purge.");
+    } finally {
+      setPurgeBusy(false);
+    }
+  };
   const [form, setForm] = useState<Partial<MaintenanceConfig>>({});
 
   const load = useCallback(() => {
@@ -186,7 +213,82 @@ export default function MaintenanceTab() {
         )}
       </div>
 
+      {/* ── Zone de danger — purge des données patients UAT/Demo (Super Admin) ── */}
+      {isSuperAdmin && (
+        <div className="border-2 border-red-300 rounded-xl p-4 bg-red-50">
+          <div className="flex flex-col sm:flex-row items-start gap-3">
+            <Trash2 className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-red-800">Zone de danger — Données patients (UAT/Demo)</h3>
+              <p className="text-sm text-red-700 mt-1">
+                Supprime <strong>TOUTES</strong> les données patients : dossiers, épisodes, admissions,
+                consultations, rendez-vous, urgences, hospitalisations, réanimation, bloc opératoire,
+                laboratoire, imagerie, prescriptions, factures, paiements, assurance patient, documents,
+                portail patient, historiques et notifications liés. Les lits, box et ambulances sont libérés.
+              </p>
+              <p className="text-xs text-red-600 mt-1">
+                Sont CONSERVÉS : utilisateurs, rôles, permissions, départements, employés, médicaments,
+                catalogues, stock, définitions des lits/salles, organismes d'assurance, paramètres système.
+                Action IRRÉVERSIBLE — exécutée via le script sécurisé (transaction unique + garde-fou).
+              </p>
+              {purgeCounts && (
+                <div className="mt-2 text-xs font-mono text-red-800 bg-red-100 border border-red-200 rounded-lg p-2 break-words">
+                  {Object.entries(purgeCounts).map(([k, v]) => `${k}: ${v}`).join(" · ")}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => { setPurgeInput(""); setPurgeConfirmOpen(true); }}
+              disabled={purgeBusy}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 w-full sm:w-auto"
+            >
+              {purgeBusy ? "Purge en cours…" : "Supprimer toutes les données patients UAT/Demo"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation très forte : phrase exacte à saisir avant le step-up */}
+      {purgeConfirmOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              <h3 className="font-bold">Purge TOTALE des données patients</h3>
+            </div>
+            <p className="text-sm text-gray-600">
+              Cette action supprime définitivement TOUS les patients et leurs données liées.
+              Elle est <strong>IRRÉVERSIBLE</strong>. Tapez{" "}
+              <strong className="font-mono">{PURGE_PHRASE}</strong> pour continuer,
+              puis confirmez avec votre mot de passe.
+            </p>
+            <input
+              value={purgeInput}
+              onChange={e => setPurgeInput(e.target.value)}
+              placeholder={PURGE_PHRASE}
+              className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-red-400 focus:outline-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { if (purgeInput === PURGE_PHRASE) { setPurgeConfirmOpen(false); setPurgeStepUpOpen(true); } }}
+                disabled={purgeInput !== PURGE_PHRASE}
+                className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm disabled:opacity-40"
+              >
+                Continuer
+              </button>
+              <button
+                onClick={() => { setPurgeConfirmOpen(false); setPurgeInput(""); }}
+                className="flex-1 border py-2 rounded-lg text-sm"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <StepUpDialog open={stepUpOpen} onClose={() => setStepUpOpen(false)} onSuccess={handleStepUpSuccess} title="Modifier le mode maintenance" description="Cette opération sensible nécessite une re-authentification."/>
+      <StepUpDialog open={purgeStepUpOpen} onClose={() => setPurgeStepUpOpen(false)} onSuccess={handlePurgeStepUp} title="Purger les données patients UAT/Demo" description="Confirmation finale : saisissez votre mot de passe pour exécuter la purge irréversible."/>
     </div>
   );
 }

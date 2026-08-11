@@ -40,6 +40,32 @@ export function requirePermission(permission: string) {
 }
 
 /**
+ * Middleware réservé STRICTEMENT au rôle super_admin.
+ * Contrairement à requirePermission (où super_admin bypasse la vérification
+ * mais où d'autres rôles peuvent détenir la permission), ici AUCUN autre rôle
+ * ne passe, quelles que soient ses permissions.
+ */
+export function requireSuperAdmin(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!req.auth) {
+    res.status(401).json({ message: "Authentication required." });
+    return;
+  }
+  if (req.auth.role === "super_admin") {
+    next();
+    return;
+  }
+  logDenied(req.auth.userId, req.auth.role, "super_admin_only", req.ip).catch(() => {});
+  res.status(403).json({
+    message: "Action réservée au Super Administrateur.",
+    required: "super_admin",
+  });
+}
+
+/**
  * Returns middleware that requires ANY one of the listed permissions.
  */
 export function requireAnyPermission(permissions: string[]) {

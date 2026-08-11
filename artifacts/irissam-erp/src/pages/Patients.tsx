@@ -11,6 +11,8 @@ import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { useGetPatientsList } from '@workspace/api-client-react';
+import { useAuth } from '@/store/AuthContext';
+import { apiClient } from '@/services/api/client';
 
 const DEFAULT_FILTERS: PatientFiltersState = { search: '', status: 'all', gender: 'all', bloodType: 'all' };
 
@@ -42,6 +44,15 @@ export default function PatientsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [archivingPatient, setArchivingPatient] = useState<Patient | null>(null);
+
+  // ── Suppression définitive (Super Admin uniquement) ─────────────────────────
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
+  const [deletingPatient, setDeletingPatient] = useState<Patient | null>(null);
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // ── API data ─────────────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -114,6 +125,38 @@ export default function PatientsPage() {
     if (!archivingPatient) return;
     log('archive', 'patient', archivingPatient.id, `Archive de ${archivingPatient.lastName} ${archivingPatient.firstName}`);
     setArchivingPatient(null);
+  };
+
+  // ── Suppression définitive (Super Admin uniquement) ─────────────────────────
+  const openDeleteModal = (patient: Patient) => {
+    setDeletingPatient(patient);
+    setDeleteStep(1);
+    setDeleteConfirmText('');
+    setDeleteError(null);
+  };
+
+  const closeDeleteModal = () => {
+    if (deleteBusy) return;
+    setDeletingPatient(null);
+  };
+
+  const deleteConfirmValue = deletingPatient
+    ? (deletingPatient.fileNumber || deletingPatient.mpiId || 'SUPPRIMER')
+    : '';
+
+  const handleDeletePermanent = async () => {
+    if (!deletingPatient || deleteConfirmText.trim() !== deleteConfirmValue) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await apiClient.delete(`/patients/${deletingPatient.id}/permanent`);
+      setDeletingPatient(null);
+      refetch();
+    } catch (e) {
+      setDeleteError((e as { message?: string })?.message || t('pat.delete.error'));
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const handleSave = (_data: Partial<Patient>) => {
@@ -245,6 +288,8 @@ export default function PatientsPage() {
               onArchive={p => setArchivingPatient(p)}
               canEdit={can('patients.edit')}
               canArchive={can('patients.archive')}
+              canDeletePermanent={isSuperAdmin}
+              onDeletePermanent={openDeleteModal}
               sortField={sortField}
               sortDir={sortDir}
               onSort={handleSort}
@@ -321,6 +366,91 @@ export default function PatientsPage() {
                 {t('pat.confirm.archive.yes')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Suppression définitive — double confirmation (Super Admin) ── */}
+      {deletingPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeDeleteModal} />
+          <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} className="text-red-600" />
+              </div>
+              <h3 className="font-bold text-gray-900">
+                {deleteStep === 1 ? t('pat.delete.title') : t('pat.delete.step2.title')}
+              </h3>
+            </div>
+
+            {deleteStep === 1 ? (
+              <>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-500">{t('pat.delete.name')}</span>
+                    <span className="font-semibold text-gray-900 text-right">
+                      {deletingPatient.lastName} {deletingPatient.firstName}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-500">{t('pat.delete.mpi')}</span>
+                    <span className="font-mono text-gray-900">{deletingPatient.mpiId || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-500">{t('pat.delete.file')}</span>
+                    <span className="font-mono text-gray-900">{deletingPatient.fileNumber || '—'}</span>
+                  </div>
+                </div>
+                <p className="text-sm font-semibold text-red-600 mb-2">{t('pat.delete.warning')}</p>
+                <p className="text-xs text-gray-500 mb-5">{t('pat.delete.consequences')}</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={closeDeleteModal}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
+                    {t('pat.delete.cancel')}
+                  </button>
+                  <button
+                    onClick={() => setDeleteStep(2)}
+                    className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    {t('pat.delete.continue')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600 mb-2">{t('pat.delete.step2.desc')}</p>
+                <p className="font-mono text-sm font-bold text-gray-900 bg-gray-100 rounded-lg px-3 py-2 mb-3 select-all">
+                  {deleteConfirmValue}
+                </p>
+                <input
+                  value={deleteConfirmText}
+                  onChange={e => setDeleteConfirmText(e.target.value)}
+                  placeholder={deleteConfirmValue}
+                  autoFocus
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-red-400 focus:outline-none mb-3"
+                />
+                {deleteError && <p className="text-xs text-red-600 mb-3">{deleteError}</p>}
+                <div className="flex gap-3">
+                  <button
+                    onClick={closeDeleteModal}
+                    disabled={deleteBusy}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {t('pat.delete.cancel')}
+                  </button>
+                  <button
+                    onClick={handleDeletePermanent}
+                    disabled={deleteBusy || deleteConfirmText.trim() !== deleteConfirmValue}
+                    className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40"
+                  >
+                    {deleteBusy ? t('pat.delete.busy') : t('pat.delete.confirm')}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

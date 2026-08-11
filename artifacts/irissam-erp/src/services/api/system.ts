@@ -219,6 +219,11 @@ export const getMaintenanceModeConfig = () =>
 export const updateMaintenanceMode = (data: Record<string, unknown>, stepUpToken: string) =>
   apiClient.patch<any>(`${BASE}/maintenance`, data, { headers: { "x-step-up-token": stepUpToken } });
 
+/** Purge TOTALE des données patients UAT/Demo (Super Admin + step-up obligatoires). */
+export const purgeUatPatientData = (stepUpToken: string) =>
+  apiClient.post<{ message: string; counts: Record<string, number> }>(
+    `${BASE}/maintenance/purge-uat-data`, {}, { headers: { "x-step-up-token": stepUpToken } });
+
 // ─── Version ──────────────────────────────────────────────────────────────────
 export const getSystemVersion = () =>
   apiClient.get<any>(`${BASE}/version`);

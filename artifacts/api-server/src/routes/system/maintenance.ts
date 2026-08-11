@@ -1,7 +1,9 @@
 import { Router } from "express";
+import fs from "node:fs";
+import path from "node:path";
 import { pool } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/requireAuth.js";
-import { requirePermission } from "../../middleware/requirePermission.js";
+import { requirePermission, requireSuperAdmin } from "../../middleware/requirePermission.js";
 import { requireStepUp, requireStepUpFor } from "../../middleware/requireStepUp.js";
 import { invalidateMaintenanceCache } from "../../middleware/maintenanceGuard.js";
 
@@ -107,6 +109,78 @@ router.patch(
       res.status(500).json({ message: "Erreur lors de la mise à jour du mode maintenance." });
     }
   }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /purge-uat-data — purge TOTALE des données patients UAT/Demo.
+// Protections : rôle super_admin STRICT + step-up (mot de passe re-vérifié).
+// Réutilise le script sécurisé scripts/reset-uat-data.sql : transaction unique,
+// DELETE ordonnés selon les FK, libération des ressources, garde-fou final qui
+// vérifie tables patients vides ET tables système intactes, sinon ROLLBACK.
+// Aucune donnée structurelle (users, rôles, départements, employés,
+// médicaments, lits, stock, paramètres) n'est supprimée. Ni DROP ni TRUNCATE.
+router.post(
+  "/purge-uat-data",
+  requireAuth,
+  requireSuperAdmin,
+  requireStepUpFor("purge_uat_data"),
+  async (req: AuthenticatedRequest, res) => {
+    const candidates = [
+      process.env.RESET_UAT_SQL_PATH,
+      path.resolve(process.cwd(), "scripts/reset-uat-data.sql"),
+      path.resolve(process.cwd(), "../../scripts/reset-uat-data.sql"),
+    ].filter((c): c is string => Boolean(c));
+    const sqlPath = candidates.find((c) => fs.existsSync(c));
+    if (!sqlPath) {
+      res.status(500).json({
+        message: "Script scripts/reset-uat-data.sql introuvable sur le serveur.",
+      });
+      return;
+    }
+
+    // Les méta-commandes psql (\set, \echo) ne sont pas du SQL — retirées.
+    const sql = fs
+      .readFileSync(sqlPath, "utf8")
+      .split("\n")
+      .filter((line) => !/^\s*\\/.test(line))
+      .join("\n");
+
+    const client = await pool.connect();
+    try {
+      // Le script contient BEGIN/COMMIT + garde-fou : toute erreur ⇒ ROLLBACK complet.
+      await client.query(sql);
+
+      const { rows } = await client.query(
+        `SELECT (SELECT count(*)::int FROM patients)         AS patients,
+                (SELECT count(*)::int FROM encounters)       AS encounters,
+                (SELECT count(*)::int FROM admissions)       AS admissions,
+                (SELECT count(*)::int FROM consultations)    AS consultations,
+                (SELECT count(*)::int FROM emergency_visits) AS emergency_visits,
+                (SELECT count(*)::int FROM invoices)         AS invoices,
+                (SELECT count(*)::int FROM users)            AS users,
+                (SELECT count(*)::int FROM medications)      AS medications`,
+      );
+
+      await auditLog(
+        req.auth!.userId,
+        "system",
+        "PURGE UAT/Demo exécutée : toutes les données patients supprimées via le script sécurisé reset-uat-data.sql (système et référentiels conservés)",
+        req.ip,
+      );
+
+      res.json({
+        message:
+          "Purge UAT/Demo terminée : toutes les données patients ont été supprimées, le système et les référentiels sont intacts.",
+        counts: rows[0],
+      });
+    } catch (err: unknown) {
+      await client.query("ROLLBACK").catch(() => {});
+      const msg = err instanceof Error ? err.message : "Erreur inconnue";
+      res.status(500).json({ message: `Purge annulée (rollback complet) : ${msg}` });
+    } finally {
+      client.release();
+    }
+  },
 );
 
 export default router;

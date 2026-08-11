@@ -47,6 +47,9 @@ interface Props {
   onArchive: (p: Patient) => void;
   canEdit: boolean;
   canArchive: boolean;
+  /** Suppression définitive — Super Administrateur uniquement */
+  onDeletePermanent?: (p: Patient) => void;
+  canDeletePermanent?: boolean;
   sortField: string;
   sortDir: 'asc' | 'desc';
   onSort: (field: string) => void;
@@ -54,7 +57,8 @@ interface Props {
 
 export function PatientTable({
   patients, page, perPage, onView, onEdit, onArchive,
-  canEdit, canArchive, sortField, sortDir, onSort,
+  canEdit, canArchive, onDeletePermanent, canDeletePermanent,
+  sortField, sortDir, onSort,
 }: Props) {
   const { t } = useLanguage();
 
@@ -182,6 +186,8 @@ export function PatientTable({
                       onArchive={() => onArchive(patient)}
                       canEdit={canEdit}
                       canArchive={canArchive}
+                      onDeletePermanent={onDeletePermanent ? () => onDeletePermanent(patient) : undefined}
+                      canDeletePermanent={canDeletePermanent}
                     />
                   </td>
                 </tr>
