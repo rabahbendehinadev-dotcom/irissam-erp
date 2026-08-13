@@ -90,13 +90,19 @@ export function EmployeeWizard({ onClose, onCreated }: Props) {
 
   const isLastStep = step === STEPS.length - 1;
   const canGoNext = () => {
+    // Étape 0 — Identité : prénom + nom obligatoires
     if (step === 0) return data.identity.firstName.trim() && data.identity.lastName.trim();
+    // Étape 1 — Identifiants : catégorie obligatoire (personnel_category enum côté DB)
+    if (step === 1) return !!data.assignment.category;
+    // Étape 4 — Contrat : type + date de début obligatoires
     if (step === 4) return data.contract.type && data.contract.startDate;
+    // Étape 8 — Accès ERP : si compte demandé, valider email/rôle/mot de passe
     if (step === 8) return !data.account.create || (
       /\S+@\S+\.\S+/.test(data.account.email.trim()) && !!data.account.roleId && data.account.tempPassword.length >= 8
     );
     return true;
   };
+  const step1Error = step === 1 && !data.assignment.category;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
@@ -154,8 +160,9 @@ export function EmployeeWizard({ onClose, onCreated }: Props) {
               <Field label="N° sécurité sociale" value={data.identifiers.socialSecurityNumber} onChange={v => set("identifiers","socialSecurityNumber",v)}/>
               <Field label="N° ordre professionnel" value={data.identifiers.professionalOrderNumber} onChange={v => set("identifiers","professionalOrderNumber",v)} placeholder="Médecins / Pharmaciens"/>
               <div className="sm:col-span-2">
-                <Field label="Type de personnel" type="select" value={data.assignment.category} onChange={v => set("assignment","category",v)}
-                  options={[{v:"",l:"—"},{v:"medical",l:"Médical"},{v:"paramedical",l:"Paramédical"},{v:"administratif",l:"Administratif"},{v:"technique",l:"Technique"},{v:"support",l:"Support"}]}/>
+                <Field label="Type de personnel *" type="select" value={data.assignment.category} onChange={v => set("assignment","category",v)}
+                  options={[{v:"",l:"— Sélectionner —"},{v:"medical",l:"Médical"},{v:"paramedical",l:"Paramédical"},{v:"administratif",l:"Administratif"},{v:"technique",l:"Technique"},{v:"support",l:"Support"}]}
+                  error={step1Error ? "Le type de personnel est obligatoire" : undefined}/>
               </div>
             </div>
           )}
@@ -413,10 +420,13 @@ interface FieldProps {
   options?: { v: string; l: string }[];
   placeholder?: string;
   multiline?: boolean;
+  error?: string;
 }
 
-function Field({ label, value, onChange, type = "text", options, placeholder, multiline }: FieldProps) {
-  const cls = "w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20";
+function Field({ label, value, onChange, type = "text", options, placeholder, multiline, error }: FieldProps) {
+  const cls = `w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
+    error ? "border-red-400 focus:ring-red-400/20" : "border-gray-200 focus:ring-blue-500/20"
+  }`;
   return (
     <div>
       <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
@@ -429,6 +439,7 @@ function Field({ label, value, onChange, type = "text", options, placeholder, mu
       ) : (
         <input type={type} value={value} onChange={e => onChange(e.target.value)} className={cls} placeholder={placeholder}/>
       )}
+      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </div>
   );
 }

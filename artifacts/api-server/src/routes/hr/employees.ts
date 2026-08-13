@@ -32,13 +32,14 @@ async function nextContractNumber(client: any): Promise<string> {
 const nn = (v: unknown) => (v === "" || v === undefined || v === null ? null : v);
 
 /** Traduit les erreurs PostgreSQL de format/doublon en réponses françaises claires. Retourne true si gérée. */
-function pgErrorResponse(err: any, res: any): boolean {
+function pgErrorResponse(err: any, res: any, step = ""): boolean {
+  const stepHint = step ? ` (étape: ${step})` : "";
   if (err?.code === "22007" || err?.code === "22008") {
-    res.status(400).json({ error: "Format de date invalide — vérifiez les champs date saisis." });
+    res.status(400).json({ error: `Format de date invalide — vérifiez les champs date saisis${stepHint}.` });
     return true;
   }
   if (err?.code === "22P02") {
-    res.status(400).json({ error: "Format de données invalide (nombre, identifiant ou valeur de liste) — vérifiez les champs saisis." });
+    res.status(400).json({ error: `Format de données invalide${stepHint} — vérifiez les champs saisis (genre, catégorie, type de contrat, rôle ERP).` });
     return true;
   }
   if (err?.code === "23505") {
@@ -285,12 +286,14 @@ router.get("/:id", requirePermission("hr.employees.view"), async (req: Authentic
 // POST /hr/employees — create (wizard, full transaction)
 router.post("/", requirePermission("hr.employees.create"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
   const client = await pool.connect();
+  let _step = "init";   // étape courante pour diagnostic 22P02
   try {
     await client.query("BEGIN");
     const { identity, identifiers, contacts, assignment, contract, schedule, emergency, documents } = req.body;
     const act = actor(req);
 
     // Step 1 — Check for duplicate matricule (auto-generate if not provided)
+    _step = "matricule";
     const matricule = identifiers?.matricule || await nextMatricule(client);
     const existing = await client.query("SELECT id FROM employees WHERE matricule=$1 AND deleted_at IS NULL", [matricule]);
     if (existing.rows.length) {
@@ -299,22 +302,28 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     }
 
     // Step 2 — Insert employee
+    // gender et marital_status : cast explicite pour éviter 22P02 sur enum implicite
+    _step = "employees";
+    const genderVal   = nn(identity?.gender);
+    const categoryVal = nn(assignment?.category);
     const empRes = await client.query(`
       INSERT INTO employees (
         matricule, first_name, last_name, gender, date_of_birth, place_of_birth,
         nationality, marital_status, photo_url,
         id_document_number, social_security_number, professional_order_number, linked_user_id,
         status, category, hire_date, created_by, updated_by
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
+      ) VALUES ($1,$2,$3,
+        CASE WHEN $4::text IS NULL THEN NULL ELSE $4::gender_type END,
+        $5,$6,$7,$8,$9,$10,$11,$12,$13,
         COALESCE($14,'actif')::employee_status,
-        $15::personnel_category,
+        CASE WHEN $15::text IS NULL THEN NULL ELSE $15::personnel_category END,
         $16, $17::uuid, $17::uuid)
       RETURNING *`,
       [
         matricule,
         identity?.firstName ?? identifiers?.firstName ?? "",
         identity?.lastName  ?? identifiers?.lastName  ?? "",
-        nn(identity?.gender),
+        genderVal,
         nn(identity?.dateOfBirth),
         nn(identity?.placeOfBirth),
         nn(identity?.nationality) ?? "Algérienne",
@@ -325,7 +334,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
         nn(identifiers?.professionalOrderNumber),
         nn(identifiers?.linkedUserId),
         nn(assignment?.status) ?? "actif",
-        nn(assignment?.category),
+        categoryVal,
         nn(contract?.startDate),
         act.userId,
       ]
@@ -333,12 +342,18 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     const emp = empRes.rows[0];
 
     // Step 3 — Profile
+    _step = "profile";
     if (assignment) {
       await client.query(`
         INSERT INTO employee_profiles
           (employee_id, position_id, department_id, site_id, building, floor,
            service, team, manager_id, salary_base, created_by, updated_by)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::uuid,$11::uuid)`,
+        VALUES ($1,
+          CASE WHEN $2::text IS NULL THEN NULL ELSE $2::uuid END,
+          CASE WHEN $3::text IS NULL THEN NULL ELSE $3::uuid END,
+          $4,$5,$6,$7,$8,
+          CASE WHEN $9::text IS NULL THEN NULL ELSE $9::uuid END,
+          $10,$11::uuid,$11::uuid)`,
         [emp.id, nn(assignment.positionId), nn(assignment.departmentId),
          nn(assignment.siteId), nn(assignment.building), nn(assignment.floor),
          nn(assignment.service), nn(assignment.team), nn(assignment.managerId),
@@ -347,6 +362,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     }
 
     // Step 4 — Contacts
+    _step = "contacts";
     if (contacts) {
       await client.query(`
         INSERT INTO employee_contacts
@@ -361,6 +377,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     }
 
     // Step 5 — Emergency contacts
+    _step = "emergency";
     if (emergency?.name) {
       await client.query(`
         INSERT INTO employee_emergency_contacts
@@ -372,6 +389,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     }
 
     // Step 6 — Contract
+    _step = "contract";
     let contractRecord = null;
     if (contract?.type) {
       const contractNumber = await nextContractNumber(client);
@@ -394,6 +412,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     }
 
     // Step 7 — Schedule
+    _step = "schedule";
     if (schedule?.workDays) {
       await client.query(`
         INSERT INTO employee_schedules
@@ -401,13 +420,14 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
            rotation, night_work, on_call, created_by, updated_by)
         VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9::uuid,$9::uuid)`,
         [emp.id, JSON.stringify(schedule.workDays), nn(schedule.startTime),
-         nn(schedule.endTime), schedule.breakMinutes ?? 0,
-         schedule.rotation ?? false, schedule.nightWork ?? false,
-         schedule.onCall ?? false, act.userId]
+         nn(schedule.endTime), typeof schedule.breakMinutes === "number" ? schedule.breakMinutes : 0,
+         schedule.rotation === true, schedule.nightWork === true,
+         schedule.onCall === true, act.userId]
       );
     }
 
     // Step 8 — Initialize leave balances for current year
+    _step = "leave_balances";
     const currentYear = new Date().getFullYear();
     const leaveTypes = ["annuel", "maladie", "recuperation"];
     for (const lt of leaveTypes) {
@@ -420,6 +440,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     }
 
     // Audit
+    _step = "audit_employee";
     await client.query(`
       INSERT INTO hr_audit_events (employee_id, actor_id, actor_name, action, entity_type, entity_id, new_values)
       VALUES ($1::uuid, $2::uuid, $3, 'create_employee', 'employee', $1::uuid, $4::jsonb)`,
@@ -427,6 +448,7 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     );
 
     // Step 9 (optionnel) — Compte ERP lié, dans la même transaction
+    _step = "erp_account";
     let accountResult: ErpAccountResult | null = null;
     const account = req.body?.account;
     if (account?.create) {
@@ -452,7 +474,11 @@ router.post("/", requirePermission("hr.employees.create"), async (req: Authentic
     });
   } catch (err: any) {
     await client.query("ROLLBACK").catch(() => {});
-    if (pgErrorResponse(err, res)) return;
+    // Enrichir l'erreur avec l'étape pour diagnostic en prod
+    if (err?.code === "22P02" || err?.code === "22007" || err?.code === "22008") {
+      (err as any)._step = _step;
+    }
+    if (pgErrorResponse(err, res, _step)) return;
     next(err);
   } finally { client.release(); }
 });
