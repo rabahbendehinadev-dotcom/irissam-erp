@@ -30,3 +30,9 @@ description: Règles durables du module Consultation pro — patients de passage
 
 ## Piège récurrent
 - `safeUuid()` renvoie `string | undefined` — coalescer `?? null` quand la cible est `string | null` (TS2322 sinon).
+
+## Leçon : enum backend ajouté ⇒ maps front (incident prod 2026-08-13)
+- La page /consultations en prod affichait l'écran PageErrorBoundary sur TOUS les appareils dès qu'une ligne walk_in est apparue : `ORIGIN_MAP[origin]` sans clé `walk_in` → `cfg.cls` sur undefined → TypeError.
+- Invisible en dev (DB vide → liste vide) et pour tsc (réponse API castée `as unknown as Consultation[]`). Le symptôme a été attribué à tort au déploiement précédent (fausse piste cache/chunks).
+- **Why:** un lookup `Record<Enum, cfg>` non gardé transforme toute évolution du contrat API en crash de page entière.
+- **How to apply:** (1) toute valeur enum ajoutée côté backend ⇒ grep toutes les Record maps front (badges, labels, filtres) ; (2) lookups enum-keyed UI toujours avec `?? fallback` neutre (fait pour les 3 badges consultations) ; (3) « page en erreur » signalée après un déploiement : vérifier d'abord les DONNÉES nouvelles (enum/nulls) avant la théorie du cache.

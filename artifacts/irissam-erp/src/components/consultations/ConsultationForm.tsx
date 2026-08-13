@@ -50,6 +50,7 @@ const ORIGIN_TYPE_MAP: Record<ConsultationOrigin, ConsultationType> = {
   hospitalisation: 'hospitalisation',
   admission:       'hospitalisation',
   controle:        'controle',
+  walk_in:         'sans_rdv',
 };
 
 const MOTIF_SUGGESTIONS = [

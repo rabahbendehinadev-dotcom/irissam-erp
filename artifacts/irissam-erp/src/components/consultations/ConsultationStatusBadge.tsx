@@ -30,7 +30,13 @@ interface StatusBadgeProps {
 }
 
 export function ConsultationStatusBadge({ status, showIcon = true, size = 'sm' }: StatusBadgeProps) {
-  const cfg = STATUS_MAP[status];
+  // Fallback défensif : une valeur enum inconnue envoyée par l'API (contrat
+  // qui évolue) ne doit JAMAIS faire planter toute la page — badge neutre
+  // affichant la valeur brute. (Cause réelle d'un écran d'erreur en prod :
+  // ORIGIN_MAP sans clé `walk_in` → cfg undefined → TypeError.)
+  const cfg = STATUS_MAP[status] ?? {
+    icon: Clock, bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', label: String(status),
+  };
   const Icon = cfg.icon;
   const spin = status === 'en_cours';
   return (
@@ -67,7 +73,8 @@ const TYPE_MAP: Record<ConsultationType, { bg: string; text: string; label: stri
 
 interface TypeBadgeProps { type: ConsultationType }
 export function ConsultationTypeBadge({ type }: TypeBadgeProps) {
-  const cfg = TYPE_MAP[type];
+  // Même règle : valeur inconnue → badge neutre, jamais de crash.
+  const cfg = TYPE_MAP[type] ?? { bg: 'bg-gray-100', text: 'text-gray-600', label: String(type) };
   return (
     <span className={cn('inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full', cfg.bg, cfg.text)}>
       {cfg.label}
@@ -84,11 +91,13 @@ const ORIGIN_MAP: Record<ConsultationOrigin, { label: string; cls: string }> = {
   sans_rdv:       { label: 'Sans RDV',       cls: 'bg-gray-100 text-gray-600' },
   controle:       { label: 'Contrôle',       cls: 'bg-blue-50 text-blue-700' },
   hospitalisation:{ label: 'Hospitalisation',cls: 'bg-purple-50 text-purple-700' },
+  walk_in:        { label: 'Passage',        cls: 'bg-amber-50 text-amber-700' },
 };
 
 interface OriginBadgeProps { origin: ConsultationOrigin }
 export function ConsultationOriginBadge({ origin }: OriginBadgeProps) {
-  const cfg = ORIGIN_MAP[origin];
+  // Même règle : valeur inconnue → badge neutre, jamais de crash.
+  const cfg = ORIGIN_MAP[origin] ?? { label: String(origin), cls: 'bg-gray-100 text-gray-600' };
   return (
     <span className={cn('inline-flex items-center text-xs px-2 py-0.5 rounded-full', cfg.cls)}>
       {cfg.label}

@@ -6,7 +6,7 @@ export type ConsultationStatus =
   | 'planifiee' | 'en_attente' | 'en_cours' | 'suspendue'
   | 'terminee' | 'annulee' | 'patient_absent';
 
-export type ConsultationOrigin = 'rdv' | 'urgence' | 'admission' | 'sans_rdv' | 'hospitalisation' | 'controle';
+export type ConsultationOrigin = 'rdv' | 'urgence' | 'admission' | 'sans_rdv' | 'hospitalisation' | 'controle' | 'walk_in';
 export type ConsultationPriority = 'normale' | 'urgente' | 'tres_urgente';
 
 export type LabOrderStatus = 'brouillon' | 'demandee' | 'prelevee' | 'en_cours' | 'validee' | 'annulee';

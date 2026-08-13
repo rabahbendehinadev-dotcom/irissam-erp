@@ -48,6 +48,7 @@ const ORIGINS = [
   { value: 'urgence', label: 'Urgence' },
   { value: 'admission', label: 'Admission' },
   { value: 'sans_rdv', label: 'Sans rendez-vous' },
+  { value: 'walk_in', label: 'Passage (sans dossier)' },
 ];
 
 const SELECT_CLS = 'px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white min-w-[150px]';
