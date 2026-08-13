@@ -15,7 +15,11 @@
  *   • Aucune suppression physique — désactivation uniquement (active=false / statut hors_service).
  *   • Un lit occupé ou réservé ne peut être ni déplacé ni changé de statut/service ici :
  *     ces transitions passent par les flux Admissions / occupancy-beds.
- *   • Le service d'un lit provient du référentiel departments (même règle que les admissions).
+ *   • Structure stricte : une chambre exige un étage ET un service (departments) ; un lit neuf
+ *     exige une chambre et hérite automatiquement étage/bâtiment/service de celle-ci.
+ *   • Lits historiques sans chambre : rattachement automatique à la création d'une chambre
+ *     portant le même numéro (hors lits occupés/réservés), sinon action « Affecter » côté admin.
+ *   • Un lit rattaché ne peut pas être « détaché » — seulement déplacé vers une autre chambre.
  */
 import { Router } from "express";
 import { pool } from "@workspace/db";
@@ -325,30 +329,58 @@ router.post("/rooms", requirePermission("infrastructure.manage"), async (req: Au
     const { floorId, number, name, serviceId } = req.body ?? {};
     if (!floorId || !UUID_RE.test(String(floorId))) return void res.status(400).json({ error: "Étage invalide." });
     if (!nn(number)) return void res.status(400).json({ error: "Le numéro de la chambre est obligatoire." });
+    if (nn(serviceId) === null) return void res.status(400).json({ error: "Le service de la chambre est obligatoire." });
+    if (!UUID_RE.test(String(serviceId))) return void res.status(400).json({ error: "Service invalide." });
     const flr = await pool.query(`SELECT id FROM floors WHERE id = $1 AND deleted_at IS NULL`, [floorId]);
     if (flr.rows.length === 0) return void res.status(404).json({ error: "Étage introuvable." });
-
-    let svcId: string | null = null, svcName: string | null = null;
-    if (nn(serviceId) !== null) {
-      if (!UUID_RE.test(String(serviceId))) return void res.status(400).json({ error: "Service invalide." });
-      const dept = await resolveDepartment(String(serviceId));
-      if (!dept) return void res.status(400).json({ error: "Service/département introuvable." });
-      svcId = dept.id; svcName = dept.name;
-    }
+    const dept = await resolveDepartment(String(serviceId));
+    if (!dept) return void res.status(400).json({ error: "Service/département introuvable." });
 
     const q = await pool.query(
       `INSERT INTO rooms (floor_id, number, name, service_id, service_name)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [floorId, String(number).trim(), nn(name), svcId, svcName],
+      [floorId, String(number).trim(), nn(name), dept.id, dept.name],
     );
     const r = q.rows[0];
+
+    // Rattachement automatique des lits historiques « Non affecté » portant ce numéro de chambre
+    // (jamais les lits occupés/réservés — leurs mouvements restent gérés via Admissions / ADT).
+    const chain = await resolveRoomChain(r.id);
+    const attached = await pool.query(
+      `UPDATE occupancy_beds SET
+         room_id = $1, room_number = $2,
+         floor_id = $3, floor_label = $4,
+         building_id = $5, building_name = $6, building_code = $7,
+         service_id = $8, service_name = $9,
+         updated_at = now()
+       WHERE deleted_at IS NULL AND room_id IS NULL AND room_number IS NOT NULL
+         AND lower(trim(room_number)) = lower(trim($2))
+         AND status NOT IN ('occupe', 'reserve')
+       RETURNING id, number`,
+      [
+        r.id, chain.room_number, chain.floor_id, chain.floor_label,
+        chain.building_id, chain.building_name, chain.building_code,
+        chain.service_id, chain.service_name,
+      ],
+    );
+
+    const a = actor(req);
     await auditService.log({
       module: "hospitalisation", action: "room_created",
-      resourceType: "room", resourceId: r.id, newValue: { number: r.number, floorId, serviceName: svcName },
-    }, actor(req));
+      resourceType: "room", resourceId: r.id,
+      newValue: { number: r.number, floorId, serviceName: dept.name, attachedBeds: attached.rows.map((b: any) => b.number) },
+    }, a);
+    for (const bedRow of attached.rows) {
+      await auditService.log({
+        module: "hospitalisation", action: "bed_attached_to_room",
+        resourceType: "occupancy_bed", resourceId: bedRow.id,
+        newValue: { number: bedRow.number, roomNumber: r.number, serviceName: dept.name },
+      }, a);
+    }
     res.status(201).json({
       id: r.id, floorId: r.floor_id, number: r.number, name: r.name ?? null,
       serviceId: r.service_id ?? null, serviceName: r.service_name ?? null, active: r.active,
+      attachedBeds: attached.rows.map((b: any) => b.number),
     });
   } catch (err: any) {
     if (pgErrorResponse(err, res)) return;
@@ -374,8 +406,11 @@ router.patch("/rooms/:id", requirePermission("infrastructure.manage"), async (re
       floorId = String(body.floorId);
     }
 
-    // serviceId : clé absente → inchangé ; "" ou null → effacé ; uuid → résolu
+    // serviceId : clé absente → inchangé ; "" / null → refusé (le service d'une chambre est obligatoire) ; uuid → résolu
     const serviceTouched = Object.prototype.hasOwnProperty.call(body, "serviceId");
+    if (serviceTouched && nn(body.serviceId) === null) {
+      return void res.status(400).json({ error: "Le service de la chambre est obligatoire — choisissez un autre service au lieu de le retirer." });
+    }
     let svcId: string | null = null, svcName: string | null = null;
     if (serviceTouched && nn(body.serviceId) !== null) {
       if (!UUID_RE.test(String(body.serviceId))) return void res.status(400).json({ error: "Service invalide." });
@@ -450,28 +485,27 @@ router.post("/beds", requirePermission("infrastructure.manage"), async (req: Aut
     if (!BED_TYPES.includes(bedType)) {
       return void res.status(400).json({ error: `Type de lit invalide — autorisés : ${BED_TYPES.join(", ")}.` });
     }
+    if (nn(serviceId) !== null) {
+      return void res.status(400).json({ error: "Le service d'un lit est hérité de sa chambre — définissez le service sur la chambre." });
+    }
+    if (nn(roomId) === null) {
+      return void res.status(400).json({ error: "La chambre est obligatoire : le lit hérite automatiquement de son étage, de son bâtiment et de son service." });
+    }
+    if (!UUID_RE.test(String(roomId))) return void res.status(400).json({ error: "Chambre invalide." });
+    const chain = await resolveRoomChain(String(roomId));
+    if (!chain) return void res.status(404).json({ error: "Chambre introuvable." });
+    if (!chain.service_id) {
+      return void res.status(409).json({ error: "Cette chambre n'a pas de service défini — affectez d'abord un service à la chambre." });
+    }
     const dup = await pool.query(
       `SELECT 1 FROM occupancy_beds WHERE lower(number) = lower($1) AND deleted_at IS NULL`,
       [String(number).trim()],
     );
     if (dup.rows.length > 0) return void res.status(409).json({ error: "Un lit portant ce numéro existe déjà." });
 
-    let chain: any = null;
-    if (nn(roomId) !== null) {
-      if (!UUID_RE.test(String(roomId))) return void res.status(400).json({ error: "Chambre invalide." });
-      chain = await resolveRoomChain(String(roomId));
-      if (!chain) return void res.status(404).json({ error: "Chambre introuvable." });
-    }
-
-    // Service : explicite sinon hérité de la chambre
-    let svcId: string | null = chain?.service_id ?? null;
-    let svcName: string | null = chain?.service_name ?? null;
-    if (nn(serviceId) !== null) {
-      if (!UUID_RE.test(String(serviceId))) return void res.status(400).json({ error: "Service invalide." });
-      const dept = await resolveDepartment(String(serviceId));
-      if (!dept) return void res.status(400).json({ error: "Service/département introuvable." });
-      svcId = dept.id; svcName = dept.name;
-    }
+    // Service : strictement hérité de la chambre
+    const svcId: string | null = chain.service_id;
+    const svcName: string | null = chain.service_name;
 
     const a = actor(req);
     const q = await pool.query(
@@ -519,11 +553,15 @@ router.patch("/beds/:id", requirePermission("infrastructure.manage"), async (req
     if (existingQ.rows.length === 0) return void res.status(404).json({ error: "Lit introuvable." });
     const bed = existingQ.rows[0];
 
-    const roomTouched    = Object.prototype.hasOwnProperty.call(body, "roomId");
-    const serviceTouched = Object.prototype.hasOwnProperty.call(body, "serviceId");
-    const statusTouched  = nn(body.status) !== null;
+    const roomTouched   = Object.prototype.hasOwnProperty.call(body, "roomId");
+    const statusTouched = nn(body.status) !== null;
 
-    if ((bed.status === "occupe" || bed.status === "reserve") && (roomTouched || serviceTouched || statusTouched)) {
+    if (nn(body.serviceId) !== null) {
+      return void res.status(400).json({
+        error: "Le service d'un lit est hérité de sa chambre — modifiez le service de la chambre (tous ses lits suivront).",
+      });
+    }
+    if ((bed.status === "occupe" || bed.status === "reserve") && (roomTouched || statusTouched)) {
       return void res.status(409).json({
         error: "Lit occupé ou réservé — libérez-le d'abord (sortie/transfert via Admissions) avant de le déplacer, changer de service ou de statut.",
       });
@@ -553,29 +591,32 @@ router.patch("/beds/:id", requirePermission("infrastructure.manage"), async (req
       if (dup.rows.length > 0) return void res.status(409).json({ error: "Un lit portant ce numéro existe déjà." });
     }
 
-    // Chambre : clé absente → inchangée ; "" / null → détachée ; uuid → chaîne résolue
+    // Chambre : clé absente → inchangée ; "" / null → refusé si le lit est rattaché (pas de retour en arrière) ;
+    // uuid → chaîne résolue, la chambre cible doit avoir un service défini.
     let chain: any = null;
     let detachRoom = false;
     if (roomTouched) {
       if (nn(body.roomId) === null) {
+        if (bed.room_id) {
+          return void res.status(400).json({
+            error: "Un lit rattaché doit rester dans une chambre — déplacez-le vers une autre chambre au lieu de le détacher.",
+          });
+        }
         detachRoom = true;
       } else {
         if (!UUID_RE.test(String(body.roomId))) return void res.status(400).json({ error: "Chambre invalide." });
         chain = await resolveRoomChain(String(body.roomId));
         if (!chain) return void res.status(404).json({ error: "Chambre introuvable." });
+        if (!chain.service_id) {
+          return void res.status(409).json({ error: "Cette chambre n'a pas de service défini — affectez d'abord un service à la chambre." });
+        }
       }
     }
 
-    // Service : clé absente → inchangé ; "" / null → effacé ; uuid → résolu.
-    // Si la chambre change sans service explicite, le lit hérite du service de la chambre (si défini).
-    let svcTouched = serviceTouched;
+    // Service : strictement hérité de la chambre — tout changement de chambre aligne le service du lit.
+    let svcTouched = false;
     let svcId: string | null = null, svcName: string | null = null;
-    if (serviceTouched && nn(body.serviceId) !== null) {
-      if (!UUID_RE.test(String(body.serviceId))) return void res.status(400).json({ error: "Service invalide." });
-      const dept = await resolveDepartment(String(body.serviceId));
-      if (!dept) return void res.status(400).json({ error: "Service/département introuvable." });
-      svcId = dept.id; svcName = dept.name;
-    } else if (!serviceTouched && chain && chain.service_id) {
+    if (chain) {
       svcTouched = true; svcId = chain.service_id; svcName = chain.service_name;
     }
 
