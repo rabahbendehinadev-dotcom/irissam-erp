@@ -55,7 +55,7 @@ export interface AdmissionsApiState {
   error:      string | null;
   refresh:    () => void;
   discharge:  (id: string, type: string, date: string, time: string, notes: string) => Promise<void>;
-  transfer:   (id: string, to: string, date: string, notes: string) => Promise<void>;
+  transfer:   (id: string, payload: { newBedId: string; motif: string }) => Promise<void>;
   cancel:     (id: string) => Promise<void>;
   addAdmission: (a: Admission) => void;
   updateAdmission: (a: Admission) => void;
@@ -101,9 +101,10 @@ export function useAdmissionsApi(): AdmissionsApiState {
   );
 
   const transfer = useCallback(
-    async (id: string, newBedId: string, _date: string, notes: string) => {
-      // "to" in the mock context was a service name; for real API we pass newBedId
-      await apiClient.post(`/admissions/${id}/transfer`, { newBedId, notes });
+    async (id: string, payload: { newBedId: string; motif: string }) => {
+      // Mouvement ADT atomique côté serveur : ancien lit libéré (→ nettoyage),
+      // nouveau lit occupé, admission réalignée, mouvement journalisé.
+      await apiClient.post(`/admissions/${id}/transfer`, payload);
       refresh();
     },
     [refresh],

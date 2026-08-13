@@ -42,3 +42,4 @@
 - [UAT data reset](uat-data-reset.md) — dev DB wiped 2026-08-11 on user order (empty lists are normal, no re-seed); FK-ordered self-verifying script in scripts/; nullable patient links = partial delete
 - [ERP Accounts (RH↔users)](erp-accounts.md) — employees.linked_user_id 1-1 partial idx; désactivation RH auto-suspend le compte (réactivation manuelle); doctor sans patients.create; permissions.name pas code
 - [Infrastructure & lits](infrastructure-module.md) — departments = référentiel (services VIDE); service obligatoire sur chambre, hérité par lit (serviceId refusé); auto-rattachement historiques par room_number
+- [lib/db composite dist](db-dist-rebuild.md) — after editing lib/db schema run `npx tsc -b lib/db`; api-server tsc redirects to stale dist/*.d.ts (phantom TS2339) while tsx runtime works

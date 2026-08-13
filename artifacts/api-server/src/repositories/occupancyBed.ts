@@ -55,7 +55,7 @@ export class OccupancyBedRepository {
   /** Mark a bed as occupied. Fails (returns null) if bed is not "disponible". */
   async occupy(
     id: string,
-    payload: { patientId?: string; patientName: string; encounterId?: string },
+    payload: { patientId?: string; patientName: string; encounterId?: string; admissionId?: string },
     ctx: TxContext,
   ): Promise<DbOccupancyBed | null> {
     const [row] = await qb(this.db, ctx)
@@ -65,6 +65,7 @@ export class OccupancyBedRepository {
         patientId:   payload.patientId ?? null,
         patientName: payload.patientName,
         encounterId: payload.encounterId ?? null,
+        admissionId: payload.admissionId ?? null,
         occupiedAt:  new Date(),
         updatedBy:   safeUuid(ctx.userId),
         updatedAt:   new Date(),
@@ -74,16 +75,27 @@ export class OccupancyBedRepository {
     return row ?? null;
   }
 
-  /** Free a bed on discharge — resets to "disponible" and clears occupant fields. */
-  async free(id: string, ctx: TxContext): Promise<DbOccupancyBed | null> {
+  /**
+   * Free a bed — clears occupant fields (incl. admissionId).
+   * Par défaut le lit redevient "disponible" ; passer nextStatus:"nettoyage"
+   * pour le mouvement ADT (sortie/transfert → nettoyage avant remise à dispo).
+   */
+  async free(
+    id: string,
+    ctx: TxContext,
+    opts?: { nextStatus?: "disponible" | "nettoyage" },
+  ): Promise<DbOccupancyBed | null> {
+    const nextStatus = opts?.nextStatus ?? "disponible";
     const [row] = await qb(this.db, ctx)
       .update(occupancyBedsTable)
       .set({
-        status:      "disponible",
+        status:      nextStatus,
         patientId:   null,
         patientName: null,
         encounterId: null,
+        admissionId: null,
         occupiedAt:  null,
+        ...(nextStatus === "nettoyage" ? { cleaningStartedAt: new Date() } : {}),
         updatedBy:   safeUuid(ctx.userId),
         updatedAt:   new Date(),
       })

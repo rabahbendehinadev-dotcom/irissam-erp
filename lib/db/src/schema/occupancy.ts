@@ -29,6 +29,8 @@ export const occupancyBedsTable = pgTable("occupancy_beds", {
   buildingId:    uuid("building_id").references(() => buildingsTable.id, { onDelete: "set null" }),
   buildingName:  text("building_name"),           // denormalized
   buildingCode:  text("building_code"),           // denormalized
+  serviceId:     uuid("service_id"),              // FK departments — hérité de la chambre (mig 046)
+  serviceName:   text("service_name"),            // denormalized (mig 046)
   siteId:        uuid("site_id").notNull().references(() => sitesTable.id, { onDelete: "restrict" }),
 
   type:   bedTypeEnum("type").default("standard").notNull(),

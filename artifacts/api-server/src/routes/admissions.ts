@@ -435,16 +435,26 @@ router.patch("/:id", requirePermission("admissions.edit"), async (req: Authentic
   }
 });
 
-/** POST /admissions/:id/transfer (requires admissions.transfer) */
+/** POST /admissions/:id/transfer (requires admissions.transfer)
+ *  Body: { newBedId, motif (obligatoire), notes? } — mouvement ADT atomique. */
 router.post("/:id/transfer", requirePermission("admissions.transfer"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id   = String(req.params.id);
-    const body = req.body as { newBedId?: string; notes?: string };
+    const body = req.body as { newBedId?: string; motif?: string; notes?: string };
     if (!body.newBedId) { res.status(400).json({ error: "newBedId requis" }); return; }
+    const motif = typeof body.motif === "string" ? body.motif.trim() : "";
+    if (!motif) { res.status(400).json({ error: "Le motif du transfert est obligatoire" }); return; }
+    const notes = typeof body.notes === "string" && body.notes.trim() ? body.notes.trim() : undefined;
 
-    const updated = await admissionService.transferBed(id, body.newBedId, actor(req));
+    const updated = await admissionService.transferBed(id, { newBedId: body.newBedId, motif, notes }, actor(req));
     res.json(mapAdmission(updated));
-  } catch (err) {
+  } catch (err: any) {
+    const msg: string = err?.message ?? "";
+    if (msg.includes("introuvable"))     { res.status(404).json({ error: msg }); return; }
+    if (msg.includes("déjà ce lit"))     { res.status(400).json({ error: msg }); return; }
+    if (msg.includes("n'est pas active") || msg.includes("non disponible") || msg.includes("non affecté")) {
+      res.status(409).json({ error: msg }); return;
+    }
     next(err);
   }
 });

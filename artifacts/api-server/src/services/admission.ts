@@ -78,6 +78,12 @@ export interface DischargeInput {
   dischargeNotes?: string;
 }
 
+export interface TransferInput {
+  newBedId: string;
+  motif:    string;   // motif du transfert — obligatoire (mouvement ADT)
+  notes?:   string;
+}
+
 // ─── AdmissionService ─────────────────────────────────────────────────────────
 
 export class AdmissionService {
@@ -154,6 +160,12 @@ export class AdmissionService {
         siteId:         input.siteId,
       }, ctx);
 
+      // 4b. Lier le lit à l'admission (chaîne ADT complète — utilisée par les
+      // bed-cards et par le durcissement "still linked" du transfert/annulation)
+      await tx.update(occupancyBedsTable)
+        .set({ admissionId: admission.id, updatedAt: new Date() })
+        .where(eq(occupancyBedsTable.id, input.bedId));
+
       await auditService.log({
         module:       "admissions",
         action:       "admitted",
@@ -227,39 +239,116 @@ export class AdmissionService {
 
   // ── Transfer bed ──────────────────────────────────────────────────────────────
 
-  async transferBed(admissionId: string, newBedId: string, actor: ActorCtx): Promise<DbAdmission> {
+  /**
+   * Transfert de lit (mouvement ADT interne) — UNE transaction atomique :
+   * 1. validations : admission active, lit cible ≠ lit actuel, lit cible
+   *    rattaché à la structure réelle (chambre + service — hiérarchie stricte)
+   * 2. occupation du nouveau lit (claim-first : échoue s'il n'est plus disponible)
+   * 3. libération de l'ancien lit → nettoyage, uniquement s'il est encore lié
+   *    à cette admission (durcissement identique à cancel())
+   * 4. admission réalignée sur la chaîne complète du nouveau lit
+   *    (lit/chambre/étage/bâtiment/service hérités — plus de dénorm périmée)
+   * 5. mouvement ADT complet (de → vers + motif) journalisé dans l'historique
+   *    patient (audit_logs, lié patientId + encounterId)
+   */
+  async transferBed(admissionId: string, input: TransferInput, actor: ActorCtx): Promise<DbAdmission> {
     return db.transaction(async (tx) => {
       const ctx: TxContext = { ...actor, tx };
 
       const admission = await repos.admission.findById(admissionId, ctx);
       if (!admission) throw new Error(`Admission ${admissionId} introuvable`);
-
-      if (admission.bedId) {
-        await repos.occupancyBed.free(admission.bedId, ctx);
+      if (admission.status !== "active") {
+        throw new Error("Transfert impossible — l'admission n'est pas active");
+      }
+      if (admission.bedId === input.newBedId) {
+        throw new Error("Le patient occupe déjà ce lit");
       }
 
-      const newBed = await repos.occupancyBed.occupy(newBedId, {
+      // Lit cible : structure réelle obligatoire (Bâtiment → Étage → Chambre → Lit)
+      const [target] = await tx
+        .select({
+          number:    occupancyBedsTable.number,
+          roomId:    occupancyBedsTable.roomId,
+          serviceId: occupancyBedsTable.serviceId,
+        })
+        .from(occupancyBedsTable)
+        .where(eq(occupancyBedsTable.id, input.newBedId))
+        .limit(1);
+      if (!target) throw new Error(`Lit de destination introuvable`);
+      if (!target.roomId || !target.serviceId) {
+        throw new Error("Lit de destination non affecté à une chambre/un service — rattachez-le d'abord via Gestion des lits");
+      }
+
+      // 1. Occuper le nouveau lit (WHERE status='disponible' — verrou anti-course)
+      const newBed = await repos.occupancyBed.occupy(input.newBedId, {
         patientId:   admission.patientId,
         patientName: admission.patientName,
-        encounterId: admission.encounterId ?? "",
+        encounterId: admission.encounterId ?? undefined,
+        admissionId: admission.id,
       }, ctx);
+      if (!newBed) throw new Error(`Lit ${target.number} non disponible (occupé entre-temps)`);
 
-      if (!newBed) throw new Error(`Nouveau lit ${newBedId} non disponible`);
+      // 2. Libérer l'ancien lit → nettoyage, uniquement s'il est encore lié
+      //    à cette admission (il peut avoir été réassigné depuis)
+      const oldBedId = admission.bedId;
+      if (oldBedId) {
+        const [oldBed] = await tx
+          .select({
+            patientId:   occupancyBedsTable.patientId,
+            encounterId: occupancyBedsTable.encounterId,
+            admissionId: occupancyBedsTable.admissionId,
+          })
+          .from(occupancyBedsTable)
+          .where(eq(occupancyBedsTable.id, oldBedId))
+          .limit(1);
+        const stillLinked = !!oldBed && (
+          oldBed.admissionId === admission.id ||
+          (admission.encounterId != null && oldBed.encounterId === admission.encounterId) ||
+          (oldBed.patientId != null && oldBed.patientId === admission.patientId)
+        );
+        if (stillLinked) {
+          await repos.occupancyBed.free(oldBedId, ctx, { nextStatus: "nettoyage" });
+        }
+      }
 
+      // 3. Réaligner l'admission sur la chaîne réelle du nouveau lit
       const updated = await repos.admission.update(admissionId, {
-        bedId:      newBedId,
-        bedNumber:  newBed.number,
-        roomNumber: newBed.roomNumber ?? undefined,
+        bedId:        input.newBedId,
+        bedNumber:    newBed.number,
+        roomNumber:   newBed.roomNumber,
+        floorLabel:   newBed.floorLabel,
+        buildingName: newBed.buildingName,
+        serviceId:    newBed.serviceId ?? admission.serviceId,
+        serviceName:  newBed.serviceName ?? admission.serviceName,
       }, ctx);
       if (!updated) throw new Error("Mise à jour de l'admission échouée");
 
+      // 4. Mouvement ADT complet dans l'historique patient
       await auditService.log({
         module:       "admissions",
         action:       "bed_transferred",
         resourceType: "admission",
         resourceId:   admissionId,
-        oldValue:     { bedId: admission.bedId },
-        newValue:     { bedId: newBedId, bedNumber: newBed.number },
+        oldValue: {
+          bedId:        oldBedId,
+          bedNumber:    admission.bedNumber,
+          roomNumber:   admission.roomNumber,
+          floorLabel:   admission.floorLabel,
+          buildingName: admission.buildingName,
+          serviceId:    admission.serviceId,
+          serviceName:  admission.serviceName,
+        },
+        newValue: {
+          bedId:        input.newBedId,
+          bedNumber:    newBed.number,
+          roomNumber:   newBed.roomNumber,
+          floorLabel:   newBed.floorLabel,
+          buildingName: newBed.buildingName,
+          serviceId:    newBed.serviceId,
+          serviceName:  newBed.serviceName,
+          motif:        input.motif,
+          ...(input.notes ? { notes: input.notes } : {}),
+        },
         patientId:    admission.patientId,
         encounterId:  admission.encounterId ?? undefined,
         siteId:       admission.siteId ?? undefined,
