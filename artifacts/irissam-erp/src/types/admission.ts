@@ -166,6 +166,22 @@ export interface AdmissionTimelineEvent {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Structure représentant un service hospitalier (pour les selects) */
+export type ConsumableItemType = 'medicament' | 'consommable';
+
+/** Ligne de la fiche consommable du séjour (étape 1 — sans liaison Stock/Pharmacie). */
+export interface AdmissionConsumable {
+  id: string;
+  admissionId: string;
+  itemType: ConsumableItemType;
+  designation: string;
+  quantity: number;
+  usedAt: string;
+  note?: string | null;
+  recordedBy?: string | null;
+  recordedByName: string;
+  createdAt?: string;
+}
+
 export interface HospitalService {
   id: string;
   name: string;

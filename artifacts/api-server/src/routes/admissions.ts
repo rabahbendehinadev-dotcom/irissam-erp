@@ -18,7 +18,7 @@
 
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db, pool } from "@workspace/db";
-import { admissionsTable, auditLogsTable } from "@workspace/db/schema";
+import { admissionsTable, auditLogsTable, admissionConsumablesTable } from "@workspace/db/schema";
 import { requirePermission } from "../middleware/requirePermission";
 import {
   eq,
@@ -609,6 +609,113 @@ router.post("/:id/cancel", requirePermission("admissions.cancel"), async (req: A
     if (msg.includes("déjà"))        { res.status(409).json({ error: msg }); return; }
     next(err);
   }
+});
+
+/* ─── Fiche consommable du séjour ─────────────────────────────────────────────
+ * Étape 1 : saisie libre (désignation texte), SANS liaison Stock Médical /
+ * Pharmacie (étape 2 prévue). La ligne elle-même porte l'utilisateur
+ * responsable et l'horodatage — c'est le registre demandé. */
+
+function mapConsumable(c: typeof admissionConsumablesTable.$inferSelect) {
+  return {
+    id:             c.id,
+    admissionId:    c.admissionId,
+    itemType:       c.itemType,
+    designation:    c.designation,
+    quantity:       c.quantity,
+    usedAt:         c.usedAt,
+    note:           c.note,
+    recordedBy:     c.recordedBy,
+    recordedByName: c.recordedByName,
+    createdAt:      c.createdAt,
+  };
+}
+
+/** GET /admissions/:id/consumables (requires admissions.view) */
+router.get("/:id/consumables", requirePermission("admissions.view"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    if (!UUID_RE.test(id)) { res.status(400).json({ error: "Identifiant d'admission invalide" }); return; }
+    const [adm] = await db.select({ id: admissionsTable.id }).from(admissionsTable).where(eq(admissionsTable.id, id)).limit(1);
+    if (!adm) { res.status(404).json({ error: "Admission introuvable" }); return; }
+    const rows = await db.select().from(admissionConsumablesTable)
+      .where(eq(admissionConsumablesTable.admissionId, id))
+      .orderBy(desc(admissionConsumablesTable.usedAt), desc(admissionConsumablesTable.createdAt));
+    res.json(rows.map(mapConsumable));
+  } catch (err) { next(err); }
+});
+
+/** POST /admissions/:id/consumables (requires admissions.edit)
+ *  Enregistre un médicament / consommable utilisé pour ce séjour. */
+router.post("/:id/consumables", requirePermission("admissions.edit"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    if (!UUID_RE.test(id)) { res.status(400).json({ error: "Identifiant d'admission invalide" }); return; }
+
+    const body = (req.body ?? {}) as {
+      designation?: unknown; itemType?: unknown; quantity?: unknown; usedAt?: unknown; note?: unknown;
+    };
+
+    const designation = typeof body.designation === "string" ? body.designation.trim() : "";
+    if (!designation) { res.status(400).json({ error: "designation requise" }); return; }
+    if (designation.length > 200) { res.status(400).json({ error: "designation trop longue (200 caractères max)" }); return; }
+
+    const itemType = body.itemType === undefined ? "consommable" : body.itemType;
+    if (itemType !== "medicament" && itemType !== "consommable") {
+      res.status(400).json({ error: "itemType invalide — valeurs autorisées : medicament, consommable" });
+      return;
+    }
+
+    const quantity = body.quantity;
+    if (typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 || quantity > 9999) {
+      res.status(400).json({ error: "quantity invalide (entier entre 1 et 9999)" });
+      return;
+    }
+
+    let usedAt = new Date();
+    if (body.usedAt !== undefined) {
+      if (typeof body.usedAt !== "string" || Number.isNaN(new Date(body.usedAt).getTime())) {
+        res.status(400).json({ error: "usedAt invalide (date/heure ISO attendue)" });
+        return;
+      }
+      usedAt = new Date(body.usedAt);
+      if (usedAt.getTime() > Date.now() + 5 * 60 * 1000) {
+        res.status(400).json({ error: "usedAt est dans le futur" });
+        return;
+      }
+    }
+
+    const rawNote = typeof body.note === "string" ? body.note.trim() : "";
+    if (rawNote.length > 1000) { res.status(400).json({ error: "note trop longue (1000 caractères max)" }); return; }
+    const note = rawNote || null;
+
+    const [adm] = await db.select().from(admissionsTable).where(eq(admissionsTable.id, id)).limit(1);
+    if (!adm) { res.status(404).json({ error: "Admission introuvable" }); return; }
+    if (adm.status === "cancelled") {
+      res.status(409).json({ error: "Admission annulée — enregistrement impossible" });
+      return;
+    }
+    if (adm.status === "preadmission") {
+      res.status(409).json({ error: "Patient non encore admis (préadmission) — confirmez l'admission d'abord" });
+      return;
+    }
+
+    const act = actor(req);
+    const [row] = await db.insert(admissionConsumablesTable).values({
+      admissionId:    adm.id,
+      patientId:      adm.patientId,
+      encounterId:    adm.encounterId ?? null,
+      itemType,
+      designation,
+      quantity,
+      usedAt,
+      note,
+      recordedBy:     UUID_RE.test(act.userId) ? act.userId : null,
+      recordedByName: act.userName,
+    }).returning();
+
+    res.status(201).json(mapConsumable(row));
+  } catch (err) { next(err); }
 });
 
 /** POST /admissions/:id/confirm (requires admissions.create)

@@ -4,7 +4,7 @@
  * REPLACES the legacy minimal `admissions` table (which only had name+service+dates).
  */
 import {
-  pgTable, uuid, text, date, timestamp, index, uniqueIndex,
+  pgTable, uuid, text, date, timestamp, index, uniqueIndex, integer,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -107,12 +107,40 @@ export const admissionTimelineEventsTable = pgTable("admission_timeline_events",
   index("adm_timeline_date_idx").on(t.date),
 ]);
 
+// ─── Fiche consommable du séjour ──────────────────────────────────────────────
+// Médicaments et consommables utilisés pendant l'hospitalisation (désignation
+// libre, quantité, date/heure, note, utilisateur responsable). Étape 1 : table
+// autonome — PAS encore reliée au Stock Médical ni à la Pharmacie (étape 2 :
+// colonnes de liaison à ajouter par ALTER TABLE).
+
+export const admissionConsumablesTable = pgTable("admission_consumables", {
+  id:             uuid("id").primaryKey().defaultRandom(),
+  admissionId:    uuid("admission_id").notNull().references(() => admissionsTable.id, { onDelete: "cascade" }),
+  patientId:      uuid("patient_id").notNull().references(() => patientsTable.id, { onDelete: "restrict" }),
+  encounterId:    uuid("encounter_id").references(() => encountersTable.id, { onDelete: "set null" }),
+  itemType:       text("item_type", { enum: ["medicament", "consommable"] }).notNull().default("consommable"),
+  designation:    text("designation").notNull(),
+  quantity:       integer("quantity").notNull(),
+  usedAt:         timestamp("used_at", { withTimezone: true }).defaultNow().notNull(),
+  note:           text("note"),
+  recordedBy:     uuid("recorded_by").references(() => usersTable.id, { onDelete: "set null" }),
+  recordedByName: text("recorded_by_name").notNull(),
+  createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("adm_consumables_admission_idx").on(t.admissionId),
+  index("adm_consumables_patient_idx").on(t.patientId),
+  index("adm_consumables_used_at_idx").on(t.usedAt),
+]);
+
 // ─── Insert Schemas & Types ───────────────────────────────────────────────────
 
 export const insertAdmissionSchema              = createInsertSchema(admissionsTable).omit({ id: true });
 export const insertAdmissionTimelineEventSchema = createInsertSchema(admissionTimelineEventsTable).omit({ id: true });
+export const insertAdmissionConsumableSchema    = createInsertSchema(admissionConsumablesTable).omit({ id: true });
 
 export type InsertAdmission              = z.infer<typeof insertAdmissionSchema>;
 export type InsertAdmissionTimelineEvent = z.infer<typeof insertAdmissionTimelineEventSchema>;
+export type InsertAdmissionConsumable    = z.infer<typeof insertAdmissionConsumableSchema>;
 export type DbAdmission                  = typeof admissionsTable.$inferSelect;
 export type DbAdmissionTimelineEvent     = typeof admissionTimelineEventsTable.$inferSelect;
+export type DbAdmissionConsumable        = typeof admissionConsumablesTable.$inferSelect;

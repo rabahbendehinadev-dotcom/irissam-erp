@@ -5,7 +5,7 @@ import {
   ArrowLeft, Edit, LogOut, ArrowRight, AlertTriangle,
   Stethoscope, Bed, MapPin, Clock, User,
   FileText, StickyNote, ClipboardList, CheckCircle2,
-  PlusCircle, Printer, Activity, Loader2,
+  PlusCircle, Printer, Activity, Loader2, Syringe,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
@@ -15,6 +15,7 @@ import { PriorityBadge } from '@/components/admissions/PriorityBadge';
 import { AdmissionTimeline } from '@/components/admissions/AdmissionTimeline';
 import { AdmissionForm } from '@/components/admissions/AdmissionForm';
 import { TransferBedModal } from '@/components/admissions/TransferBedModal';
+import { ConsumablesTab } from '@/components/admissions/ConsumablesTab';
 import { apiClient } from '@/services/api/client';
 import { mapApiAdmission } from '@/hooks/useAdmissionsApi';
 import { useLanguage } from '@/i18n';
@@ -550,11 +551,12 @@ function DischargeSummaryTab({ admission }: { admission: Admission }) {
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'timeline' | 'notes' | 'documents' | 'sortie';
+type Tab = 'overview' | 'timeline' | 'consommables' | 'notes' | 'documents' | 'sortie';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview',   label: 'Vue générale',  icon: <ClipboardList size={14} /> },
-  { id: 'timeline',   label: 'Timeline',      icon: <Clock size={14} /> },
+  { id: 'overview',     label: 'Vue générale',  icon: <ClipboardList size={14} /> },
+  { id: 'timeline',     label: 'Timeline',      icon: <Clock size={14} /> },
+  { id: 'consommables', label: 'Consommables',  icon: <Syringe size={14} /> },
   { id: 'notes',      label: 'Notes',         icon: <StickyNote size={14} /> },
   { id: 'documents',  label: 'Documents',     icon: <FileText size={14} /> },
   { id: 'sortie',     label: 'Sortie',        icon: <CheckCircle2 size={14} /> },
@@ -804,6 +806,7 @@ export default function AdmissionDetailPage() {
                 <AdmissionTimeline events={timeline} />
               )
             )}
+            {activeTab === 'consommables' && <ConsumablesTab admission={admission} />}
             {activeTab === 'notes'     && <NotesTab     admission={admission} />}
             {activeTab === 'documents' && <DocumentsTab admission={admission} />}
             {activeTab === 'sortie'    && <DischargeSummaryTab admission={admission} />}
