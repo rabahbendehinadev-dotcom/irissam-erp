@@ -26,6 +26,7 @@ const ImagingPage = lazy(() => import('@/pages/Imaging'));
 const EmergenciesPage = lazy(() => import('@/pages/Emergencies'));
 const EmergencyPatientDetail = lazy(() => import('@/pages/EmergencyPatientDetail'));
 const HospitalizationPage = lazy(() => import('@/pages/Hospitalization'));
+const BedManagementPage = lazy(() => import('@/pages/BedManagement'));
 const ResuscitationPage = lazy(() => import('@/pages/Resuscitation'));
 const OperatingRoomPage = lazy(() => import('@/pages/OperatingRoom'));
 const PersonnelPage = lazy(() => import('@/pages/Personnel'));
@@ -227,6 +228,7 @@ function Router() {
       <Route path="/emergencies/:id" component={() => <ProtectedRoute component={EmergencyPatientDetail} />} />
       <Route path="/emergencies" component={() => <ProtectedRoute component={EmergenciesPage} />} />
       <Route path="/hospitalization" component={() => <ProtectedRoute component={HospitalizationPage} />} />
+      <Route path="/bed-management" component={() => <ProtectedRoute component={BedManagementPage} />} />
       <Route path="/operating-room" component={() => <ProtectedRoute component={OperatingRoomPage} />} />
       <Route path="/resuscitation" component={() => <ProtectedRoute component={ResuscitationPage} />} />
       <Route path="/maternity" component={() => <Redirect to="/" />} />

@@ -7,6 +7,7 @@ export default {
   "nav.emergencies": "الطوارئ",
   "nav.consultations": "الاستشارات",
   "nav.hospitalization": "الاستشفاء",
+  "nav.bedManagement": "إدارة الأسرّة",
   "nav.operating_room": "غرفة العمليات",
   "nav.resuscitation": "الإنعاش",
   "nav.maternity": "قسم الولادة",

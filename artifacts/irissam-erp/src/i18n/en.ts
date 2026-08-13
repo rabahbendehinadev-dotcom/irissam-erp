@@ -7,6 +7,7 @@ export default {
   "nav.emergencies": "Emergencies",
   "nav.consultations": "Consultations",
   "nav.hospitalization": "Hospitalization",
+  "nav.bedManagement": "Bed Management",
   "nav.operating_room": "Operating Room",
   "nav.resuscitation": "Resuscitation",
   "nav.maternity": "Maternity",

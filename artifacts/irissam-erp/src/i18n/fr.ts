@@ -7,6 +7,7 @@ export default {
   "nav.emergencies": "Urgences",
   "nav.consultations": "Consultations",
   "nav.hospitalization": "Hospitalisation",
+  "nav.bedManagement": "Gestion des lits",
   "nav.operating_room": "Bloc opératoire",
   "nav.resuscitation": "Réanimation",
   "nav.maternity": "Maternité",

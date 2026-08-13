@@ -23,6 +23,7 @@ import surgicalRequestsRouter from "./surgical-requests";
 import operatingRoomsRouter   from "./operating-rooms";
 import notificationsRouter    from "./notifications";
 import occupancyBedsRouter    from "./occupancy-beds";
+import infrastructureRouter   from "./infrastructure";
 import emergencyRouter        from "./emergency";
 import invoicesRouter         from "./invoices";
 import paymentsRouter         from "./payments";
@@ -75,6 +76,7 @@ router.use("/imaging-orders",  requireAuth, imagingOrdersRouter);
 router.use("/prescriptions",   requireAuth, prescriptionsRouter);
 // Occupancy + ICU + Bloc + Notifications
 router.use("/occupancy-beds",      requireAuth, occupancyBedsRouter);
+router.use("/infrastructure",      requireAuth, infrastructureRouter);
 router.use("/icu",                 requireAuth, icuRouter);
 router.use("/surgical-requests",   requireAuth, surgicalRequestsRouter);
 router.use("/operating-rooms",     requireAuth, operatingRoomsRouter);

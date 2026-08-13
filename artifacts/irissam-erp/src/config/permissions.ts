@@ -17,6 +17,8 @@ export type Permission =
   | 'admissions.view' | 'admissions.create' | 'admissions.edit'
   | 'admissions.discharge' | 'admissions.transfer' | 'admissions.cancel'
   | 'admissions.export' | 'admissions.view_audit'
+  // Infrastructure hospitalière (bâtiments, étages, chambres, lits)
+  | 'infrastructure.manage'
   // Emergencies — full module
   | 'emergencies.view' | 'emergencies.create' | 'emergencies.triage'
   | 'emergencies.start_care' | 'emergencies.update'
@@ -233,6 +235,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'reports.view', 'reports.export',
     'settings.view', 'settings.manage',
     'admin.users', 'admin.roles', 'admin.audit', 'admin.backup',
+    'infrastructure.manage',
   ],
   administrator: [
     'dashboard.view',
@@ -271,6 +274,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'reports.view', 'reports.export',
     'settings.view', 'settings.manage',
     'admin.users', 'admin.roles', 'admin.audit',
+    'infrastructure.manage',
   ],
   director: [
     'dashboard.view',
