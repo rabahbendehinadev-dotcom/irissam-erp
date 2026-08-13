@@ -1,0 +1,99 @@
+Avant de continuer les tests d’hospitalisation, je veux corriger et centraliser la gestion des services hospitaliers.
+
+IMPORTANT :
+Commence par auditer l’existant. Le système possède déjà une table `departments` utilisée comme référence des services dans Admissions. Ne crée surtout pas une deuxième table ou un deuxième référentiel si `departments` couvre déjà ce besoin.
+
+Je veux que les services ne soient jamais hardcodés dans le frontend.
+
+OBJECTIF :
+
+Créer/compléter une vraie gestion centralisée des services hospitaliers basée sur la source existante `departments`.
+
+Un administrateur autorisé doit pouvoir :
+- Ajouter un service
+- Modifier un service
+- Activer / désactiver un service
+- Consulter la liste des services
+- Rechercher/filtrer les services
+
+Exemples :
+Chirurgie
+Cardiologie
+Pédiatrie
+Urgences
+Réanimation
+Gynécologie
+etc.
+
+RÈGLE IMPORTANTE :
+Un service déjà utilisé par des chambres, admissions, médecins, hospitalisations ou autres données historiques ne doit pas être supprimé physiquement.
+Il doit pouvoir être désactivé afin de préserver l’historique.
+
+Toutes les listes de services existantes dans :
+- Admissions
+- Infrastructure
+- Chambres
+- Hospitalisation
+- Médecins
+- et les autres modules concernés
+
+doivent utiliser le même référentiel central existant et ne contenir aucune liste hardcodée.
+
+INFRASTRUCTURE :
+
+Conserver la structure stricte :
+
+Bâtiment
+→ Étage
+→ Chambre
+→ Service
+→ Lit
+
+Lors de la création/modification d’une chambre :
+- bâtiment/étage obligatoires
+- service obligatoire
+- le service doit provenir du référentiel central
+
+Lors de la création d’un lit :
+- la chambre est obligatoire
+- le service ne doit PAS être sélectionné manuellement
+- le lit hérite automatiquement du service de sa chambre
+- bâtiment et étage sont également dérivés de la chambre
+
+Exemple :
+
+Bâtiment Principal
+→ 2ème étage
+→ Chambre CH-201
+→ Chirurgie
+→ Lit 201-A
+→ Lit 201-B
+
+Les deux lits appartiennent automatiquement au service Chirurgie.
+
+INTERFACE :
+
+Dans “Gérer l’infrastructure”, ajoute une gestion claire des services ou un accès vers le référentiel des services, sans dupliquer les données.
+
+Je veux pouvoir configurer réellement l’hôpital depuis l’interface sans modifier le code à chaque ajout d’un service, d’une chambre ou d’un lit.
+
+IMPORTANT :
+- PostgreSQL réel uniquement
+- aucune donnée mock/demo
+- aucune duplication du référentiel `departments`
+- ne casse pas Admissions / ADT / Hospitalisation existants
+- conserver les protections des lits occupés/réservés
+- conserver audit logs et permissions
+- vérifier les relations existantes avant toute migration
+- ne créer une migration que si elle est réellement nécessaire
+
+Avant de modifier, audite le schéma actuel et les APIs existantes, puis implémente la solution la plus cohérente avec l’architecture actuelle.
+
+À la fin, donne-moi :
+1. ce qui existait déjà
+2. ce qui était hardcodé
+3. ce qui a été modifié
+4. les fichiers modifiés
+5. les migrations éventuelles
+6. les tests effectués
+7. le commit hash
