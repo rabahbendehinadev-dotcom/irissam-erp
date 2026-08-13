@@ -1,0 +1,154 @@
+Avant de continuer le workflow Transfert / ADT, je veux finaliser correctement la gestion de l’infrastructure et des lits pour un grand hôpital.
+
+IMPORTANT :
+Inspecte d’abord tout ce qui existe actuellement (Migration 046, tables, relations, API et interface).
+Ne reconstruis pas ce qui existe déjà.
+Ne crée aucune donnée Demo / hardcodée.
+
+PROBLÈME ACTUEL :
+
+Les lits historiques 101 à 110 existent encore avec des libellés CH-101, CH-102, etc., mais ils ne sont pas réellement rattachés à la nouvelle structure.
+
+Dans "Gestion des lits", plusieurs informations affichent encore :
+- Bâtiment : —
+- Étage : —
+- Service : —
+
+Dans "Gérer l’infrastructure", les lits apparaissent également "sans service".
+
+Je ne veux PAS recréer manuellement tous les lits.
+
+OBJECTIF :
+
+La structure hospitalière doit devenir strictement :
+
+Bâtiment
+→ Étage
+→ Chambre
+→ Service
+→ Lit
+
+1. ANCIENS LITS
+
+Prévoir une méthode propre pour affecter les lits historiques existants à la nouvelle infrastructure.
+
+Ne supprime pas les lits existants.
+
+Ne touche surtout pas de manière destructive au lit actuellement occupé ni à l’admission du patient.
+
+Si l’affectation automatique d’un ancien lit est ambiguë :
+- laisser le lit comme "Non affecté"
+- afficher une action "Affecter"
+- permettre à l’administrateur de sélectionner sa vraie chambre
+
+2. CHAMBRES
+
+Une chambre d’hospitalisation doit être liée à :
+- un étage
+- donc automatiquement à son bâtiment
+- un service
+
+Lors de la création d’une chambre :
+Bâtiment → Étage → Service → Numéro/Nom chambre
+
+Les listes doivent être dépendantes/cascadées.
+
+3. LITS
+
+Pour un lit d’hospitalisation normal, "Chambre" ne doit plus être un simple champ optionnel.
+
+Lors de la création d’un lit :
+- sélectionner la chambre
+- récupérer automatiquement son étage
+- récupérer automatiquement son bâtiment
+- récupérer automatiquement son service
+
+Ne pas demander à l’utilisateur de sélectionner plusieurs fois les mêmes informations.
+
+Éviter qu’un nouveau lit puisse terminer "sans étage / sans bâtiment / sans service".
+
+4. PAGE GESTION DES LITS
+
+Conserver la page actuelle en Cards mais l’améliorer pour qu’elle soit exploitable avec plusieurs centaines de lits.
+
+Filtres en cascade :
+
+Bâtiment
+→ Étage
+→ Service
+→ Chambre
+→ Statut
+
+Ajouter également recherche par :
+- numéro de lit
+- chambre
+- patient
+- MPI / IPP
+- numéro dossier
+- médecin
+
+5. CARD D’UN LIT DISPONIBLE
+
+Afficher clairement :
+- N° lit
+- Chambre
+- Étage
+- Bâtiment
+- Service
+- Type
+- Statut
+
+6. CARD D’UN LIT OCCUPÉ
+
+Afficher clairement :
+- N° lit
+- Chambre
+- Étage
+- Bâtiment
+- Service
+- Patient
+- MPI / IPP
+- N° dossier
+- N° admission
+- Date/heure d’entrée
+- Médecin responsable
+- Statut
+
+Ajouter un accès direct au dossier patient.
+
+7. SÉCURITÉ / COHÉRENCE
+
+Un lit occupé ne doit jamais pouvoir être déplacé, réaffecté ou modifié de manière destructive depuis la gestion de l’infrastructure.
+
+Les mouvements d’un patient hospitalisé doivent rester gérés exclusivement via Admissions / ADT / Transfert.
+
+Conserver les protections 409 déjà mises en place.
+
+Toutes les opérations d’administration de l’infrastructure doivent rester tracées dans l’Audit Log.
+
+8. IMPORTANT POUR LA SUITE
+
+Cette structure va devenir la source officielle utilisée ensuite par :
+
+Admission
+→ Attribution du lit
+→ Hospitalisation
+→ Transfert ADT
+→ Sortie
+→ Nettoyage
+→ Lit de nouveau disponible
+
+Donc ne crée pas une logique parallèle spécifique à cette page.
+
+Utilise les mêmes entités et relations partout dans le système.
+
+Ne fais pas de Browser Agent / E2E.
+
+À la fin, donne-moi uniquement :
+1. Ce qui existait déjà
+2. Ce qui était réellement incorrect/manquant
+3. Ce qui a été corrigé
+4. Comment les anciens lits 101–110 ont été traités
+5. Les fichiers/migrations modifiés
+6. Les vérifications effectuées
+7. Le Commit Hash
