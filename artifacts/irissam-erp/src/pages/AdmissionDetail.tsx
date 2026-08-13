@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import {
   ArrowLeft, Edit, LogOut, ArrowRight, AlertTriangle,
   Stethoscope, Bed, MapPin, Clock, User,
   FileText, StickyNote, ClipboardList, CheckCircle2,
-  PlusCircle, Printer, Activity,
+  PlusCircle, Printer, Activity, Loader2,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
@@ -14,8 +14,9 @@ import { AdmissionTypeBadge } from '@/components/admissions/AdmissionTypeBadge';
 import { PriorityBadge } from '@/components/admissions/PriorityBadge';
 import { AdmissionTimeline } from '@/components/admissions/AdmissionTimeline';
 import { AdmissionForm } from '@/components/admissions/AdmissionForm';
-import { useAdmissions } from '@/store/AdmissionsContext';
-import { MOCK_ADMISSION_TIMELINES } from '@/mock';
+import { TransferBedModal } from '@/components/admissions/TransferBedModal';
+import { apiClient } from '@/services/api/client';
+import { mapApiAdmission } from '@/hooks/useAdmissionsApi';
 import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
@@ -170,7 +171,7 @@ function VitalsModal({ onSave, onCancel }: {
 
 function DischargeModal({ admission, onConfirm, onCancel }: {
   admission: Admission;
-  onConfirm: (type: string, date: string, time: string, notes: string) => void;
+  onConfirm: (type: string, date: string, time: string, notes: string) => Promise<void>;
   onCancel: () => void;
 }) {
   const { t } = useLanguage();
@@ -180,6 +181,8 @@ function DischargeModal({ admission, onConfirm, onCancel }: {
   const [date, setDate]   = useState(today);
   const [time, setTime]   = useState(now);
   const [notes, setNotes] = useState('');
+  const [busy, setBusy]   = useState(false);
+  const [error, setError] = useState('');
   const cls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400';
 
   return (
@@ -212,55 +215,30 @@ function DischargeModal({ admission, onConfirm, onCancel }: {
               className={`${cls} resize-none`} />
           </div>
         </div>
+        {error && (
+          <div className="flex items-start gap-2 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <AlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-red-600">{error}</p>
+          </div>
+        )}
         <div className="flex gap-3 mt-5">
-          <button onClick={onCancel} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">{t('adm.form.cancel')}</button>
-          <button onClick={() => onConfirm(type, date, time, notes)}
-            className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+          <button onClick={onCancel} disabled={busy}
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40">{t('adm.form.cancel')}</button>
+          <button
+            onClick={async () => {
+              setBusy(true); setError('');
+              try {
+                await onConfirm(type, date, time, notes);
+              } catch (e) {
+                const err = e as { data?: { error?: string; message?: string }; message?: string };
+                setError(err?.data?.error ?? err?.data?.message ?? err?.message ?? 'Erreur lors de la sortie');
+                setBusy(false);
+              }
+            }}
+            disabled={busy}
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-60">
+            {busy && <Loader2 size={14} className="animate-spin" />}
             {t('adm.discharge.confirm')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TransferModal({ admission, onConfirm, onCancel }: {
-  admission: Admission;
-  onConfirm: (to: string, date: string, notes: string) => void;
-  onCancel: () => void;
-}) {
-  const { t } = useLanguage();
-  const today = new Date().toISOString().slice(0, 10);
-  const [to, setTo]       = useState('');
-  const [date, setDate]   = useState(today);
-  const [notes, setNotes] = useState('');
-  const cls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400';
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-6 max-h-[95dvh] overflow-y-auto">
-        <h3 className="font-bold text-gray-900 text-lg mb-4">{t('adm.transfer.title')}</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">{t('adm.transfer.to')} *</label>
-            <input value={to} onChange={e => setTo(e.target.value)} className={cls}
-              placeholder="Ex: CHU Mustapha — Cardiologie" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">{t('adm.transfer.date')}</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className={cls} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">{t('adm.transfer.notes')}</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={`${cls} resize-none`} />
-          </div>
-        </div>
-        <div className="flex gap-3 mt-5">
-          <button onClick={onCancel} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">{t('adm.form.cancel')}</button>
-          <button onClick={() => onConfirm(to, date, notes)} disabled={!to.trim()}
-            className="flex-1 px-3 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium disabled:opacity-40">
-            {t('adm.transfer.confirm')}
           </button>
         </div>
       </div>
@@ -535,8 +513,13 @@ export default function AdmissionDetailPage() {
   const [, navigate] = useLocation();
   const [, params]   = useRoute('/admissions/:id');
 
-  const { admissions, discharge, transfer } = useAdmissions();
-  const admission = admissions.find(a => a.id === params?.id);
+  const admissionId = params?.id;
+
+  // Chargement direct depuis l'API (GET /admissions/:id) — la page ne dépend
+  // plus d'un store local : lien profond, rafraîchissement et admissions
+  // clôturées fonctionnent. 404 → introuvable ; autre erreur → réessayer.
+  const [admission, setAdmission] = useState<Admission | null>(null);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound' | 'error'>('loading');
 
   const [activeTab,    setActiveTab]    = useState<Tab>('overview');
   const [showForm,     setShowForm]     = useState(false);
@@ -545,7 +528,59 @@ export default function AdmissionDetailPage() {
   const [showVitals,   setShowVitals]   = useState(false);
   const [localEvents,  setLocalEvents]  = useState<AdmissionTimelineEvent[]>([]);
 
-  // Not found
+  const loadAdmission = useCallback(async () => {
+    if (!admissionId) { setAdmission(null); setLoadState('notfound'); return; }
+    try {
+      const raw = await apiClient.get<Record<string, unknown>>(`/admissions/${admissionId}`);
+      setAdmission(mapApiAdmission(raw));
+      setLoadState('ready');
+    } catch (e) {
+      const err = e as { status?: number };
+      setAdmission(null);
+      setLoadState(err?.status === 404 ? 'notfound' : 'error');
+    }
+  }, [admissionId]);
+
+  useEffect(() => {
+    setLoadState('loading');
+    loadAdmission();
+  }, [loadAdmission]);
+
+  // Loading
+  if (loadState === 'loading') {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+          <Loader2 size={28} className="animate-spin text-blue-500" />
+          <p className="text-sm text-gray-400">Chargement de l'admission…</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Network / server error — distinct from "not found" to avoid false negatives
+  if (loadState === 'error') {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <AlertTriangle size={40} className="text-red-400 opacity-70" />
+          <p className="text-gray-600 font-medium">Impossible de charger l'admission</p>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <button onClick={() => { setLoadState('loading'); loadAdmission(); }}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              Réessayer
+            </button>
+            <button onClick={() => navigate('/admissions')}
+              className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+              <ArrowLeft size={14} /> Retour à la liste des admissions
+            </button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Not found (404 confirmé par le serveur)
   if (!admission) {
     return (
       <DashboardLayout>
@@ -561,8 +596,7 @@ export default function AdmissionDetailPage() {
     );
   }
 
-  const seedTimeline = MOCK_ADMISSION_TIMELINES[admission.id] ?? [];
-  const timeline = [...seedTimeline, ...localEvents];
+  const timeline = localEvents;
   const isActive = ['active', 'preadmission', 'ambulatoire'].includes(admission.status);
 
   return (
@@ -686,7 +720,7 @@ export default function AdmissionDetailPage() {
       {showForm && (
         <AdmissionForm
           admission={admission}
-          onSave={() => setShowForm(false)}
+          onSave={() => { setShowForm(false); loadAdmission(); }}
           onCancel={() => setShowForm(false)}
         />
       )}
@@ -694,10 +728,19 @@ export default function AdmissionDetailPage() {
       {discharging && (
         <DischargeModal
           admission={admission}
-          onConfirm={(type, date, time, notes) => {
-            discharge(admission.id, type, date, time, notes);
+          onConfirm={async (type, date, time, notes) => {
+            // Sortie ADT atomique côté serveur : admission clôturée + lit →
+            // nettoyage + encounter fermé + journalisation. Jette en cas
+            // d'échec — le modal affiche l'erreur.
+            await apiClient.post(`/admissions/${admission.id}/discharge`, {
+              dischargeType:  type,
+              dischargeNotes: notes || undefined,
+              dischargeDate:  date || undefined,
+              dischargeTime:  time || undefined,
+            });
             log('archive', 'admission', admission.id, `Sortie ${type}`);
             setDischarging(false);
+            await loadAdmission();
             setActiveTab('sortie');
           }}
           onCancel={() => setDischarging(false)}
@@ -705,12 +748,16 @@ export default function AdmissionDetailPage() {
       )}
 
       {transferring && (
-        <TransferModal
+        <TransferBedModal
           admission={admission}
-          onConfirm={(to, date, notes) => {
-            transfer(admission.id, to, date, notes);
-            log('update', 'admission', admission.id, `Transfert → ${to}`);
+          onConfirm={async ({ newBedId, motif }) => {
+            // Mouvement ADT atomique côté serveur : ancien lit libéré
+            // (→ nettoyage), nouveau lit occupé, admission réalignée,
+            // mouvement journalisé dans l'historique patient.
+            await apiClient.post(`/admissions/${admission.id}/transfer`, { newBedId, motif });
+            log('update', 'admission', admission.id, `Transfert de lit — ${motif}`);
             setTransferring(false);
+            await loadAdmission();
           }}
           onCancel={() => setTransferring(false)}
         />

@@ -43,3 +43,4 @@
 - [ERP Accounts (RH↔users)](erp-accounts.md) — employees.linked_user_id 1-1 partial idx; désactivation RH auto-suspend le compte (réactivation manuelle); doctor sans patients.create; permissions.name pas code
 - [Infrastructure & lits](infrastructure-module.md) — departments = référentiel unique (CRUD + désactivation, jamais DELETE, rename propagé); service hérité par lit; hook useServices = seule source front
 - [lib/db composite dist](db-dist-rebuild.md) — after editing lib/db schema run `npx tsc -b lib/db`; api-server tsc redirects to stale dist/*.d.ts (phantom TS2339) while tsx runtime works
+- [Admission detail de-mock](admissions-detail-demock.md) — /admissions/:id fetches the API directly; legacy AdmissionsContext = mock localStorage store (only Settings.resetToDefaults left) — never wire pages to it; "introuvable" only on server 404
