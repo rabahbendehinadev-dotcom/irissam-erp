@@ -1,0 +1,71 @@
+Je veux maintenant professionnaliser le module Consultation.
+
+Le directeur souhaite que les patients qui viennent uniquement en consultation ne soient pas obligatoirement enregistrés dans la liste permanente « Patients ». Ils doivent pouvoir être créés directement dans le workflow Consultation et rester dans l’historique des consultations.
+
+Je veux un workflow professionnel :
+
+Réception / Nouvelle consultation
+→ identité minimale du patient
+→ médecin
+→ spécialité
+→ date/heure
+→ consultation médicale
+
+Dans la consultation, le médecin doit pouvoir renseigner :
+- diagnostic
+- médicaments
+- traitements
+- notes cliniques
+- fichiers/documents
+- éventuellement examens demandés
+
+Pour les médicaments :
+- nom
+- dosage
+- fréquence
+- durée
+- instructions
+
+Puis générer une ordonnance électronique professionnelle, imprimable/PDF, avec automatiquement :
+- identité du patient
+- date
+- médecin
+- spécialité
+- médicaments + dosage + fréquence + durée + instructions
+- informations de l’établissement
+
+IMPORTANT :
+Tout ce que le médecin enregistre doit être automatiquement lié à SON compte ERP.
+
+Je veux une traçabilité complète :
+- quel médecin a créé/modifié la consultation
+- date et heure
+- diagnostic
+- ordonnance
+- traitements
+- documents
+- historique des modifications si le système le permet déjà
+
+L’administration doit pouvoir consulter toutes les consultations et voir clairement :
+- patient
+- médecin
+- spécialité
+- date/heure
+- diagnostic
+- ordonnance générée
+- statut de la consultation
+- utilisateur ayant effectué les actions
+
+Un médecin ne doit pas pouvoir écrire au nom d’un autre médecin sauf permission administrative explicite.
+
+Si la personne revient plus tard, retrouver son historique de consultation.
+Si elle doit ensuite être hospitalisée ou devenir patient permanent, prévoir une conversion/rattachement propre au dossier patient existant sans ressaisie ni doublon.
+
+Avant de développer, audite le module Consultation existant et réutilise tout ce qui existe déjà.
+Pas de mock, pas de duplication.
+
+À la fin donne-moi seulement :
+- ce qui existait
+- ce qui manquait
+- ce qui a été ajouté/corrigé
+- le commit hash
