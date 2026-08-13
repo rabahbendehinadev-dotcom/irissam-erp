@@ -1,5 +1,9 @@
 /**
- * Ordonnance électronique — aperçu A4 professionnel + impression/PDF.
+ * Ordonnance électronique — format classique compact (A5 portrait, comme les
+ * ordonnanciers de clinique) + impression/PDF. Logo officiel IRISSAM conservé
+ * dans l'en-tête ET répété en filigrane centré, grand et très transparent en
+ * arrière-plan (il ne gêne pas la lecture ; les <img> s'impriment nativement,
+ * contrairement aux backgrounds CSS).
  *
  * Données 100 % réelles : les lignes proviennent de
  * GET /prescriptions?consultationId=… (prescriptions non annulées) ; le
@@ -41,7 +45,7 @@ function fmtDate(iso?: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-// ─── Document A4 ──────────────────────────────────────────────────────────────
+// ─── Document A5 (format ordonnance classique) ───────────────────────────────
 
 function OrdonnanceDoc({ consultation: c, lines }: { consultation: Consultation; lines: RxLine[] }) {
   // Enrichissement du dossier patient réel (DOB/sexe/téléphone) ; pour un
@@ -66,43 +70,69 @@ function OrdonnanceDoc({ consultation: c, lines }: { consultation: Consultation;
   return (
     <div
       className="bg-white font-sans text-gray-900"
-      style={{ width: '210mm', minHeight: '297mm', padding: '16mm 18mm', boxSizing: 'border-box', fontSize: '12px' }}
+      style={{
+        width: '148mm', minHeight: '210mm', padding: '9mm 10mm',
+        boxSizing: 'border-box', fontSize: '11px',
+        position: 'relative', overflow: 'hidden',
+      }}
     >
-      {/* ── En-tête établissement ── */}
-      <div className="flex items-start justify-between mb-6 pb-4 border-b-2 border-blue-700">
+      {/* ── Filigrane : logo officiel centré, grand et très léger (z-0) ── */}
+      <img
+        src="/logo.png"
+        alt=""
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '100mm',
+          height: '100mm',
+          objectFit: 'contain',
+          opacity: 0.05,
+          pointerEvents: 'none',
+          zIndex: 0,
+          userSelect: 'none',
+        }}
+      />
+
+      {/* Contenu au-dessus du filigrane */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+      {/* ── En-tête établissement (logo conservé) ── */}
+      <div className="flex items-start justify-between mb-3 pb-2.5 border-b-2 border-blue-700">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <img src="/logo.png" alt="IRISSAM Hospital" className="w-10 h-10 object-contain rounded" />
+          <div className="flex items-center gap-2 mb-0.5">
+            <img src="/logo.png" alt="IRISSAM Hospital" className="w-9 h-9 object-contain rounded" />
             <div>
-              <div className="font-black text-[18px] text-blue-800 leading-none">IRISSAM HOSPITAL</div>
-              <div className="text-[10px] text-gray-500 tracking-widest uppercase">Centre Hospitalier Multidisciplinaire</div>
+              <div className="font-black text-[15px] text-blue-800 leading-none">IRISSAM HOSPITAL</div>
+              <div className="text-[8.5px] text-gray-500 tracking-widest uppercase mt-0.5">Centre Hospitalier Multidisciplinaire</div>
             </div>
           </div>
-          <div className="text-[10px] text-gray-500 mt-1">
+          <div className="text-[9px] text-gray-500 mt-0.5">
             Tél : +213 XX XX XX XX · www.irissam-hospital.dz
           </div>
         </div>
         <div className="text-right">
-          <div className="font-black text-[15px] text-blue-800 uppercase tracking-wide">Ordonnance Médicale</div>
-          <div className="font-mono text-[12px] text-blue-600 font-semibold mt-0.5">{c.number}</div>
-          <div className="text-[10px] text-gray-500 mt-0.5">Le {fmtDate(c.scheduledAt)}</div>
+          <div className="font-black text-[12px] text-blue-800 uppercase tracking-wide">Ordonnance Médicale</div>
+          <div className="font-mono text-[11px] text-blue-600 font-semibold mt-0.5">{c.number}</div>
+          <div className="text-[9px] text-gray-500 mt-0.5">Le {fmtDate(c.scheduledAt)}</div>
         </div>
       </div>
 
       {/* ── Prescripteur + Patient ── */}
-      <div className="grid grid-cols-2 gap-6 mb-6">
-        <div className="border border-gray-200 rounded-lg p-3">
-          <div className="font-bold text-[10px] text-blue-700 uppercase tracking-widest mb-2">Prescripteur</div>
-          <div className="space-y-0.5 text-[11px]">
-            <div className="font-bold text-[13px] text-gray-900">{c.doctorName}</div>
+      <div className="grid grid-cols-2 gap-2.5 mb-3">
+        <div className="border border-gray-200 rounded-lg p-2">
+          <div className="font-bold text-[8.5px] text-blue-700 uppercase tracking-widest mb-1">Prescripteur</div>
+          <div className="space-y-0.5 text-[10px]">
+            <div className="font-bold text-[11.5px] text-gray-900">{c.doctorName}</div>
             <div className="text-gray-600">{c.specialty}</div>
             <div className="text-gray-500">{c.serviceName}</div>
           </div>
         </div>
-        <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/40">
-          <div className="font-bold text-[10px] text-blue-700 uppercase tracking-widest mb-2">Patient</div>
-          <div className="space-y-0.5 text-[11px]">
-            <div className="font-bold text-[13px] text-gray-900">{c.patientName}</div>
+        <div className="border border-blue-200 rounded-lg p-2 bg-blue-50/40">
+          <div className="font-bold text-[8.5px] text-blue-700 uppercase tracking-widest mb-1">Patient</div>
+          <div className="space-y-0.5 text-[10px]">
+            <div className="font-bold text-[11.5px] text-gray-900">{c.patientName}</div>
             <div className="font-mono text-blue-600">
               {c.patientMpi}
               {c.isWalkIn && <span className="ml-1.5 text-amber-700 font-sans font-semibold">(patient de passage)</span>}
@@ -120,22 +150,22 @@ function OrdonnanceDoc({ consultation: c, lines }: { consultation: Consultation;
       </div>
 
       {/* ── Prescriptions ── */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className="font-serif font-black text-[26px] text-blue-800 leading-none">℞</span>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="font-serif font-black text-[20px] text-blue-800 leading-none">℞</span>
         <div className="flex-1 border-t-2 border-blue-200" />
       </div>
 
-      <div className="space-y-4 mb-8">
+      <div className="space-y-2 mb-4">
         {lines.map((rx, i) => (
-          <div key={rx.id} className="pb-3 border-b border-dashed border-gray-200">
+          <div key={rx.id} className="pb-2 border-b border-dashed border-gray-200">
             <div className="flex items-baseline gap-2">
-              <span className="font-bold text-[12px] text-gray-400 shrink-0">{i + 1}.</span>
+              <span className="font-bold text-[11px] text-gray-400 shrink-0">{i + 1}.</span>
               <div className="flex-1">
-                <div className="font-bold text-[13px] uppercase tracking-wide text-gray-900">
+                <div className="font-bold text-[12px] uppercase tracking-wide text-gray-900">
                   {rx.drug}
                   {rx.dosage && <span className="normal-case font-semibold text-gray-700"> — {rx.dosage}</span>}
                 </div>
-                <div className="text-[11px] text-gray-700 mt-0.5">
+                <div className="text-[10px] text-gray-700 mt-0.5">
                   {[
                     rx.frequency,
                     rx.duration ? `pendant ${rx.duration}` : null,
@@ -143,9 +173,9 @@ function OrdonnanceDoc({ consultation: c, lines }: { consultation: Consultation;
                   ].filter(Boolean).join(' · ') || 'Selon prescription'}
                 </div>
                 {rx.instructions && (
-                  <div className="text-[11px] text-blue-800 italic mt-0.5">Instructions : {rx.instructions}</div>
+                  <div className="text-[10px] text-blue-800 italic mt-0.5">Instructions : {rx.instructions}</div>
                 )}
-                {rx.notes && <div className="text-[10px] text-gray-500 mt-0.5">{rx.notes}</div>}
+                {rx.notes && <div className="text-[9px] text-gray-500 mt-0.5">{rx.notes}</div>}
               </div>
             </div>
           </div>
@@ -153,22 +183,23 @@ function OrdonnanceDoc({ consultation: c, lines }: { consultation: Consultation;
       </div>
 
       {/* ── Signature ── */}
-      <div className="mt-10 pt-4 border-t border-gray-300">
-        <div className="flex justify-between items-end">
-          <div className="text-[10px] text-gray-500">
+      <div className="mt-5 pt-2.5 border-t border-gray-300">
+        <div className="flex justify-between items-end gap-3">
+          <div className="text-[8.5px] text-gray-500">
             <div>Ordonnance électronique générée par le système IRISSAM ERP</div>
             <div className="font-mono">{c.number} · imprimée le {printDate}</div>
             <div className="mt-1 italic">Document valable accompagné du cachet du prescripteur.</div>
           </div>
-          <div className="text-center">
-            <div className="border-t border-gray-400 w-48 pt-1 text-[11px] text-gray-600">
+          <div className="text-center shrink-0">
+            <div className="border-t border-gray-400 w-40 pt-1 text-[10px] text-gray-600">
               <div className="font-semibold">{c.doctorName}</div>
               <div className="text-gray-500">{c.specialty}</div>
-              <div className="mt-8 text-gray-400 italic text-[10px]">Signature et cachet</div>
+              <div className="mt-6 text-gray-400 italic text-[8.5px]">Signature et cachet</div>
             </div>
           </div>
         </div>
       </div>
+      </div>{/* fin contenu (z-1) */}
     </div>
   );
 }
@@ -196,7 +227,7 @@ function OrdonnanceModal({
   <title>Ordonnance — ${consultation.number}</title>
   <script src="https://cdn.tailwindcss.com"><\/script>
   <style>
-    @page { size: A4; margin: 0; }
+    @page { size: A5 portrait; margin: 0; }
     body { margin: 0; padding: 0; background: white; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -208,7 +239,7 @@ function OrdonnanceModal({
 
     const iframe = document.createElement('iframe');
     iframe.style.cssText =
-      'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none;visibility:hidden;';
+      'position:fixed;top:-9999px;left:-9999px;width:148mm;height:210mm;border:none;visibility:hidden;';
     document.body.appendChild(iframe);
 
     const doc = iframe.contentDocument!;
@@ -271,7 +302,7 @@ function OrdonnanceModal({
       </div>
 
       <div className="flex-1 overflow-y-auto flex justify-center py-8 px-4">
-        <div ref={previewRef} className="shadow-2xl rounded-sm" style={{ width: '210mm', minHeight: '297mm' }}>
+        <div ref={previewRef} className="shadow-2xl rounded-sm" style={{ width: '148mm', minHeight: '210mm' }}>
           <OrdonnanceDoc consultation={consultation} lines={lines} />
         </div>
       </div>
@@ -311,8 +342,9 @@ export function OrdonnancePanel({
         <div>
           <h3 className="font-semibold text-gray-800">Ordonnance électronique</h3>
           <p className="text-xs text-gray-400 mt-0.5">
-            Document A4 officiel généré à partir des médicaments prescrits dans
-            cette consultation — au nom du médecin traitant, impression auditée.
+            Format ordonnance classique compact (A5) avec filigrane IRISSAM —
+            généré à partir des médicaments prescrits dans cette consultation,
+            au nom du médecin traitant, impression auditée.
           </p>
         </div>
         <button
@@ -375,7 +407,7 @@ export function OrdonnancePanel({
               title={consultationCancelled ? 'Consultation annulée — impression désactivée' : undefined}
               className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <Printer size={14} /> Aperçu & impression (A4)
+              <Printer size={14} /> Aperçu & impression
             </button>
           </div>
         </>
