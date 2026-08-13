@@ -93,8 +93,15 @@ export function useAdmissionsApi(): AdmissionsApiState {
   }, [refreshKey]);
 
   const discharge = useCallback(
-    async (id: string, type: string, _date: string, _time: string, notes: string) => {
-      await apiClient.post(`/admissions/${id}/discharge`, { dischargeType: type, dischargeNotes: notes });
+    async (id: string, type: string, date: string, time: string, notes: string) => {
+      // Sortie ADT atomique côté serveur : admission clôturée + lit → nettoyage
+      // + encounter fermé + journalisation. La date/heure saisies sont transmises.
+      await apiClient.post(`/admissions/${id}/discharge`, {
+        dischargeType:  type,
+        dischargeNotes: notes || undefined,
+        dischargeDate:  date || undefined,
+        dischargeTime:  time || undefined,
+      });
       refresh();
     },
     [refresh],

@@ -76,6 +76,8 @@ export interface AdmitInput {
 export interface DischargeInput {
   dischargeType:   string;
   dischargeNotes?: string;
+  dischargeDate?:  string;   // AAAA-MM-JJ — saisie utilisateur (défaut : aujourd'hui)
+  dischargeTime?:  string;   // HH:MM — saisie utilisateur (défaut : maintenant)
 }
 
 export interface TransferInput {
@@ -184,10 +186,15 @@ export class AdmissionService {
   // ── Discharge ─────────────────────────────────────────────────────────────────
 
   /**
-   * Discharge atomically:
-   * 1. Mark admission discharged
-   * 2. Free bed (Task #63 — automatic)
-   * 3. Close encounter
+   * Sortie patient (mouvement ADT) — UNE transaction atomique :
+   * 1. validations : admission active (déjà sorti / annulée → erreurs dédiées),
+   *    date/heure de sortie cohérentes (pas dans le futur, pas avant l'admission)
+   * 2. admission → discharged avec type + date/heure réellement saisies + notes
+   * 3. lit → nettoyage (retour à « disponible » via le workflow complete-cleaning),
+   *    uniquement s'il est encore lié à cette admission (durcissement identique
+   *    à transferBed()/cancel())
+   * 4. encounter fermé (repos.encounter.close est idempotent)
+   * 5. mouvement de sortie complet journalisé dans l'historique patient
    */
   async discharge(admissionId: string, input: DischargeInput, actor: ActorCtx): Promise<DbAdmission> {
     return db.transaction(async (tx) => {
@@ -196,22 +203,63 @@ export class AdmissionService {
       const admission = await repos.admission.findById(admissionId, ctx);
       if (!admission) throw new Error(`Admission ${admissionId} introuvable`);
       if (admission.status === "discharged") throw new Error("Patient déjà sorti");
+      if (admission.status === "cancelled")  throw new Error("Admission annulée — sortie impossible");
+      if (admission.status !== "active") {
+        throw new Error(`Sortie impossible — l'admission n'est pas active (statut : ${admission.status})`);
+      }
 
-      // 1. Mark discharged
+      // Date/heure de sortie : saisies utilisateur, sinon maintenant
+      const dischargeDate = input.dischargeDate ?? todayIso();
+      const dischargeTime = input.dischargeTime ?? nowHHMM();
+      if (dischargeDate > todayIso()) {
+        throw new Error("Date de sortie invalide — elle ne peut pas être dans le futur");
+      }
+      if (admission.admissionDate && dischargeDate < admission.admissionDate) {
+        throw new Error("Date de sortie invalide — antérieure à la date d'admission");
+      }
+      if (
+        admission.admissionDate && dischargeDate === admission.admissionDate &&
+        admission.admissionTime && dischargeTime < admission.admissionTime
+      ) {
+        throw new Error("Heure de sortie invalide — antérieure à l'heure d'admission");
+      }
+
+      // 1. Admission → discharged (type + date/heure + notes réellement enregistrés)
       const discharged = await repos.admission.discharge(admissionId, {
         dischargeType:       input.dischargeType,
         dischargeNotes:      input.dischargeNotes,
-        actualDischargeDate: todayIso(),
-        actualDischargeTime: nowHHMM(),
+        actualDischargeDate: dischargeDate,
+        actualDischargeTime: dischargeTime,
       }, ctx);
       if (!discharged) throw new Error("La sortie a échoué");
 
-      // 2. Free bed (Task #63)
+      // 2. Lit → nettoyage, uniquement s'il est encore lié à cette admission
+      //    (il peut avoir été réassigné à un autre patient — ne pas l'évincer)
+      let bedOutcome: string | null = null;
       if (admission.bedId) {
-        await repos.occupancyBed.free(admission.bedId, ctx);
+        const [bed] = await tx
+          .select({
+            patientId:   occupancyBedsTable.patientId,
+            encounterId: occupancyBedsTable.encounterId,
+            admissionId: occupancyBedsTable.admissionId,
+          })
+          .from(occupancyBedsTable)
+          .where(eq(occupancyBedsTable.id, admission.bedId))
+          .limit(1);
+        const stillLinked = !!bed && (
+          bed.admissionId === admission.id ||
+          (admission.encounterId != null && bed.encounterId === admission.encounterId) ||
+          (bed.patientId != null && bed.patientId === admission.patientId)
+        );
+        if (stillLinked) {
+          await repos.occupancyBed.free(admission.bedId, ctx, { nextStatus: "nettoyage" });
+          bedOutcome = "nettoyage";
+        } else {
+          bedOutcome = "non libéré (réassigné à un autre patient)";
+        }
       }
 
-      // 3. Close encounter
+      // 3. Fermer l'encounter
       if (admission.encounterId) {
         await encounterService.close(
           admission.encounterId,
@@ -221,13 +269,30 @@ export class AdmissionService {
         );
       }
 
+      // 4. Mouvement de sortie complet dans l'historique patient
       await auditService.log({
         module:       "admissions",
         action:       "discharged",
         resourceType: "admission",
         resourceId:   admissionId,
-        oldValue:     { status: "active" },
-        newValue:     { status: "discharged", dischargeType: input.dischargeType },
+        oldValue: {
+          status:       admission.status,
+          bedId:        admission.bedId,
+          bedNumber:    admission.bedNumber,
+          roomNumber:   admission.roomNumber,
+          floorLabel:   admission.floorLabel,
+          buildingName: admission.buildingName,
+          serviceId:    admission.serviceId,
+          serviceName:  admission.serviceName,
+        },
+        newValue: {
+          status:        "discharged",
+          dischargeType: input.dischargeType,
+          dischargeDate,
+          dischargeTime,
+          ...(bedOutcome ? { bedOutcome } : {}),
+          ...(input.dischargeNotes ? { dischargeNotes: input.dischargeNotes } : {}),
+        },
         patientId:    admission.patientId,
         encounterId:  admission.encounterId ?? undefined,
         siteId:       admission.siteId ?? undefined,

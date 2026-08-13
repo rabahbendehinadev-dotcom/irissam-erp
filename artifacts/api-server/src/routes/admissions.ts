@@ -474,23 +474,51 @@ router.post("/:id/cancel", requirePermission("admissions.cancel"), async (req: A
   }
 });
 
-/** POST /admissions/:id/discharge (requires admissions.discharge) */
+/** POST /admissions/:id/discharge (requires admissions.discharge)
+ *  Body: { dischargeType (obligatoire), dischargeNotes?, dischargeDate? (AAAA-MM-JJ), dischargeTime? (HH:MM) }
+ *  Sortie ADT atomique : admission clôturée + lit → nettoyage + encounter fermé + journalisation. */
+const DISCHARGE_TYPES = ["domicile", "transfert_interne", "transfert_externe", "deces", "fugue", "contre_avis"];
+
 router.post("/:id/discharge", requirePermission("admissions.discharge"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = String(req.params.id);
     const body = req.body as {
-      dischargeType?: "domicile" | "transfert_interne" | "transfert_externe" | "deces" | "fugue" | "contre_avis";
+      dischargeType?:  string;
       dischargeNotes?: string;
+      dischargeDate?:  string;
+      dischargeTime?:  string;
     };
 
-    const admission = await admissionService.discharge(
-      id,
-      { dischargeType: body.dischargeType ?? "domicile", dischargeNotes: body.dischargeNotes },
-      actor(req),
-    );
+    if (!body.dischargeType || !DISCHARGE_TYPES.includes(body.dischargeType)) {
+      res.status(400).json({ error: `Type de sortie invalide — attendu : ${DISCHARGE_TYPES.join(", ")}` });
+      return;
+    }
+    const dischargeDate = typeof body.dischargeDate === "string" && body.dischargeDate.trim() ? body.dischargeDate.trim() : undefined;
+    const dischargeTime = typeof body.dischargeTime === "string" && body.dischargeTime.trim() ? body.dischargeTime.trim() : undefined;
+    if (dischargeDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(dischargeDate)) {
+      res.status(400).json({ error: "Date de sortie invalide (format AAAA-MM-JJ)" });
+      return;
+    }
+    if (dischargeTime !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(dischargeTime)) {
+      res.status(400).json({ error: "Heure de sortie invalide (format HH:MM)" });
+      return;
+    }
+
+    const admission = await admissionService.discharge(id, {
+      dischargeType:  body.dischargeType,
+      dischargeNotes: typeof body.dischargeNotes === "string" && body.dischargeNotes.trim() ? body.dischargeNotes.trim() : undefined,
+      dischargeDate,
+      dischargeTime,
+    }, actor(req));
 
     res.json(mapAdmission(admission));
-  } catch (err) {
+  } catch (err: any) {
+    const msg: string = err?.message ?? "";
+    if (msg.includes("introuvable")) { res.status(404).json({ error: msg }); return; }
+    if (msg.includes("invalide"))    { res.status(400).json({ error: msg }); return; }
+    if (msg.includes("déjà sorti") || msg.includes("annulée") || msg.includes("pas active")) {
+      res.status(409).json({ error: msg }); return;
+    }
     next(err);
   }
 });

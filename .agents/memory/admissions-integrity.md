@@ -14,13 +14,19 @@ description: Referential-integrity contract of POST /admissions, transactional c
 
 ## Transactional cancel + hardening
 - `admissionService.cancel()` mirrors discharge: status→cancelled + free bed + close encounter + audit in ONE transaction. Route no longer flips status inline; frontend must NOT call `/occupancy-beds/:id/release` manually.
-- **Free-only-if-still-linked rule:** before freeing, check the bed still references THIS admission (admissionId, encounterId or patientId). Legacy data had active admissions pointing at beds since reassigned to other patients — blind free() would evict the current occupant. transferBed() and cancel() have it; discharge() does NOT yet.
+- **Free-only-if-still-linked rule:** before freeing, check the bed still references THIS admission (admissionId, encounterId or patientId). Legacy data had active admissions pointing at beds since reassigned to other patients — blind free() would evict the current occupant. transferBed(), cancel() AND discharge() all have it now.
 
 ## Transfer = internal ADT move (rework 2026-08)
 - `transferBed(id, {newBedId, motif, notes?})` — ONE transaction: admission must be `active` (409), target bed must have roomId+serviceId (strict structure, 409), claim-first occupy (sets bed.admissionId), old bed → **nettoyage** only-if-still-linked, admission realigned on the FULL denorm chain (bed/room/floor/building/service inherited from the new bed — stale-service bug fixed), audit `bed_transferred` with complete from/to + motif (patient history via /audit-logs?patientId).
 - `motif` is required at the route (400). Frontend must NOT call `/occupancy-beds/:id/start-cleaning` after transfer anymore — the server does it atomically.
 - `admit()` also sets `bed.admission_id` now (bed-cards join + still-linked checks depend on it).
 - Transfer UI = shared cascade modal (`TransferBedModal`) built from `/infrastructure/tree` (active rooms only) + `/infrastructure/bed-cards`; internal transfer keeps status `active` — never mark `transferred` (that's the mock-context legacy semantic).
+
+## Discharge = ADT exit (rework 2026-08)
+- ONE tx: active-only guard (déjà sorti / annulée → 409), user-entered dischargeDate/Time actually persisted (pre-rework they were silently discarded and now() was stored) with chronology checks (≤ today, ≥ admission date/heure → 400), bed → **nettoyage** only-if-still-linked, encounter closed, audit `discharged` with full bed/room/floor/building/service chain + type/date/heure/notes.
+- Route validates dischargeType against the 6 `discharge_type` enum values → 400 (was silently defaulting bad input to "domicile"); repos.encounter.close is idempotent (plain UPDATE) — safe when encounter already closed.
+- Frontend must NOT call `/occupancy-beds/:id/start-cleaning` after discharge (server does it in-tx). DischargeModal surfaces API errors (was `.catch(() => {})` — closed pretending success while admission stayed active).
+- Retour à disponible = existing complete-cleaning workflow (page Hospitalisation), guarded 409 unless status=nettoyage.
 
 ## Occupancy-beds RBAC + guards
 - All bed routes gated with `admissions.*` (no dedicated bed permissions exist in DB): GET→view, assign→create, release→edit, cleaning→view (nurse class has only view).

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
-import { PlusCircle, Download, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Download, AlertTriangle, Loader2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
@@ -21,7 +21,6 @@ import { useLanguage } from '@/i18n';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { useAdmissionsApi } from '@/hooks/useAdmissionsApi';
-import { apiClient } from '@/services/api/client';
 import { useAuth } from '@/store/AuthContext';
 import { formatDate } from '@/utils/format';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
@@ -31,7 +30,7 @@ import { PatientDrawer } from '@/components/shared/PatientDrawer';
 
 function DischargeModal({ admission, onConfirm, onCancel }: {
   admission: Admission;
-  onConfirm: (type: string, date: string, time: string, notes: string) => void;
+  onConfirm: (type: string, date: string, time: string, notes: string) => Promise<void>;
   onCancel: () => void;
 }) {
   const { t } = useLanguage();
@@ -41,13 +40,30 @@ function DischargeModal({ admission, onConfirm, onCancel }: {
   const [date, setDate] = useState(today);
   const [time, setTime] = useState(now);
   const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy]   = useState(false);
   const cls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400';
+
+  const submit = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await onConfirm(type, date, time, notes);
+    } catch (e: any) {
+      setError(e?.data?.error ?? e?.message ?? 'Échec de la sortie');
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-6 max-h-[95dvh] overflow-y-auto">
-        <h3 className="font-bold text-gray-900 text-lg mb-4">{t('adm.discharge.title')}</h3>
+        <h3 className="font-bold text-gray-900 text-lg mb-1">{t('adm.discharge.title')}</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          {admission.patientName} · Lit {admission.bedNumber || '—'} · {admission.serviceName}
+        </p>
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">{t('adm.discharge.type')}</label>
@@ -60,7 +76,8 @@ function DischargeModal({ admission, onConfirm, onCancel }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">{t('adm.discharge.date')}</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} className={cls} />
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className={cls}
+                min={admission.admissionDate || undefined} max={today} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">{t('adm.discharge.time')}</label>
@@ -72,11 +89,26 @@ function DischargeModal({ admission, onConfirm, onCancel }: {
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
               className={`${cls} resize-none`} />
           </div>
+          {admission.bedNumber && (
+            <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-2.5">
+              Le lit {admission.bedNumber} passera en <span className="font-medium">nettoyage</span>, puis redeviendra
+              disponible une fois le nettoyage terminé (Hospitalisation).
+            </p>
+          )}
+          {error && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-lg p-3 text-xs text-red-700">
+              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" /> {error}
+            </div>
+          )}
         </div>
         <div className="flex gap-3 mt-5">
-          <button onClick={onCancel} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">{t('adm.form.cancel')}</button>
-          <button onClick={() => onConfirm(type, date, time, notes)}
-            className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+          <button onClick={onCancel} disabled={busy}
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40">
+            {t('adm.form.cancel')}
+          </button>
+          <button onClick={submit} disabled={busy}
+            className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-40 flex items-center justify-center gap-1.5">
+            {busy && <Loader2 size={13} className="animate-spin" />}
             {t('adm.discharge.confirm')}
           </button>
         </div>
@@ -371,11 +403,11 @@ export default function AdmissionsPage() {
         <DischargeModal
           admission={discharging}
           onConfirm={async (type, date, time, notes) => {
-            await discharge(discharging.id, type, date, time, notes).catch(() => {});
+            // Sortie ADT atomique côté serveur : admission clôturée + lit →
+            // nettoyage + encounter fermé + mouvement journalisé — une seule
+            // transaction. Plus d'appel start-cleaning séparé ni d'erreur avalée.
+            await discharge(discharging.id, type, date, time, notes); // jette en cas d'échec — le modal affiche l'erreur
             log('archive', 'admission', discharging.id, `Sortie ${type}`);
-            if (discharging.bedId) {
-              apiClient.post(`/occupancy-beds/${discharging.bedId}/start-cleaning`, {}).catch(() => {});
-            }
             setBedRefreshKey(k => k + 1);
             setDischarging(null);
           }}
