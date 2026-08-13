@@ -243,6 +243,7 @@ export function AdmissionForm({ admission, initialPatientId, onSave, onCancel }:
           notes:         form.notes || undefined,
           bedId:         selectedBed!.id,
           bedNumber:     selectedBed!.number,
+          preadmissionDate: form.type === 'preadmission' && form.preadmissionDate ? form.preadmissionDate : undefined,
         });
         log('create', 'admission', (created as any).id, `${form.type} — ${selectedPatient.lastName}`);
         const mapped = mapApiAdmission(created);

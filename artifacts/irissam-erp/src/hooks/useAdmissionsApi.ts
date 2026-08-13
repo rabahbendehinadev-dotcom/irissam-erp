@@ -39,6 +39,8 @@ export function mapApiAdmission(a: any): Admission {
     actualDischargeTime:   a.actualDischargeTime   ?? '',
     dischargeType:       a.dischargeType   ?? undefined,
     dischargeNotes:      a.dischargeNotes  ?? '',
+    preadmissionDate:        a.preadmissionDate        ?? undefined,
+    preadmissionConvertedAt: a.preadmissionConvertedAt ?? undefined,
     notes:               a.notes           ?? '',
     createdAt:           a.createdAt       ?? new Date().toISOString(),
     updatedAt:           a.updatedAt       ?? new Date().toISOString(),

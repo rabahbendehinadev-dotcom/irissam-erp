@@ -76,6 +76,56 @@ export class OccupancyBedRepository {
   }
 
   /**
+   * Réserver un lit pour une préadmission — claim-first : échoue si le lit
+   * n'est plus "disponible". Pas d'occupiedAt : le patient n'est pas entré.
+   */
+  async reserve(
+    id: string,
+    payload: { patientId?: string; patientName: string; admissionId?: string },
+    ctx: TxContext,
+  ): Promise<DbOccupancyBed | null> {
+    const [row] = await qb(this.db, ctx)
+      .update(occupancyBedsTable)
+      .set({
+        status:      "reserve",
+        patientId:   payload.patientId ?? null,
+        patientName: payload.patientName,
+        admissionId: payload.admissionId ?? null,
+        updatedBy:   safeUuid(ctx.userId),
+        updatedAt:   new Date(),
+      })
+      .where(and(eq(occupancyBedsTable.id, id), eq(occupancyBedsTable.status, "disponible")))
+      .returning();
+    return row ?? null;
+  }
+
+  /**
+   * Confirmer une réservation : réservé → occupé. Claim-first strict —
+   * le lit doit être encore "reserve" ET lié à CETTE admission.
+   */
+  async occupyReserved(
+    id: string,
+    admissionId: string,
+    ctx: TxContext,
+  ): Promise<DbOccupancyBed | null> {
+    const [row] = await qb(this.db, ctx)
+      .update(occupancyBedsTable)
+      .set({
+        status:     "occupe",
+        occupiedAt: new Date(),
+        updatedBy:  safeUuid(ctx.userId),
+        updatedAt:  new Date(),
+      })
+      .where(and(
+        eq(occupancyBedsTable.id, id),
+        eq(occupancyBedsTable.status, "reserve"),
+        eq(occupancyBedsTable.admissionId, admissionId),
+      ))
+      .returning();
+    return row ?? null;
+  }
+
+  /**
    * Free a bed — clears occupant fields (incl. admissionId).
    * Par défaut le lit redevient "disponible" ; passer nextStatus:"nettoyage"
    * pour le mouvement ADT (sortie/transfert → nettoyage avant remise à dispo).

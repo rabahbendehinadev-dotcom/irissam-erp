@@ -86,6 +86,8 @@ function mapAdmission(a: typeof admissionsTable.$inferSelect) {
     actualDischargeTime:   a.actualDischargeTime,
     dischargeType:      a.dischargeType,
     dischargeNotes:     a.dischargeNotes,
+    preadmissionDate:        a.preadmissionDate,
+    preadmissionConvertedAt: a.preadmissionConvertedAt,
     notes:              a.notes,
     siteId:             a.siteId,
     createdAt:          a.createdAt,
@@ -211,7 +213,10 @@ router.get("/:id/timeline", requirePermission("admissions.view"), async (req: Re
       .where(and(
         eq(auditLogsTable.resourceType, "admission"),
         eq(auditLogsTable.resourceId, id),
-        inArray(auditLogsTable.action, ["admitted", "bed_transferred", "discharged", "cancelled"]),
+        inArray(auditLogsTable.action, [
+          "admitted", "preadmitted", "preadmission_converted",
+          "bed_transferred", "discharged", "cancelled",
+        ]),
       ))
       .orderBy(asc(auditLogsTable.timestamp));
 
@@ -228,6 +233,20 @@ router.get("/:id/timeline", requirePermission("admissions.view"), async (req: Re
           const num = typeof newV.admissionNumber === "string" ? newV.admissionNumber : "";
           const bed = typeof newV.bedNumber === "string" ? newV.bedNumber : "";
           description = `Admission${num ? ` ${num}` : ""} créée${bed ? ` — lit ${bed}` : ""}`;
+          break;
+        }
+        case "preadmitted": {
+          type = "admission";
+          const num  = typeof newV.admissionNumber === "string" ? newV.admissionNumber : "";
+          const bed  = typeof newV.bedNumber === "string" ? newV.bedNumber : "";
+          const prev = frDate(newV.preadmissionDate);
+          description = `Préadmission${num ? ` ${num}` : ""} créée${bed ? ` — lit ${bed} réservé` : ""}${prev ? ` (entrée prévue le ${prev})` : ""}`;
+          break;
+        }
+        case "preadmission_converted": {
+          type = "preadmission_converted";
+          const bed = typeof newV.bedNumber === "string" ? newV.bedNumber : "";
+          description = `Admission confirmée — hospitalisation effective${bed ? ` (lit ${bed} occupé)` : ""}`;
           break;
         }
         case "bed_transferred": {
@@ -294,6 +313,7 @@ router.post("/", requirePermission("admissions.create"), async (req: Authenticat
       floorLabel?: string;
       buildingName?: string;
       expectedDischargeDate?: string;
+      preadmissionDate?: string;
       notes?: string;
     };
 
@@ -335,6 +355,14 @@ router.post("/", requirePermission("admissions.create"), async (req: Authenticat
     }
     if (body.priority !== undefined && !ADMISSION_PRIORITIES.includes(body.priority)) {
       res.status(400).json({ error: `priority invalide — valeurs autorisées : ${ADMISSION_PRIORITIES.join(", ")}` });
+      return;
+    }
+
+    // ── preadmissionDate : optionnelle, AAAA-MM-JJ (type "preadmission" uniquement) ──
+    const preadmissionDate =
+      typeof body.preadmissionDate === "string" && body.preadmissionDate.trim() ? body.preadmissionDate.trim() : undefined;
+    if (preadmissionDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(preadmissionDate)) {
+      res.status(400).json({ error: "preadmissionDate invalide (format AAAA-MM-JJ)" });
       return;
     }
 
@@ -466,6 +494,7 @@ router.post("/", requirePermission("admissions.create"), async (req: Authenticat
           floorLabel:    body.floorLabel,
           buildingName:  body.buildingName,
           expectedDischargeDate: body.expectedDischargeDate,
+          preadmissionDate: body.type === "preadmission" ? preadmissionDate : undefined,
           encounterId:   body.encounterId, // reuse from Urgences/Consultation
           siteId:        undefined,
         },
@@ -578,6 +607,26 @@ router.post("/:id/cancel", requirePermission("admissions.cancel"), async (req: A
     const msg: string = err?.message ?? "";
     if (msg.includes("introuvable")) { res.status(404).json({ error: msg }); return; }
     if (msg.includes("déjà"))        { res.status(409).json({ error: msg }); return; }
+    next(err);
+  }
+});
+
+/** POST /admissions/:id/confirm (requires admissions.create)
+ *  Confirmation d'une préadmission (entrée réelle du patient) — transaction
+ *  atomique côté service : lit réservé → occupé, encounter clinique ouvert,
+ *  statut → active, conversion journalisée. */
+router.post("/:id/confirm", requirePermission("admissions.create"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    const confirmed = await admissionService.confirmPreadmission(id, actor(req));
+    res.json(mapAdmission(confirmed));
+  } catch (err: any) {
+    const msg: string = err?.message ?? "";
+    if (msg.includes("introuvable")) { res.status(404).json({ error: msg }); return; }
+    if (msg.includes("n'est pas une préadmission") || msg.includes("annulée") ||
+        msg.includes("plus disponible") || msg.includes("Aucun lit")) {
+      res.status(409).json({ error: msg }); return;
+    }
     next(err);
   }
 });

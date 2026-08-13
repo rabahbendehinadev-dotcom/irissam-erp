@@ -169,6 +169,60 @@ function VitalsModal({ onSave, onCancel }: {
 
 // ─── Discharge modal (inline copy from Admissions.tsx to keep page self-contained) ──
 
+/** Modal de confirmation d'une préadmission — entrée réelle du patient. */
+function ConfirmAdmissionModal({ admission, onConfirm, onCancel }: {
+  admission: Admission;
+  onConfirm: () => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [busy, setBusy]   = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
+      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-6 max-h-[95dvh] overflow-y-auto">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 size={18} className="text-blue-600" />
+          </div>
+          <h3 className="font-bold text-gray-900 text-lg">Confirmer l'admission réelle</h3>
+        </div>
+        <p className="text-sm text-gray-600 mb-2">
+          Le patient <span className="font-semibold">{admission.patientName}</span> entre effectivement à l'hôpital :
+        </p>
+        <ul className="text-sm text-gray-600 mb-4 list-disc pl-5 space-y-1">
+          <li>la préadmission devient une hospitalisation en cours ;</li>
+          {admission.bedNumber && (
+            <li>le lit <span className="font-semibold">{admission.bedNumber}</span> passe de Réservé à Occupé ;</li>
+          )}
+          <li>la date et l'heure d'entrée réelles sont enregistrées maintenant.</li>
+        </ul>
+        {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
+        <div className="flex gap-3">
+          <button onClick={onCancel} disabled={busy}
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+            Annuler
+          </button>
+          <button
+            onClick={async () => {
+              setBusy(true); setError('');
+              try {
+                await onConfirm();
+              } catch (e: any) {
+                setError(e?.data?.error ?? e?.data?.message ?? e?.message ?? 'Échec de la confirmation');
+                setBusy(false);
+              }
+            }}
+            disabled={busy}
+            className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            {busy ? 'Confirmation…' : "Confirmer l'admission"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DischargeModal({ admission, onConfirm, onCancel }: {
   admission: Admission;
   onConfirm: (type: string, date: string, time: string, notes: string) => Promise<void>;
@@ -525,6 +579,7 @@ export default function AdmissionDetailPage() {
   const [showForm,     setShowForm]     = useState(false);
   const [discharging,  setDischarging]  = useState(false);
   const [transferring, setTransferring] = useState(false);
+  const [confirmingAdm, setConfirmingAdm] = useState(false);
   const [showVitals,   setShowVitals]   = useState(false);
   const [localEvents,  setLocalEvents]  = useState<AdmissionTimelineEvent[]>([]);
   const [serverEvents, setServerEvents] = useState<AdmissionTimelineEvent[]>([]);
@@ -615,6 +670,10 @@ export default function AdmissionDetailPage() {
 
   const timeline = [...serverEvents, ...localEvents];
   const isActive = ['active', 'preadmission', 'ambulatoire'].includes(admission.status);
+  // Préadmission : le patient n'est pas encore entré — pas de sortie, de
+  // transfert ni de signes vitaux; à la place, confirmation de l'admission
+  // réelle (lit réservé → occupé, encounter ouvert côté serveur).
+  const isPreadmission = admission.status === 'preadmission';
 
   return (
     <DashboardLayout>
@@ -672,7 +731,7 @@ export default function AdmissionDetailPage() {
 
             {/* Action buttons */}
             <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-              {can('admissions.edit') && isActive && (
+              {can('admissions.edit') && isActive && !isPreadmission && (
                 <button
                   onClick={() => setShowVitals(true)}
                   className="flex items-center gap-1.5 px-3 py-2 text-sm bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
@@ -688,7 +747,15 @@ export default function AdmissionDetailPage() {
                   <Edit size={13} /> Modifier
                 </button>
               )}
-              {can('admissions.transfer') && isActive && (
+              {can('admissions.create') && isPreadmission && (
+                <button
+                  onClick={() => setConfirmingAdm(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <CheckCircle2 size={13} /> Confirmer l'admission
+                </button>
+              )}
+              {can('admissions.transfer') && isActive && !isPreadmission && (
                 <button
                   onClick={() => setTransferring(true)}
                   className="flex items-center gap-1.5 px-3 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
@@ -696,7 +763,7 @@ export default function AdmissionDetailPage() {
                   <ArrowRight size={13} /> Transfert
                 </button>
               )}
-              {can('admissions.discharge') && isActive && (
+              {can('admissions.discharge') && isActive && !isPreadmission && (
                 <button
                   onClick={() => setDischarging(true)}
                   className="flex items-center gap-1.5 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -789,6 +856,22 @@ export default function AdmissionDetailPage() {
             await Promise.all([loadAdmission(), loadTimeline()]);
           }}
           onCancel={() => setTransferring(false)}
+        />
+      )}
+
+      {confirmingAdm && (
+        <ConfirmAdmissionModal
+          admission={admission}
+          onConfirm={async () => {
+            // Conversion atomique côté serveur : statut → active, lit réservé
+            // → occupé, encounter ouvert, conversion journalisée. Jette en cas
+            // d'échec — le modal affiche l'erreur.
+            await apiClient.post(`/admissions/${admission.id}/confirm`, {});
+            log('update', 'admission', admission.id, 'Confirmation préadmission');
+            setConfirmingAdm(false);
+            await Promise.all([loadAdmission(), loadTimeline()]);
+          }}
+          onCancel={() => setConfirmingAdm(false)}
         />
       )}
 

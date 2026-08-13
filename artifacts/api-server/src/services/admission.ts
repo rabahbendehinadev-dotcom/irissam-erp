@@ -59,6 +59,7 @@ export interface AdmitInput {
   diagnosis?:          string;
   notes?:              string;
   expectedDischargeDate?: string;
+  preadmissionDate?:   string;   // AAAA-MM-JJ — entrée prévue (type "preadmission")
 
   // Optional — reuse an existing encounter (e.g. from Urgences)
   encounterId?: string;
@@ -94,39 +95,52 @@ export class AdmissionService {
     return db.transaction(async (tx) => {
       const ctx: TxContext = { ...actor, tx };
 
-      // 1. Reuse existing encounter or create a new one
-      let encounter: { id: string };
-      if (input.encounterId) {
-        // Use the provided encounter ID (e.g. patient arrived from Urgences)
-        const existing = await repos.encounter.findById(input.encounterId, ctx);
-        if (!existing) {
-          throw new Error(`Encounter ${input.encounterId} introuvable`);
+      const isPreadmission = input.type === "preadmission";
+
+      // 1. Encounter — uniquement pour une admission réelle. Une préadmission
+      // n'ouvre PAS d'encounter clinique : il sera créé à la confirmation de
+      // l'entrée effective (confirmPreadmission) — un encounter ouvert
+      // autorise les actes cliniques, ce qui serait faux pour un préadmis.
+      let encounter: { id: string } | null = null;
+      if (!isPreadmission) {
+        if (input.encounterId) {
+          // Use the provided encounter ID (e.g. patient arrived from Urgences)
+          const existing = await repos.encounter.findById(input.encounterId, ctx);
+          if (!existing) {
+            throw new Error(`Encounter ${input.encounterId} introuvable`);
+          }
+          encounter = existing;
+        } else {
+          encounter = await encounterService.create({
+            patientId:       input.patientId,
+            patientName:     input.patientName,
+            patientMrn:      input.patientMpiId,
+            type:            "admission",
+            status:          "open",
+            chiefComplaint:  input.motif,
+            sourceModule:    "admissions",
+            primaryDoctorId:   input.doctorId,
+            primaryDoctorName: input.doctorName,
+            siteId:          input.siteId,
+          }, actor, ctx);
         }
-        encounter = existing;
-      } else {
-        encounter = await encounterService.create({
-          patientId:       input.patientId,
-          patientName:     input.patientName,
-          patientMrn:      input.patientMpiId,
-          type:            "admission",
-          status:          "open",
-          chiefComplaint:  input.motif,
-          sourceModule:    "admissions",
-          primaryDoctorId:   input.doctorId,
-          primaryDoctorName: input.doctorName,
-          siteId:          input.siteId,
-        }, actor, ctx);
       }
 
-      // 2. Occupy bed (fails if not "disponible")
-      const bed = await repos.occupancyBed.occupy(input.bedId, {
-        patientId:   input.patientId,
-        patientName: input.patientName,
-        encounterId: encounter.id,
-      }, ctx);
+      // 2. Lit : occupé pour une admission réelle, RÉSERVÉ pour une
+      // préadmission (claim-first : échoue si le lit n'est plus "disponible")
+      const bed = isPreadmission
+        ? await repos.occupancyBed.reserve(input.bedId, {
+            patientId:   input.patientId,
+            patientName: input.patientName,
+          }, ctx)
+        : await repos.occupancyBed.occupy(input.bedId, {
+            patientId:   input.patientId,
+            patientName: input.patientName,
+            encounterId: encounter!.id,
+          }, ctx);
 
       if (!bed) {
-        throw new Error(`Lit ${input.bedId} non disponible (déjà occupé ou introuvable)`);
+        throw new Error(`Lit ${input.bedId} non disponible (déjà occupé, réservé ou introuvable)`);
       }
 
       // 3. Generate admission number
@@ -135,7 +149,7 @@ export class AdmissionService {
       // 4. Create admission record
       const admission = await repos.admission.create({
         admissionNumber,
-        encounterId:    encounter.id,
+        encounterId:    encounter?.id,
         patientId:      input.patientId,
         patientName:    input.patientName,
         patientMpiId:   input.patientMpiId,
@@ -143,7 +157,7 @@ export class AdmissionService {
         patientPhone:   input.patientPhone,
         type:           (input.type ?? "hospitalisation") as any,
         priority:       (input.priority ?? "normal") as any,
-        status:         "active",
+        status:         isPreadmission ? "preadmission" : "active",
         serviceId:      input.serviceId,
         serviceName:    input.serviceName,
         doctorId:       input.doctorId,
@@ -159,6 +173,7 @@ export class AdmissionService {
         admissionDate:  todayIso(),
         admissionTime:  nowHHMM(),
         expectedDischargeDate: input.expectedDischargeDate,
+        preadmissionDate: isPreadmission ? input.preadmissionDate : undefined,
         siteId:         input.siteId,
       }, ctx);
 
@@ -170,12 +185,18 @@ export class AdmissionService {
 
       await auditService.log({
         module:       "admissions",
-        action:       "admitted",
+        action:       isPreadmission ? "preadmitted" : "admitted",
         resourceType: "admission",
         resourceId:   admission.id,
-        newValue:     { admissionNumber, bedNumber: bed.number, encounterId: encounter.id },
+        newValue:     {
+          admissionNumber,
+          bedNumber: bed.number,
+          ...(isPreadmission
+            ? { bedStatus: "reserve", ...(input.preadmissionDate ? { preadmissionDate: input.preadmissionDate } : {}) }
+            : { encounterId: encounter!.id }),
+        },
         patientId:    input.patientId,
-        encounterId:  encounter.id,
+        encounterId:  encounter?.id,
         siteId:       input.siteId,
       }, actor, ctx);
 
@@ -488,6 +509,83 @@ export class AdmissionService {
 
   async list(opts: Parameters<typeof repos.admission.list>[0]) {
     return repos.admission.list(opts);
+  }
+  // ── Confirm preadmission ──────────────────────────────────────────────────────
+
+  /**
+   * Confirmation d'une préadmission (entrée réelle du patient) — UNE
+   * transaction atomique :
+   * 1. validations : l'admission doit être au statut "preadmission"
+   * 2. lit : réservé → occupé (claim-first : WHERE status='reserve' AND
+   *    admission_id = cette admission — échoue si la réservation a sauté)
+   * 3. encounter clinique ouvert maintenant (l'entrée effective commence ici)
+   * 4. admission : status → active, date/heure d'entrée réelles,
+   *    preadmission_converted_at horodaté
+   * 5. conversion journalisée dans l'historique patient (audit_logs)
+   */
+  async confirmPreadmission(admissionId: string, actor: ActorCtx): Promise<DbAdmission> {
+    return db.transaction(async (tx) => {
+      const ctx: TxContext = { ...actor, tx };
+
+      const admission = await repos.admission.findById(admissionId, ctx);
+      if (!admission) throw new Error("Admission introuvable");
+      if (admission.status === "cancelled") throw new Error("Préadmission annulée — confirmation impossible");
+      if (admission.status !== "preadmission") {
+        throw new Error(`Cette admission n'est pas une préadmission (statut : ${admission.status})`);
+      }
+      if (!admission.bedId) {
+        throw new Error("Aucun lit réservé sur cette préadmission — attribuez un lit avant de confirmer");
+      }
+
+      // 2. Lit réservé → occupé (verrou anti-course sur la réservation)
+      const bed = await repos.occupancyBed.occupyReserved(admission.bedId, admissionId, ctx);
+      if (!bed) {
+        throw new Error("Le lit réservé n'est plus disponible — modifiez la préadmission pour choisir un autre lit");
+      }
+
+      // 3. Encounter clinique ouvert à l'entrée effective
+      const encounter = await encounterService.create({
+        patientId:       admission.patientId,
+        patientName:     admission.patientName,
+        patientMrn:      admission.patientMpiId ?? undefined,
+        type:            "admission",
+        status:          "open",
+        chiefComplaint:  admission.motif,
+        sourceModule:    "admissions",
+        primaryDoctorId:   admission.doctorId ?? undefined,
+        primaryDoctorName: admission.doctorName,
+        siteId:          admission.siteId ?? undefined,
+      }, actor, ctx);
+
+      // 3b. Lier le lit à l'encounter (occupyReserved ne le connaissait pas)
+      await tx.update(occupancyBedsTable)
+        .set({ encounterId: encounter.id, updatedAt: new Date() })
+        .where(eq(occupancyBedsTable.id, admission.bedId));
+
+      // 4. Admission → hospitalisation effective
+      const updated = await repos.admission.update(admissionId, {
+        status:                  "active",
+        encounterId:             encounter.id,
+        preadmissionConvertedAt: new Date(),
+        admissionDate:           todayIso(),
+        admissionTime:           nowHHMM(),
+      }, ctx);
+      if (!updated) throw new Error("Mise à jour de l'admission échouée");
+
+      await auditService.log({
+        module:       "admissions",
+        action:       "preadmission_converted",
+        resourceType: "admission",
+        resourceId:   admissionId,
+        oldValue:     { status: "preadmission", bedStatus: "reserve" },
+        newValue:     { status: "active", bedStatus: "occupe", bedNumber: bed.number, encounterId: encounter.id },
+        patientId:    admission.patientId,
+        encounterId:  encounter.id,
+        siteId:       admission.siteId ?? undefined,
+      }, actor, ctx);
+
+      return updated;
+    });
   }
 }
 
