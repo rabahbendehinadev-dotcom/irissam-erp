@@ -25,6 +25,20 @@ interface State {
   errorInfo: React.ErrorInfo | null;
 }
 
+/**
+ * Erreur de chargement de chunk : après un déploiement, un onglet ouvert
+ * référence encore les anciens hashes (404 côté serveur). La seule
+ * récupération possible est un VRAI rechargement de la page.
+ */
+const CHUNK_ERROR_RE =
+  /(Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Loading chunk \S+ failed|ChunkLoadError)/i;
+
+function isChunkLoadError(error: Error | null): boolean {
+  return !!error && CHUNK_ERROR_RE.test(`${error.name} ${error.message}`);
+}
+
+const PAGE_CHUNK_RELOAD_KEY = 'irissam_page_chunk_reload_at';
+
 export class PageErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -46,9 +60,26 @@ export class PageErrorBoundary extends React.Component<Props, State> {
       message: error.message,
       componentStack: errorInfo.componentStack?.slice(0, 500),
     });
+
+    // Chunk disparu après un déploiement : recharger UNE fois récupère le
+    // nouvel index.html (nouveaux hashes). Garde anti-boucle 15 s — au 2e
+    // échec rapproché on laisse l'écran d'erreur s'afficher.
+    if (isChunkLoadError(error)) {
+      const last = Number(sessionStorage.getItem(PAGE_CHUNK_RELOAD_KEY) || 0);
+      if (Date.now() - last > 15000) {
+        sessionStorage.setItem(PAGE_CHUNK_RELOAD_KEY, String(Date.now()));
+        window.location.reload();
+      }
+    }
   }
 
   handleRetry = () => {
+    // Un chunk manquant ne reviendra jamais sans recharger la page —
+    // « Réessayer » fait alors un vrai reload au lieu d'un simple reset.
+    if (isChunkLoadError(this.state.error)) {
+      window.location.reload();
+      return;
+    }
     this.setState({ hasError: false, error: null, errorInfo: null });
   };
 
