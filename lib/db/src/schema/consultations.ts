@@ -4,7 +4,7 @@
  * REPLACES the legacy consultations table (which had serial PK and partial fields).
  */
 import {
-  pgTable, uuid, text, integer, timestamp, index, uniqueIndex,
+  pgTable, uuid, text, integer, timestamp, index, uniqueIndex, date, boolean,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -15,6 +15,7 @@ import { sitesTable } from "./infrastructure";
 import { usersTable } from "./users";
 import { patientsTable } from "./patients";
 import { encountersTable } from "./encounters";
+import { medicationsTable } from "./medications";
 
 // ─── Consultations ────────────────────────────────────────────────────────────
 
@@ -45,6 +46,13 @@ export const consultationsTable = pgTable("consultations", {
   diagnosis: text("diagnosis"),
   notes:     text("notes"),
 
+  // Patient de passage (consultation seule, sans dossier patient permanent) :
+  // identité minimale portée par la consultation ; patientId reste NULL
+  // jusqu'au rattachement éventuel (POST /consultations/:id/attach-patient).
+  patientPhone:     text("patient_phone"),
+  patientBirthDate: date("patient_birth_date"),
+  patientGender:    text("patient_gender"),
+
   siteId:     uuid("site_id").references(() => sitesTable.id, { onDelete: "set null" }),
   syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
 
@@ -65,8 +73,56 @@ export const consultationsTable = pgTable("consultations", {
   index("consultations_deleted_at_idx").on(t.deletedAt),
 ]);
 
+// ─── Traitements de la consultation ───────────────────────────────────────────
+// Soins / actes / traitements renseignés par le médecin pendant la
+// consultation. La ligne porte l'utilisateur responsable et l'horodatage.
+
+export const consultationTreatmentsTable = pgTable("consultation_treatments", {
+  id:             uuid("id").primaryKey().defaultRandom(),
+  consultationId: uuid("consultation_id").notNull().references(() => consultationsTable.id, { onDelete: "cascade" }),
+  patientId:      uuid("patient_id").references(() => patientsTable.id, { onDelete: "restrict" }),
+  designation:    text("designation").notNull(),
+  note:           text("note"),
+  performedAt:    timestamp("performed_at", { withTimezone: true }).defaultNow().notNull(),
+  recordedBy:     uuid("recorded_by").references(() => usersTable.id, { onDelete: "set null" }),
+  recordedByName: text("recorded_by_name").notNull(),
+  createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("cons_treatments_consultation_idx").on(t.consultationId),
+  index("cons_treatments_patient_idx").on(t.patientId),
+]);
+
+// ─── Favoris du praticien ─────────────────────────────────────────────────────
+// Personnels (userId) : diagnostics / médicaments fréquents — épinglage +
+// compteur d'usage pour éviter la ressaisie. medication_* ne concerne que
+// kind = 'medication'. Unicité (user_id, kind, lower(label)) côté SQL (048).
+
+export const doctorFavoritesTable = pgTable("doctor_favorites", {
+  id:           uuid("id").primaryKey().defaultRandom(),
+  userId:       uuid("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  kind:         text("kind", { enum: ["diagnosis", "medication", "treatment"] }).notNull(),
+  label:        text("label").notNull(),
+  medicationId: uuid("medication_id").references(() => medicationsTable.id, { onDelete: "set null" }),
+  dosage:       text("dosage"),
+  frequency:    text("frequency"),
+  duration:     text("duration"),
+  instructions: text("instructions"),
+  pinned:       boolean("pinned").notNull().default(false),
+  usageCount:   integer("usage_count").notNull().default(0),
+  lastUsedAt:   timestamp("last_used_at", { withTimezone: true }),
+  createdAt:    timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("doctor_favorites_user_idx").on(t.userId),
+]);
+
 // ─── Insert Schemas & Types ───────────────────────────────────────────────────
 
 export const insertConsultationSchema = createInsertSchema(consultationsTable).omit({ id: true });
-export type InsertConsultation = z.infer<typeof insertConsultationSchema>;
-export type DbConsultation     = typeof consultationsTable.$inferSelect;
+export const insertConsultationTreatmentSchema = createInsertSchema(consultationTreatmentsTable).omit({ id: true });
+export const insertDoctorFavoriteSchema        = createInsertSchema(doctorFavoritesTable).omit({ id: true });
+export type InsertConsultation          = z.infer<typeof insertConsultationSchema>;
+export type InsertConsultationTreatment = z.infer<typeof insertConsultationTreatmentSchema>;
+export type InsertDoctorFavorite        = z.infer<typeof insertDoctorFavoriteSchema>;
+export type DbConsultation              = typeof consultationsTable.$inferSelect;
+export type DbConsultationTreatment     = typeof consultationTreatmentsTable.$inferSelect;
+export type DbDoctorFavorite            = typeof doctorFavoritesTable.$inferSelect;

@@ -46,3 +46,4 @@
 - [Admission detail de-mock](admissions-detail-demock.md) — /admissions/:id fetches the API directly; legacy AdmissionsContext = mock localStorage store (only Settings.resetToDefaults left) — never wire pages to it; "introuvable" only on server 404
 - [Preadmission workflow](preadmission-workflow.md) — préadmission = statut preadmission + lit "reserve", SANS encounter; conversion atomique /admissions/:id/confirm (reserve→occupe claim-first, encounter ouvert là)
 - [Fiche consommable (séjour)](consumables-sheet.md) — admission_consumables étape 1 AUTONOME (saisie libre, pas de stock); étape 2 = liaison Stock/Pharmacie par ALTER TABLE + chaîne FEFO
+- [Consultation professionnelle](consultation-pro.md) — walk-in = !patientId (pas de colonne), attach-patient tx + backfill, favoris self-scoped, rx via consultationId (champ `drug`), docs 2 temps sans delete

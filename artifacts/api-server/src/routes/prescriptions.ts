@@ -40,6 +40,8 @@ function mapPrescription(p: DbPrescription) {
   return {
     id:                p.id,
     encounterId:       p.encounterId ?? null,
+    consultationId:    p.consultationId ?? null,
+    instructions:      p.instructions ?? null,
     patientId:         p.patientId,
     patientName:       p.patientName,
     visitId:           p.visitId ?? null,
@@ -69,10 +71,11 @@ function mapPrescription(p: DbPrescription) {
 /** GET /prescriptions */
 router.get("/", requirePermission("pharmacy.view"), async (req, res, next) => {
   try {
-    const { patientId, encounterId, status, limit, offset } = req.query as Record<string, string>;
+    const { patientId, encounterId, consultationId, status, limit, offset } = req.query as Record<string, string>;
     const result = await repos.prescription.list({
       patientId,
       encounterId,
+      consultationId,
       status,
       limit:  limit  ? parseInt(limit,  10) : 100,
       offset: offset ? parseInt(offset, 10) : 0,
@@ -109,27 +112,64 @@ router.post(
       route?:           string;
       frequency?:       string;
       duration?:        string;
+      instructions?:    string;
       notes?:           string;
       sourceModule?:    string;
+      /** Ordonnance de consultation : patient/encounter hérités de la consultation. */
+      consultationId?:  string;
     };
 
-    const patientId   = body.patientId   ? safeUuid(body.patientId)   : null;
-    const encounterId = body.encounterId ? safeUuid(body.encounterId) : null;
-    if (!patientId)   { res.status(400).json({ error: "patientId requis (UUID valide)" }); return; }
-    if (!encounterId) { res.status(400).json({ error: "encounterId requis — aucune prescription sans encounter réel" }); return; }
     if (!body.dosage?.trim())    { res.status(400).json({ error: "dosage requis" }); return; }
     if (!body.route?.trim())     { res.status(400).json({ error: "route requis" }); return; }
     if (!body.frequency?.trim()) { res.status(400).json({ error: "frequency requis" }); return; }
+    const instructions = typeof body.instructions === "string" && body.instructions.trim()
+      ? body.instructions.trim() : null;
+    if (instructions && instructions.length > 500) {
+      res.status(400).json({ error: "instructions trop longues (500 caractères max)" }); return;
+    }
 
-    // Patient réel obligatoire
-    const patient = await repos.patient.findById(patientId);
-    if (!patient) { res.status(400).json({ error: "Patient introuvable — prescription refusée" }); return; }
+    // ── Deux chemins d'ancrage ────────────────────────────────────────────
+    // A) consultationId : ordonnance de consultation — patient/encounter
+    //    HÉRITÉS de la consultation (patient de passage possible : patient
+    //    NULL, encounter NULL en externe). Un médecin ne prescrit QUE dans
+    //    ses propres consultations.
+    // B) chemin historique (Urgences/Hospitalisation) : patientId +
+    //    encounterId réels obligatoires, appartenance vérifiée (anti-IDOR).
+    let patientId: string | null = null;
+    let encounterId: string | null = null;
+    let consultationId: string | null = null;
+    let patientNameResolved = "";
 
-    // Encounter réel ET appartenant à ce patient (anti-IDOR)
-    const encounter = await repos.encounter.findById(encounterId);
-    if (!encounter) { res.status(400).json({ error: "Encounter introuvable — aucune prescription sans encounter réel" }); return; }
-    if (encounter.patientId !== patientId) {
-      res.status(400).json({ error: "L'encounter n'appartient pas à ce patient — prescription refusée" }); return;
+    if (body.consultationId) {
+      consultationId = safeUuid(body.consultationId) ?? null;
+      if (!consultationId) { res.status(400).json({ error: "consultationId invalide (UUID attendu)" }); return; }
+      const cons = await repos.consultation.findById(consultationId);
+      if (!cons) { res.status(400).json({ error: "Consultation introuvable — prescription refusée" }); return; }
+      if (cons.status === "annulee") { res.status(409).json({ error: "Consultation annulée — prescription refusée" }); return; }
+      if (req.auth?.role === "doctor" && cons.doctorId && cons.doctorId !== req.auth.userId) {
+        res.status(403).json({ error: "Consultation d'un autre médecin — prescription refusée" });
+        return;
+      }
+      patientId   = cons.patientId   ?? null;
+      encounterId = cons.encounterId ?? null;
+      patientNameResolved = cons.patientName;
+    } else {
+      patientId   = body.patientId   ? (safeUuid(body.patientId)   ?? null) : null;
+      encounterId = body.encounterId ? (safeUuid(body.encounterId) ?? null) : null;
+      if (!patientId)   { res.status(400).json({ error: "patientId requis (UUID valide)" }); return; }
+      if (!encounterId) { res.status(400).json({ error: "encounterId requis — aucune prescription sans encounter réel" }); return; }
+
+      // Patient réel obligatoire
+      const patient = await repos.patient.findById(patientId);
+      if (!patient) { res.status(400).json({ error: "Patient introuvable — prescription refusée" }); return; }
+      patientNameResolved = `${patient.firstName} ${patient.lastName}`.trim();
+
+      // Encounter réel ET appartenant à ce patient (anti-IDOR)
+      const encounter = await repos.encounter.findById(encounterId);
+      if (!encounter) { res.status(400).json({ error: "Encounter introuvable — aucune prescription sans encounter réel" }); return; }
+      if (encounter.patientId !== patientId) {
+        res.status(400).json({ error: "L'encounter n'appartient pas à ce patient — prescription refusée" }); return;
+      }
     }
 
     // Médicament du stock (optionnel mais recommandé) : s'il est fourni, il doit
@@ -146,14 +186,18 @@ router.post(
     if (!drug) { res.status(400).json({ error: "drug requis (ou medicationId d'un médicament du stock)" }); return; }
 
     const a = actor(req);
-    const sourceModule = RX_SOURCE_MODULES.has(body.sourceModule ?? "")
-      ? body.sourceModule as "urgences" | "consultations" | "hospitalisation"
-      : "urgences";
+    const sourceModule = consultationId
+      ? ("consultations" as const)
+      : RX_SOURCE_MODULES.has(body.sourceModule ?? "")
+        ? body.sourceModule as "urgences" | "consultations" | "hospitalisation"
+        : "urgences";
 
     const rx = await clinicalOrderService.createPrescription({
       patientId,
       encounterId,
-      patientName:      body.patientName?.trim() || `${patient.firstName} ${patient.lastName}`.trim(),
+      consultationId,
+      instructions,
+      patientName:      body.patientName?.trim() || patientNameResolved,
       visitId:          body.visitId ?? null,
       medicationId,
       drug,

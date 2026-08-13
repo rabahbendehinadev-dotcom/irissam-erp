@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   ClipboardList, Activity, Brain, History, Shield, Pill,
+  Syringe, Paperclip, FileText,
 } from 'lucide-react';
 import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import { ConsultationHeader } from './ConsultationHeader';
@@ -9,6 +10,9 @@ import { ConsultationPrintModal } from './ConsultationPrintModal';
 import { DiagnosisBuilder } from './DiagnosisBuilder';
 import { ConsultationHistoryPanel } from './ConsultationHistoryPanel';
 import { ConsultationPrescriptionsPanel } from './ConsultationPrescriptionsPanel';
+import { ConsultationTreatmentsPanel } from './ConsultationTreatmentsPanel';
+import { ConsultationDocumentsPanel } from './ConsultationDocumentsPanel';
+import { OrdonnancePanel } from './OrdonnanceModal';
 import type { Consultation, ConsultationStatus, AuditEntry } from '@/types/consultation';
 import { useAuth } from '@/store/AuthContext';
 
@@ -16,12 +20,15 @@ import { useAuth } from '@/store/AuthContext';
  * Espace de travail d'une consultation — 100 % données réelles.
  *
  * Onglets affichés : uniquement ceux adossés à des données PostgreSQL
- * (contexte, diagnostic, prescriptions) ou à des états honnêtes (signes
- * vitaux ; historique ; journal de session). Les prescriptions sont créées
- * sur l'encounter réel de la consultation avec un médicament du stock
- * pharmacie, puis suivent le flux préparation → délivrance (stock déduit).
- * Les anciens onglets de démonstration (examen clinique, analyses, imagerie,
- * documents, suivi) restent retirés tant que leurs modules n'existent pas.
+ * (contexte, diagnostic, médicaments, traitements, documents, ordonnance)
+ * ou à des états honnêtes (signes vitaux ; historique ; journal de session).
+ * Flux médecin : Diagnostic → Médicaments → Traitements → Documents →
+ * Ordonnance. Les prescriptions sont rattachées à la consultation (médicament
+ * du stock pharmacie) puis suivent le flux préparation → délivrance (stock
+ * déduit). Documents : téléversement réel en deux temps (stockage objet →
+ * rattachement audité). Les anciens onglets de démonstration (examen
+ * clinique, analyses, imagerie, suivi) restent retirés tant que leurs
+ * modules n'existent pas.
  */
 
 // ─── Libellés type / origine (valeurs enum PostgreSQL + héritées) ────────────
@@ -212,9 +219,12 @@ function SessionJournalTab({ consultationNumber, entries }: {
 
 const TABS = [
   { id: 'context',       label: 'Contexte',      icon: ClipboardList },
-  { id: 'vitals',        label: 'Signes vitaux', icon: Activity },
   { id: 'diagnosis',     label: 'Diagnostic',    icon: Brain },
-  { id: 'prescriptions', label: 'Prescriptions', icon: Pill },
+  { id: 'prescriptions', label: 'Médicaments',   icon: Pill },
+  { id: 'treatments',    label: 'Traitements',   icon: Syringe },
+  { id: 'documents',     label: 'Documents',     icon: Paperclip },
+  { id: 'ordonnance',    label: 'Ordonnance',    icon: FileText },
+  { id: 'vitals',        label: 'Signes vitaux', icon: Activity },
   { id: 'history',       label: 'Historique',    icon: History },
   { id: 'journal',       label: 'Session',       icon: Shield },
 ];
@@ -229,10 +239,12 @@ interface Props {
   diagnosisSaving: boolean;
   /** Un PATCH réel (notes / diagnostic) est en cours — affiché dans l'en-tête. */
   saving?: boolean;
+  /** Recharge la consultation depuis l'API (ex. après rattachement patient). */
+  onReload?: () => void;
 }
 
 export function ConsultationWorkspace({
-  consultation, onStatusChange, onSaveDiagnosis, diagnosisSaving, saving = false,
+  consultation, onStatusChange, onSaveDiagnosis, diagnosisSaving, saving = false, onReload,
 }: Props) {
   const { user } = useAuth();
   const [activeTab, setActiveTab]     = useState('context');
@@ -293,6 +305,7 @@ export function ConsultationWorkspace({
         onStatusChange={handleStatusChange}
         onTerminer={handleTerminer}
         onPrint={handlePrint}
+        onReload={onReload}
       />
 
       {/* Barre d'onglets */}
@@ -329,6 +342,26 @@ export function ConsultationWorkspace({
             <ConsultationPrescriptionsPanel
               consultation={consultation}
               readOnly={readOnly}
+              onLog={pushEntry}
+            />
+          </div>
+          <div className={activeTab === 'treatments' ? '' : 'hidden'}>
+            <ConsultationTreatmentsPanel
+              consultation={consultation}
+              readOnly={readOnly}
+              onLog={pushEntry}
+            />
+          </div>
+          <div className={activeTab === 'documents' ? '' : 'hidden'}>
+            <ConsultationDocumentsPanel
+              consultation={consultation}
+              readOnly={readOnly}
+              onLog={pushEntry}
+            />
+          </div>
+          <div className={activeTab === 'ordonnance' ? '' : 'hidden'}>
+            <OrdonnancePanel
+              consultation={consultation}
               onLog={pushEntry}
             />
           </div>

@@ -100,7 +100,10 @@ export class ConsultationService {
       }
       const number = `CONS-${year}-${String(nextVal).padStart(5, "0")}`;
 
-      const consultation = await repos.consultation.create({ ...input, number }, ctx);
+      // Patient de passage (patientId NULL, patientMpi vide) : MPI d'affichage
+      // EXT-YYYY-NNNNN dérivé du numéro — identifiant lisible, jamais un MRN.
+      const patientMpi = input.patientMpi || number.replace(/^CONS-/, "EXT-");
+      const consultation = await repos.consultation.create({ ...input, number, patientMpi }, ctx);
 
       await auditService.log({
         module:       "consultations",
@@ -113,6 +116,7 @@ export class ConsultationService {
           doctorId:    consultation.doctorId,
           serviceName: consultation.serviceName,
           encounterId: consultation.encounterId,
+          walkIn:      !input.patientId || undefined,
         },
         patientId:    input.patientId ?? undefined,
         encounterId:  input.encounterId ?? undefined,
@@ -192,6 +196,75 @@ export class ConsultationService {
     }, actor);
 
     return updated;
+  }
+
+  /**
+   * Rattachement d'une consultation « patient de passage » à un dossier
+   * patient permanent — transaction atomique, sans ressaisie ni doublon :
+   *  - la consultation reçoit patientId + identité dénormalisée réelle ;
+   *  - prescriptions et traitements de la consultation sont backfillés ;
+   *  - audit `patient_attached` (traçabilité administration).
+   */
+  async attachPatient(consultationId: string, patientId: string, actor: ActorCtx): Promise<DbConsultation> {
+    return db.transaction(async (tx) => {
+      const ctx: TxContext = { ...actor, tx };
+
+      const consQ = await tx.execute(sql`
+        SELECT id, patient_id, patient_name, patient_mpi FROM consultations
+        WHERE id = ${consultationId} AND deleted_at IS NULL
+        FOR UPDATE
+      `);
+      const consRows =
+        (consQ as unknown as { rows?: Array<{ id: string; patient_id: string | null; patient_name: string; patient_mpi: string }> }).rows
+        ?? (consQ as unknown as Array<{ id: string; patient_id: string | null; patient_name: string; patient_mpi: string }>);
+      const cons = consRows[0];
+      if (!cons)            throw new Error("Consultation introuvable");
+      if (cons.patient_id)  throw new Error("Consultation déjà rattachée à un dossier patient");
+
+      const patQ = await tx.execute(sql`
+        SELECT id, first_name, last_name, mrn, mpi_id FROM patients
+        WHERE id = ${patientId} AND deleted_at IS NULL
+      `);
+      const patRows =
+        (patQ as unknown as { rows?: Array<{ id: string; first_name: string; last_name: string; mrn: string; mpi_id: string | null }> }).rows
+        ?? (patQ as unknown as Array<{ id: string; first_name: string; last_name: string; mrn: string; mpi_id: string | null }>);
+      const pat = patRows[0];
+      if (!pat) throw new Error("Patient introuvable");
+
+      const patientName = `${pat.first_name} ${pat.last_name}`;
+      const patientMpi  = pat.mpi_id ?? pat.mrn;
+
+      const updated = await repos.consultation.update(consultationId, {
+        patientId: pat.id,
+        patientName,
+        patientMpi,
+      }, ctx);
+      if (!updated) throw new Error("Consultation introuvable");
+
+      // Backfill des ressources créées pendant la phase « de passage »
+      await tx.execute(sql`
+        UPDATE prescriptions
+           SET patient_id = ${pat.id}, patient_name = ${patientName}, updated_at = now()
+         WHERE consultation_id = ${consultationId} AND patient_id IS NULL AND deleted_at IS NULL
+      `);
+      await tx.execute(sql`
+        UPDATE consultation_treatments
+           SET patient_id = ${pat.id}
+         WHERE consultation_id = ${consultationId} AND patient_id IS NULL
+      `);
+
+      await auditService.log({
+        module:       "consultations",
+        action:       "patient_attached",
+        resourceType: "consultation",
+        resourceId:   consultationId,
+        oldValue:     { patientId: null, patientName: cons.patient_name, patientMpi: cons.patient_mpi },
+        newValue:     { patientId: pat.id, patientName, patientMpi },
+        patientId:    pat.id,
+      }, actor, ctx);
+
+      return updated;
+    });
   }
 }
 

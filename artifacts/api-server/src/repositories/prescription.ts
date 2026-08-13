@@ -20,9 +20,10 @@ import { type TxContext, type QueryOptions, type PagedResult, paged, qb, safeUui
 export type { DbPrescription };
 
 export interface PrescriptionListOpts extends QueryOptions {
-  encounterId?: string;
-  patientId?:   string;
-  status?:      string;
+  encounterId?:    string;
+  patientId?:      string;
+  consultationId?: string;
+  status?:         string;
 }
 
 export class PrescriptionRepository {
@@ -37,11 +38,12 @@ export class PrescriptionRepository {
   }
 
   async list(opts: PrescriptionListOpts = {}): Promise<PagedResult<DbPrescription>> {
-    const { encounterId, patientId, status, limit = 50, offset = 0, includeDeleted = false } = opts;
+    const { encounterId, patientId, consultationId, status, limit = 50, offset = 0, includeDeleted = false } = opts;
     const conditions = [];
     if (!includeDeleted) conditions.push(isNull(prescriptionsTable.deletedAt));
     if (encounterId) conditions.push(eq(prescriptionsTable.encounterId, encounterId));
     if (patientId)   conditions.push(eq(prescriptionsTable.patientId, patientId));
+    if (consultationId) conditions.push(eq(prescriptionsTable.consultationId, consultationId));
     if (status)      conditions.push(eq(prescriptionsTable.status, status as any));
 
     const where = conditions.length ? and(...conditions) : undefined;

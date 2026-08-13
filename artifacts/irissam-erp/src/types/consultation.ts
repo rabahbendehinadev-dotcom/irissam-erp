@@ -208,6 +208,14 @@ export interface Consultation {
   documents?: MedicalDocument[];
   followUp?: FollowUpPlan;
 
+  // Patient de passage (walk-in) : consultation sans dossier patient permanent.
+  // patientId contient alors un identifiant technique (non navigable) et
+  // patientMpi un numéro provisoire EXT-YYYY-NNNNN.
+  isWalkIn?: boolean;
+  patientPhone?: string;
+  patientBirthDate?: string;
+  patientGender?: string;
+
   // Audit
   versions?: ConsultationVersion[];
   auditLog?: AuditEntry[];
@@ -215,4 +223,46 @@ export interface Consultation {
   updatedAt: string;
   createdById: string;
   completedById?: string;
+}
+
+/** Traitement tracé pendant la consultation (table consultation_treatments). */
+export interface ConsultationTreatment {
+  id: string;
+  consultationId: string;
+  designation: string;
+  note: string | null;
+  performedAt: string;
+  recordedBy: string | null;
+  recordedByName: string;
+  createdAt: string;
+}
+
+/** Document rattaché à la consultation (table attachments, stockage objet). */
+export interface ConsultationAttachment {
+  id: string;
+  fileName: string;
+  fileSize: number | null;
+  mimeType: string;
+  category: string;
+  title: string | null;
+  storageKey: string;
+  objectPath: string;
+  createdAt: string;
+  createdByName: string | null;
+}
+
+/** Favori personnel du praticien (table doctor_favorites, scope user_id). */
+export interface DoctorFavorite {
+  id: string;
+  kind: 'diagnosis' | 'medication' | 'treatment';
+  label: string;
+  medicationId: string | null;
+  dosage: string | null;
+  frequency: string | null;
+  duration: string | null;
+  instructions: string | null;
+  pinned: boolean;
+  usageCount: number;
+  lastUsedAt: string | null;
+  createdAt: string;
 }

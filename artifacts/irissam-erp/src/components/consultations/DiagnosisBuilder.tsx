@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Brain, Save, RefreshCw, Lock } from 'lucide-react';
+import { FavoritesPicker } from './FavoritesPicker';
+import type { DoctorFavorite } from '@/types/consultation';
 
 /**
  * Éditeur du diagnostic de la consultation.
@@ -56,6 +58,13 @@ export function DiagnosisBuilder({ value, onSave, saving, readOnly }: Props) {
         <Brain size={16} className="text-purple-500" />
         <h3 className="font-semibold text-gray-800 text-sm">Diagnostic</h3>
       </div>
+
+      {/* Favoris personnels du praticien (table doctor_favorites) — insertion en un clic */}
+      <FavoritesPicker
+        kind="diagnosis"
+        onApply={(fav: DoctorFavorite) => setDraft(prev => (prev.trim() ? `${prev}\n${fav.label}` : fav.label))}
+        suggestedLabel={draft.trim().slice(0, 200)}
+      />
 
       <textarea
         value={draft}

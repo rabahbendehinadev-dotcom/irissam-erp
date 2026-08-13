@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Play, Pause, CheckCircle2, Printer,
-  MoreVertical, Clock, Wifi, WifiOff, RefreshCw, ShieldAlert,
+  MoreVertical, Clock, Wifi, WifiOff, RefreshCw, ShieldAlert, Link2,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
 import { ConsultationStatusBadge, ConsultationTypeBadge } from './ConsultationStatusBadge';
+import { AttachPatientModal } from './AttachPatientModal';
+import { usePermission } from '@/hooks/usePermission';
 import { apiClient } from '@/services/api/client';
 import type { Consultation, ConsultationStatus, ConsultationPriority } from '@/types/consultation';
 
@@ -114,16 +116,21 @@ interface Props {
   onStatusChange: (status: ConsultationStatus) => void;
   onTerminer: () => void;
   onPrint: () => void;
+  /** Recharge la consultation depuis l'API (après rattachement patient). */
+  onReload?: () => void;
 }
 
-export function ConsultationHeader({ consultation: c, saving = false, onStatusChange, onTerminer, onPrint }: Props) {
+export function ConsultationHeader({ consultation: c, saving = false, onStatusChange, onTerminer, onPrint, onReload }: Props) {
   const [, setLocation] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const { can } = usePermission();
 
   // Fetch patient enrichment data from the real API (allergies, DOB, blood type)
+  // Patient de passage : pas de dossier permanent → aucun fetch (patientId technique).
   const [apiPatient, setApiPatient] = useState<Record<string, unknown> | null>(null);
   useEffect(() => {
-    if (!c.patientId) return;
+    if (!c.patientId || c.isWalkIn) return;
     apiClient.get<Record<string, unknown>>(`/patients/${c.patientId}`)
       .then(r => setApiPatient(r))
       .catch((err) => console.warn('[ConsultationHeader] Patient enrichment fetch failed — non-critical:', err));
@@ -133,8 +140,8 @@ export function ConsultationHeader({ consultation: c, saving = false, onStatusCh
   const allergies = (apiPatient?.medical as any)?.allergies ?? [];
   const diseases  = (apiPatient?.medical as any)?.chronicDiseases ?? [];
   const bloodType = (apiPatient?.medical as any)?.bloodType ?? (apiPatient?.bloodType as string | undefined);
-  const age       = calcAge(apiPatient?.dateOfBirth as string | undefined);
-  const gender    = apiPatient?.gender as string | undefined;
+  const age       = calcAge(c.isWalkIn ? c.patientBirthDate : (apiPatient?.dateOfBirth as string | undefined));
+  const gender    = c.isWalkIn ? c.patientGender : (apiPatient?.gender as string | undefined);
   const priority  = (c as any).priority as ConsultationPriority | undefined;
 
   const canStart    = c.status === 'en_attente' || c.status === 'planifiee';
@@ -217,7 +224,10 @@ export function ConsultationHeader({ consultation: c, saving = false, onStatusCh
                 <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-9 z-50 w-48 bg-white border border-gray-200 rounded-xl shadow-xl py-1">
                   {([
-                    { label: 'Voir le patient',    action: () => setLocation(`/patients/${c.patientId}`) },
+                    !c.isWalkIn ? { label: 'Voir le patient', action: () => setLocation(`/patients/${c.patientId}`) } : null,
+                    c.isWalkIn && can('consultations.edit')
+                      ? { label: 'Rattacher au dossier patient', action: () => setAttachOpen(true) }
+                      : null,
                     c.admissionId ? { label: "Voir l'admission", action: () => setLocation('/admissions') } : null,
                     { label: 'Imprimer le CR',     action: () => onPrint() },
                     { label: 'Annuler la consultation', action: () => onStatusChange('annulee'), danger: true },
@@ -255,11 +265,29 @@ export function ConsultationHeader({ consultation: c, saving = false, onStatusCh
             <span className="font-bold text-gray-900">{c.patientName}</span>
             <span className="font-mono text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{c.patientMpi}</span>
 
+            {/* Patient de passage : badge + rattachement au dossier permanent */}
+            {c.isWalkIn && (
+              <>
+                <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
+                  Patient de passage
+                </span>
+                {can('consultations.edit') && (
+                  <button
+                    onClick={() => setAttachOpen(true)}
+                    className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full font-medium hover:bg-blue-100 transition-colors"
+                  >
+                    <Link2 size={10} /> Rattacher au dossier
+                  </button>
+                )}
+              </>
+            )}
+
             {/* Age · Gender · Blood type */}
             <span className="text-xs text-gray-500">
               {age}
               {gender && <span className="ml-1">{gender === 'M' ? '♂' : '♀'}</span>}
               {bloodType && <span className="ml-1 font-medium text-blue-600">{bloodType}</span>}
+              {c.isWalkIn && c.patientPhone && <span className="ml-1">· {c.patientPhone}</span>}
             </span>
 
             {/* Allergies */}
@@ -323,6 +351,15 @@ export function ConsultationHeader({ consultation: c, saving = false, onStatusCh
           <p className="font-mono">{c.scheduledAt.substring(11, 16)}</p>
         </div>
       </div>
+
+      {/* Rattachement patient de passage → dossier permanent */}
+      {attachOpen && (
+        <AttachPatientModal
+          consultation={c}
+          onClose={() => setAttachOpen(false)}
+          onAttached={() => onReload?.()}
+        />
+      )}
     </div>
   );
 }

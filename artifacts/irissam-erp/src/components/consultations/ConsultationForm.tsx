@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  X, Search, ChevronRight, ChevronLeft, Stethoscope, User,
+  X, Search, ChevronRight, ChevronLeft, Stethoscope, User, UserPlus,
   Check, ExternalLink, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { PatientAvatar } from '@/components/shared/PatientAvatar';
 import { apiClient } from '@/services/api/client';
+import { useAuth } from '@/store/AuthContext';
 import { useGetPatientsList } from '@workspace/api-client-react';
 import type { Patient } from '@/types';
 import type {
@@ -232,6 +233,69 @@ function PatientSelector({ selected, onSelect }: { selected: Patient | null; onS
   );
 }
 
+// ─── Step 1bis : Patient de passage (walk-in) ─────────────────────────────────
+
+interface WalkInState { fullName: string; phone: string; birthDate: string; gender: '' | 'M' | 'F' }
+
+function WalkInFieldsStep({ value, onChange }: { value: WalkInState; onChange: (w: WalkInState) => void }) {
+  const set = <K extends keyof WalkInState>(k: K, v: WalkInState[K]) => onChange({ ...value, [k]: v });
+  const today = new Date().toISOString().slice(0, 10);
+  const INP = 'w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400';
+  return (
+    <div className="space-y-4">
+      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+        <p className="font-semibold mb-0.5">Patient de passage — sans dossier permanent</p>
+        <p>
+          Identité minimale pour ne pas bloquer la prise en charge. Un identifiant
+          provisoire <span className="font-mono">EXT-…</span> sera attribué ; la consultation pourra être
+          <strong> rattachée plus tard</strong> à un dossier patient réel, sans ressaisie ni doublon.
+        </p>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 mb-1 block">Nom complet *</label>
+        <input
+          type="text"
+          value={value.fullName}
+          onChange={e => set('fullName', e.target.value)}
+          placeholder="Nom et prénom du patient"
+          maxLength={200}
+          autoFocus
+          className={INP}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">Téléphone <span className="font-normal">(optionnel)</span></label>
+          <input type="tel" value={value.phone} onChange={e => set('phone', e.target.value)}
+            placeholder="05 XX XX XX XX" maxLength={30} className={INP} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">Date de naissance <span className="font-normal">(optionnel)</span></label>
+          <input type="date" value={value.birthDate} max={today} onChange={e => set('birthDate', e.target.value)} className={INP} />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-500 mb-1 block">Sexe <span className="font-normal">(optionnel)</span></label>
+        <div className="flex gap-2">
+          {([['', 'Non précisé'], ['M', 'Masculin'], ['F', 'Féminin']] as const).map(([v, label]) => (
+            <button
+              key={v || 'na'}
+              type="button"
+              onClick={() => set('gender', v)}
+              className={cn('flex-1 py-2 px-3 rounded-lg border-2 text-xs font-semibold transition-all',
+                value.gender === v
+                  ? 'bg-blue-50 text-blue-700 border-blue-400'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300')}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Step 2: Context Form ─────────────────────────────────────────────────────
 
 interface CtxState {
@@ -242,9 +306,10 @@ interface CtxState {
   companion: string; priority: ConsultationPriority;
 }
 
-function ContextFormStep({ form, onChange, patient, services, doctors, dirError }: {
+function ContextFormStep({ form, onChange, patient, services, doctors, dirError, doctorLocked }: {
   form: CtxState; onChange: (f: CtxState) => void; patient: Patient | null;
   services: DirectoryDepartment[]; doctors: DirectoryDoctor[]; dirError: boolean;
+  doctorLocked?: boolean;
 }) {
   const [motifOpen, setMotifOpen] = useState(false);
   const motifRef = useRef<HTMLDivElement>(null);
@@ -319,12 +384,22 @@ function ContextFormStep({ form, onChange, patient, services, doctors, dirError 
         </div>
         <div>
           <label className="text-xs font-medium text-gray-600 mb-1 block">Médecin *</label>
-          <select value={form.doctorId} onChange={e => set('doctorId', e.target.value)} className={SEL()}>
+          <select
+            value={form.doctorId}
+            onChange={e => set('doctorId', e.target.value)}
+            disabled={doctorLocked}
+            className={SEL(doctorLocked)}
+          >
             <option value="">Sélectionner un médecin…</option>
             {doctors.map(d => (
               <option key={d.id} value={d.id}>Dr {d.fullName}{d.specialty ? ` — ${d.specialty}` : ''}</option>
             ))}
           </select>
+          {doctorLocked && (
+            <p className="text-[11px] text-gray-400 mt-1">
+              Verrouillé sur votre identité — chaque consultation est tracée au nom du médecin connecté.
+            </p>
+          )}
         </div>
         <div>
           <label className="text-xs font-medium text-gray-400 mb-1 block">Spécialité <span className="font-normal">(déduite du médecin)</span></label>
@@ -433,8 +508,13 @@ function getNow() {
 
 export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props) {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const isDoctor = user?.role === 'doctor';
   const [step, setStep] = useState(1);
   const [patient, setPatient] = useState<Patient | null>(null);
+  // Patient enregistré ou patient de passage (walk-in, identité minimale)
+  const [mode, setMode] = useState<'registered' | 'walkin'>('registered');
+  const [walkIn, setWalkIn] = useState<WalkInState>({ fullName: '', phone: '', birthDate: '', gender: '' });
 
   // If opened with a pre-selected patient ID, fetch it from the real API.
   // Échec visible (pas de catch silencieux) : l'utilisateur peut toujours
@@ -489,11 +569,22 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
     return () => { cancelled = true; };
   }, []);
 
+  // Médecin connecté : identité verrouillée (traçabilité — pas de consultation
+  // au nom d'un confrère). Le serveur applique la même règle (403).
+  useEffect(() => {
+    if (!isDoctor || !user?.id) return;
+    setCtx(prev => (prev.doctorId === user.id ? prev : { ...prev, doctorId: user.id }));
+  }, [isDoctor, user?.id]);
+
   const selectedService = services.find(s => s.id === ctx.serviceId);
   const selectedDoctor  = doctors.find(d => d.id === ctx.doctorId);
 
+  const walkInValid =
+    walkIn.fullName.trim().length >= 2 &&
+    (!walkIn.birthDate || walkIn.birthDate <= today);
+
   const canNext = step === 1
-    ? !!patient
+    ? (mode === 'registered' ? !!patient : walkInValid)
     : !!(ctx.doctorId && ctx.serviceId && ctx.date && ctx.time && ctx.reason);
 
   const handleCreate = async () => {
@@ -521,13 +612,24 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
       // Identifiants RÉELS uniquement : le serveur vérifie patientId/doctorId
       // en base, résout lui-même les noms/MPI et le service (400 sinon).
       const created = await apiClient.post<{ id: string; number: string }>('/consultations', {
-        patientId:   patient!.id,
+        // Patient enregistré (patientId réel) OU patient de passage (walkIn :
+        // identité minimale → MPI provisoire EXT-… généré par le serveur).
+        ...(mode === 'walkin'
+          ? {
+              walkIn: {
+                fullName:  walkIn.fullName.trim(),
+                phone:     walkIn.phone.trim() || undefined,
+                birthDate: walkIn.birthDate || undefined,
+                gender:    walkIn.gender || undefined,
+              },
+            }
+          : { patientId: patient!.id }),
         doctorId:    ctx.doctorId,
         serviceName: selectedService?.name,
         specialty:   selectedDoctor?.specialty || undefined,
         scheduledAt: `${ctx.date}T${ctx.time}:00`,
         type:        API_TYPE[ctx.type] ?? 'consultation_externe',
-        origin:      API_ORIGIN[ctx.origin] ?? 'rdv',
+        origin:      mode === 'walkin' ? 'walk_in' : (API_ORIGIN[ctx.origin] ?? 'rdv'),
         motif:       reason,
         status:      'en_attente',
       });
@@ -593,8 +695,46 @@ export function ConsultationForm({ onClose, onCreated, initialPatientId }: Props
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {step === 1 && <PatientSelector selected={patient} onSelect={setPatient} />}
-          {step === 2 && <ContextFormStep form={ctx} onChange={setCtx} patient={patient} services={services} doctors={doctors} dirError={dirError} />}
+          {step === 1 && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMode('registered')}
+                  className={cn('flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all',
+                    mode === 'registered'
+                      ? 'bg-blue-50 text-blue-700 border-blue-400'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-300')}
+                >
+                  <User size={14} /> Patient enregistré
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('walkin')}
+                  className={cn('flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all',
+                    mode === 'walkin'
+                      ? 'bg-amber-50 text-amber-700 border-amber-400'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-300')}
+                >
+                  <UserPlus size={14} /> Patient de passage
+                </button>
+              </div>
+              {mode === 'registered'
+                ? <PatientSelector selected={patient} onSelect={setPatient} />
+                : <WalkInFieldsStep value={walkIn} onChange={setWalkIn} />}
+            </div>
+          )}
+          {step === 2 && (
+            <ContextFormStep
+              form={ctx}
+              onChange={setCtx}
+              patient={mode === 'registered' ? patient : null}
+              services={services}
+              doctors={doctors}
+              dirError={dirError}
+              doctorLocked={isDoctor}
+            />
+          )}
         </div>
 
         {/* Submission error banner */}

@@ -128,6 +128,62 @@ class ApiClient {
   delete<T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>) {
     return this.request<T>(endpoint, { ...options, method: 'DELETE' });
   }
+
+  /**
+   * Téléversement multipart (FormData) — le navigateur fixe lui-même le
+   * Content-Type/boundary. Même stratégie que request() : un seul retry
+   * après refresh sur 401.
+   */
+  async postForm<T>(endpoint: string, form: FormData, options?: Pick<RequestOptions, 'signal'>): Promise<T> {
+    const doFetch = () => {
+      const headers: Record<string, string> = {};
+      if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
+      return fetch(`${this._baseUrl}${endpoint}`, {
+        method: 'POST', headers, body: form, credentials: 'include', signal: options?.signal,
+      });
+    };
+    let response = await doFetch();
+    if (response.status === 401 && this.onUnauthorized) {
+      const newToken = await this.onUnauthorized();
+      if (newToken) {
+        response = await doFetch();
+      } else {
+        window.dispatchEvent(new CustomEvent('auth:logout'));
+      }
+    }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: response.statusText }));
+      throw Object.assign(new Error(error.error || error.message || 'API Error'), {
+        status: response.status,
+        data: error,
+      });
+    }
+    return response.json() as Promise<T>;
+  }
+
+  /** Téléchargement binaire authentifié (fichiers du stockage objet). */
+  async getBlob(endpoint: string, options?: Pick<RequestOptions, 'signal'>): Promise<Blob> {
+    const doFetch = () => {
+      const headers: Record<string, string> = {};
+      if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
+      return fetch(`${this._baseUrl}${endpoint}`, {
+        method: 'GET', headers, credentials: 'include', signal: options?.signal,
+      });
+    };
+    let response = await doFetch();
+    if (response.status === 401 && this.onUnauthorized) {
+      const newToken = await this.onUnauthorized();
+      if (newToken) response = await doFetch();
+    }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: response.statusText }));
+      throw Object.assign(new Error(error.error || error.message || 'Téléchargement impossible'), {
+        status: response.status,
+        data: error,
+      });
+    }
+    return response.blob();
+  }
 }
 
 export const apiClient = new ApiClient('/api');

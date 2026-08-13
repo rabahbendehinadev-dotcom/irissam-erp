@@ -71,6 +71,7 @@ const MIGRATIONS = [
   "045_erp_accounts.sql",
   "046_infrastructure_lits.sql",
   "047_fiche_consommable.sql",
+  "048_consultations_professionnelles.sql",
 ];
 
 async function ensureTrackingTable(client: PoolClient): Promise<void> {

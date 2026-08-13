@@ -13,6 +13,7 @@ import { usersTable } from "./users";
 import { patientsTable } from "./patients";
 import { encountersTable } from "./encounters";
 import { medicationsTable } from "./medications";
+import { consultationsTable } from "./consultations";
 
 // ─── Prescriptions ────────────────────────────────────────────────────────────
 
@@ -49,6 +50,12 @@ export const prescriptionsTable = pgTable("prescriptions", {
   dispensedAt:     timestamp("dispensed_at", { withTimezone: true }),
   dispenserComment: text("dispenser_comment"),
 
+  // Rattachement consultation (ordonnance électronique) — migration 048.
+  // Nullable : les prescriptions Urgences/Hospitalisation restent liées via
+  // encounter uniquement. instructions = consignes de prise pour le patient.
+  consultationId: uuid("consultation_id").references(() => consultationsTable.id, { onDelete: "set null" }),
+  instructions:   text("instructions"),
+
   sourceModule: sourceModuleEnum("source_module").notNull(),
   notes:        text("notes"),
 
@@ -62,6 +69,7 @@ export const prescriptionsTable = pgTable("prescriptions", {
   index("rx_encounter_idx").on(t.encounterId),
   index("rx_patient_idx").on(t.patientId),
   index("rx_medication_idx").on(t.medicationId),
+  index("rx_consultation_idx").on(t.consultationId),
   index("rx_status_idx").on(t.status),
   index("rx_prescribed_at_idx").on(t.prescribedAt),
   index("rx_deleted_at_idx").on(t.deletedAt),

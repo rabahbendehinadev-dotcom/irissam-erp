@@ -1,11 +1,14 @@
 /**
- * Onglet Prescriptions de l'espace consultation — 100 % PostgreSQL.
+ * Onglet Médicaments de l'espace consultation — 100 % PostgreSQL.
  *
- * Liste : GET /prescriptions?encounterId=… (même table que le module Pharmacie).
- * Création : POST /prescriptions avec un médicament RÉEL du stock
- * (medication_id) — le serveur valide la permission
- * consultations.create_prescription, le patient, l'appartenance de
- * l'encounter et l'existence du médicament. Aucune donnée fictive.
+ * Liste : GET /prescriptions?consultationId=… (rattachement direct à la
+ * consultation) fusionnée avec GET /prescriptions?encounterId=… (anciennes
+ * lignes créées avant le rattachement consultation). Création :
+ * POST /prescriptions { consultationId, … } — le serveur hérite patient et
+ * encounter de la consultation, force sourceModule=consultations, applique
+ * la garde médecin (un médecin ne prescrit que dans SES consultations) et
+ * valide le médicament du stock. Fonctionne aussi pour les patients de
+ * passage (sans dossier patient ni encounter). Aucune donnée fictive.
  */
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -16,7 +19,8 @@ import { apiClient } from '@/lib/api-client';
 import { usePermission } from '@/hooks/usePermission';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import type { Consultation } from '@/types/consultation';
+import { FavoritesPicker } from './FavoritesPicker';
+import type { Consultation, DoctorFavorite } from '@/types/consultation';
 import type { MedicationItem } from '@workspace/api-client-react';
 
 // ─── Types (réponse réelle de /prescriptions) ────────────────────────────────
@@ -29,6 +33,7 @@ interface RxRow {
   route: string;
   frequency: string;
   duration: string | null;
+  instructions: string | null;
   notes: string | null;
   status: 'prescrit' | 'prepare' | 'delivre' | 'annule';
   prescribedByName: string;
@@ -69,31 +74,53 @@ function NewPrescriptionForm({
 }) {
   const { toast } = useToast();
   const [medicationId, setMedicationId] = useState('');
-  const [dosage, setDosage]       = useState('');
-  const [route, setRoute]         = useState('orale');
-  const [frequency, setFrequency] = useState('');
-  const [duration, setDuration]   = useState('');
-  const [notes, setNotes]         = useState('');
+  const [dosage, setDosage]             = useState('');
+  const [route, setRoute]               = useState('orale');
+  const [frequency, setFrequency]       = useState('');
+  const [duration, setDuration]         = useState('');
+  const [instructions, setInstructions] = useState('');
+  const [notes, setNotes]               = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const selectedMed = medications.find(m => String(m.id) === medicationId);
+
+  // Application d'un favori : médicament + posologie pré-remplis en un clic.
+  const applyFavorite = (fav: DoctorFavorite) => {
+    if (fav.medicationId && medications.some(m => String(m.id) === fav.medicationId)) {
+      setMedicationId(fav.medicationId);
+    } else {
+      const byName = medications.find(m => (m.name ?? '').toLowerCase() === fav.label.toLowerCase());
+      if (byName) {
+        setMedicationId(String(byName.id));
+      } else {
+        toast({
+          title: 'Sélection manuelle requise',
+          description: `« ${fav.label} » : choisissez le médicament correspondant dans le stock.`,
+        });
+      }
+    }
+    if (fav.dosage)       setDosage(fav.dosage);
+    if (fav.frequency)    setFrequency(fav.frequency);
+    if (fav.duration)     setDuration(fav.duration);
+    if (fav.instructions) setInstructions(fav.instructions);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!medicationId || !dosage.trim() || !frequency.trim() || submitting) return;
     setSubmitting(true);
     try {
+      // Le serveur hérite patient/encounter de la consultation (walk-in inclus)
+      // et journalise la création (audit_logs).
       await apiClient.post('/prescriptions', {
-        patientId:    consultation.patientId,
-        encounterId:  consultation.encounterId,
-        patientName:  consultation.patientName,
+        consultationId: consultation.id,
         medicationId,
         dosage:       dosage.trim(),
         route,
         frequency:    frequency.trim(),
         duration:     duration.trim() || undefined,
+        instructions: instructions.trim() || undefined,
         notes:        notes.trim() || undefined,
-        sourceModule: 'consultations',
       });
       toast({
         title: 'Prescription créée',
@@ -119,6 +146,17 @@ function NewPrescriptionForm({
           <X size={16} />
         </button>
       </div>
+
+      {/* Favoris personnels : médicaments fréquents du praticien */}
+      <FavoritesPicker
+        kind="medication"
+        onApply={applyFavorite}
+        suggestedLabel={selectedMed?.name ?? ''}
+        suggestedDefaults={{
+          medicationId: medicationId || null,
+          dosage, frequency, duration, instructions,
+        }}
+      />
 
       {/* Médicament réel du stock */}
       <div>
@@ -199,15 +237,32 @@ function NewPrescriptionForm({
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Instructions</label>
-        <input
-          type="text"
-          placeholder="Instructions particulières…"
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Instructions patient <span className="font-normal text-gray-400">(imprimées sur l'ordonnance)</span>
+          </label>
+          <input
+            type="text"
+            maxLength={500}
+            placeholder="Ex : à prendre après les repas"
+            value={instructions}
+            onChange={e => setInstructions(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Note interne <span className="font-normal text-gray-400">(visible pharmacie)</span>
+          </label>
+          <input
+            type="text"
+            placeholder="Précisions pour la pharmacie…"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-1">
@@ -250,20 +305,36 @@ export function ConsultationPrescriptionsPanel({
   const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
   const cancelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: rawRx, loading, error, refetch } = useQuery<unknown[]>(
-    encounterId ? `/prescriptions?encounterId=${encounterId}` : null,
-  );
-  const prescriptions: RxRow[] = useMemo(
-    () => (Array.isArray(rawRx) ? (rawRx as RxRow[]) : []),
-    [rawRx],
-  );
+  // Source principale : rattachement direct à la consultation. Les anciennes
+  // lignes (créées via l'encounter avant ce rattachement) sont fusionnées
+  // pour ne rien perdre — dédupliquées par id.
+  const { data: byCons, loading: loadingCons, error: errorCons, refetch: refetchCons } =
+    useQuery<unknown[]>(`/prescriptions?consultationId=${consultation.id}`);
+  const { data: byEnc, loading: loadingEnc, refetch: refetchEnc } =
+    useQuery<unknown[]>(encounterId ? `/prescriptions?encounterId=${encounterId}` : null);
+
+  const prescriptions: RxRow[] = useMemo(() => {
+    const map = new Map<string, RxRow>();
+    for (const r of [
+      ...(Array.isArray(byCons) ? (byCons as RxRow[]) : []),
+      ...(Array.isArray(byEnc) ? (byEnc as RxRow[]) : []),
+    ]) map.set(r.id, r);
+    return [...map.values()].sort((a, b) => (b.prescribedAt ?? '').localeCompare(a.prescribedAt ?? ''));
+  }, [byCons, byEnc]);
+
+  const loading = loadingCons || loadingEnc;
+  const error   = errorCons;
+  const refetch = () => { refetchCons(); if (encounterId) refetchEnc(); };
 
   const { data: medsRaw } = useQuery<{ data: MedicationItem[] }>(
     '/medications?page=1&pageSize=100',
   );
   const medications = medsRaw?.data ?? [];
 
-  const canPrescribe = can('consultations.create_prescription') && !readOnly && !!encounterId;
+  // Plus d'exigence d'encounter : la prescription se rattache à la
+  // consultation elle-même (walk-in inclus). Le serveur vérifie la propriété
+  // médecin et l'état de la consultation (annulée → 409).
+  const canPrescribe = can('consultations.create_prescription') && !readOnly;
 
   const armCancel = (id: string) => {
     setPendingCancelId(id);
@@ -288,29 +359,13 @@ export function ConsultationPrescriptionsPanel({
     }
   };
 
-  if (!encounterId) {
-    return (
-      <div className="text-center py-12 max-w-md mx-auto">
-        <AlertTriangle size={36} className="mx-auto mb-3 text-amber-400" />
-        <p className="text-sm font-medium text-gray-600">
-          Aucun encounter clinique lié à cette consultation
-        </p>
-        <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-          La prescription exige un encounter réel (traçabilité PostgreSQL).
-          Cette consultation ancienne n'en possède pas — aucune prescription
-          ne peut y être rattachée.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h3 className="font-semibold text-gray-800">Prescriptions de la consultation</h3>
+          <h3 className="font-semibold text-gray-800">Médicaments de la consultation</h3>
           <p className="text-xs text-gray-400 mt-0.5">
-            Rattachées à l'encounter <code className="font-mono">{encounterId.slice(0, 8)}…</code> —
+            Prescrits au nom du médecin connecté, rattachés à {consultation.number} —
             flux pharmacie : prescrite → préparée → délivrée (stock déduit).
           </p>
         </div>
@@ -393,6 +448,9 @@ export function ConsultationPrescriptionsPanel({
                     <p className="text-xs text-gray-500 mt-1">
                       {rx.dosage} · {rx.route} · {rx.frequency}{rx.duration ? ` · ${rx.duration}` : ''}
                     </p>
+                    {rx.instructions && (
+                      <p className="text-xs text-blue-700 mt-0.5 italic">Instructions : {rx.instructions}</p>
+                    )}
                     {rx.notes && <p className="text-xs text-gray-400 mt-0.5 italic">{rx.notes}</p>}
                     <p className="text-[11px] text-gray-400 mt-1.5">
                       Prescrite par {rx.prescribedByName} · {fmtDateTime(rx.prescribedAt)}
@@ -430,6 +488,7 @@ export function ConsultationPrescriptionsPanel({
       <p className="text-xs text-gray-400">
         La préparation et la délivrance (avec déduction du stock) s'effectuent
         dans le module Pharmacie. Chaque étape est auditée côté serveur.
+        L'ordonnance imprimable est disponible dans l'onglet « Ordonnance ».
       </p>
     </div>
   );

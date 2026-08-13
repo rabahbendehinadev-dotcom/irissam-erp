@@ -23,6 +23,8 @@ export default function ConsultationWorkspacePage() {
   const [consultation, setConsultation] = useState<Consultation | undefined>(undefined);
   const [loading, setLoading] = useState(isValidId);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Incrémenté pour recharger depuis l'API (ex. après rattachement patient).
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!isValidId) return;
@@ -34,7 +36,7 @@ export default function ConsultationWorkspacePage() {
       .catch(e => { if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Erreur de chargement'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [rawId, isValidId]);
+  }, [rawId, isValidId, refreshKey]);
 
   // ── Notes du dossier (colonne réelle `notes`) — PATCH /consultations/:id ───
   const [notesDraft, setNotesDraft] = useState('');
@@ -163,6 +165,7 @@ export default function ConsultationWorkspacePage() {
         onSaveDiagnosis={handleSaveDiagnosis}
         diagnosisSaving={diagnosisSaving}
         saving={notesSaving || diagnosisSaving}
+        onReload={() => setRefreshKey(k => k + 1)}
       />
     </DashboardLayout>
   );

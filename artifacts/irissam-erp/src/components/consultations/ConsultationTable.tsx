@@ -170,14 +170,17 @@ export function ConsultationTable({ consultations, onStatusChange, onPatientClic
                     <p className="text-xs font-medium text-gray-800">{formatDate(c.scheduledAt)}</p>
                     <p className="text-xs text-gray-400">{formatTime(c.scheduledAt)}</p>
                   </td>
-                  <td className="px-4 py-3" onClick={e => { if (onPatientClick && c.patientId) { e.stopPropagation(); onPatientClick(c.patientId); } }}>
-                    <div className={cn("flex items-center gap-2", onPatientClick && c.patientId ? "cursor-pointer group" : "")}>
+                  <td className="px-4 py-3" onClick={e => { if (onPatientClick && c.patientId && !c.isWalkIn) { e.stopPropagation(); onPatientClick(c.patientId); } }}>
+                    <div className={cn("flex items-center gap-2", onPatientClick && c.patientId && !c.isWalkIn ? "cursor-pointer group" : "")}>
                       <PatientAvatar
                         firstName={nameParts[nameParts.length - 1] ?? ''}
                         lastName={nameParts[0] ?? ''}
                         size="xs"
                       />
-                      <span className={cn("font-medium whitespace-nowrap", onPatientClick && c.patientId ? "text-blue-700 group-hover:underline" : "text-gray-900")}>{c.patientName}</span>
+                      <span className={cn("font-medium whitespace-nowrap", onPatientClick && c.patientId && !c.isWalkIn ? "text-blue-700 group-hover:underline" : "text-gray-900")}>{c.patientName}</span>
+                      {c.isWalkIn && (
+                        <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap">Passage</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">{c.patientMpi}</td>
