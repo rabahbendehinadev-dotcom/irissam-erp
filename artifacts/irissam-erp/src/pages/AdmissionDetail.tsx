@@ -527,6 +527,8 @@ export default function AdmissionDetailPage() {
   const [transferring, setTransferring] = useState(false);
   const [showVitals,   setShowVitals]   = useState(false);
   const [localEvents,  setLocalEvents]  = useState<AdmissionTimelineEvent[]>([]);
+  const [serverEvents, setServerEvents] = useState<AdmissionTimelineEvent[]>([]);
+  const [timelineError, setTimelineError] = useState(false);
 
   const loadAdmission = useCallback(async () => {
     if (!admissionId) { setAdmission(null); setLoadState('notfound'); return; }
@@ -541,10 +543,25 @@ export default function AdmissionDetailPage() {
     }
   }, [admissionId]);
 
+  // Historique réel de l'admission (mouvements ADT journalisés côté serveur
+  // dans audit_logs : admission, transfert de lit, sortie, annulation).
+  const loadTimeline = useCallback(async () => {
+    if (!admissionId) return;
+    try {
+      const rows = await apiClient.get<AdmissionTimelineEvent[]>(`/admissions/${admissionId}/timeline`);
+      setServerEvents(Array.isArray(rows) ? rows : []);
+      setTimelineError(false);
+    } catch {
+      setServerEvents([]);
+      setTimelineError(true);
+    }
+  }, [admissionId]);
+
   useEffect(() => {
     setLoadState('loading');
     loadAdmission();
-  }, [loadAdmission]);
+    loadTimeline();
+  }, [loadAdmission, loadTimeline]);
 
   // Loading
   if (loadState === 'loading') {
@@ -596,7 +613,7 @@ export default function AdmissionDetailPage() {
     );
   }
 
-  const timeline = localEvents;
+  const timeline = [...serverEvents, ...localEvents];
   const isActive = ['active', 'preadmission', 'ambulatoire'].includes(admission.status);
 
   return (
@@ -707,7 +724,19 @@ export default function AdmissionDetailPage() {
           {/* Tab content */}
           <div className="p-5">
             {activeTab === 'overview'  && <OverviewTab  admission={admission} />}
-            {activeTab === 'timeline'  && <AdmissionTimeline events={timeline} />}
+            {activeTab === 'timeline'  && (
+              timelineError ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-gray-400">
+                  <AlertTriangle size={28} className="text-red-300" />
+                  <p className="text-sm">Impossible de charger l'historique</p>
+                  <button onClick={loadTimeline} className="text-sm text-blue-600 hover:underline">
+                    Réessayer
+                  </button>
+                </div>
+              ) : (
+                <AdmissionTimeline events={timeline} />
+              )
+            )}
             {activeTab === 'notes'     && <NotesTab     admission={admission} />}
             {activeTab === 'documents' && <DocumentsTab admission={admission} />}
             {activeTab === 'sortie'    && <DischargeSummaryTab admission={admission} />}
@@ -740,7 +769,7 @@ export default function AdmissionDetailPage() {
             });
             log('archive', 'admission', admission.id, `Sortie ${type}`);
             setDischarging(false);
-            await loadAdmission();
+            await Promise.all([loadAdmission(), loadTimeline()]);
             setActiveTab('sortie');
           }}
           onCancel={() => setDischarging(false)}
@@ -757,7 +786,7 @@ export default function AdmissionDetailPage() {
             await apiClient.post(`/admissions/${admission.id}/transfer`, { newBedId, motif });
             log('update', 'admission', admission.id, `Transfert de lit — ${motif}`);
             setTransferring(false);
-            await loadAdmission();
+            await Promise.all([loadAdmission(), loadTimeline()]);
           }}
           onCancel={() => setTransferring(false)}
         />

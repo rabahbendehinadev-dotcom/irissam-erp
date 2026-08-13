@@ -18,15 +18,17 @@
 
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db, pool } from "@workspace/db";
-import { admissionsTable } from "@workspace/db/schema";
+import { admissionsTable, auditLogsTable } from "@workspace/db/schema";
 import { requirePermission } from "../middleware/requirePermission";
 import {
   eq,
   isNull,
   and,
   desc,
+  asc,
   ilike,
   or,
+  inArray,
 } from "drizzle-orm";
 import { admissionService } from "../services";
 import type { ActorCtx } from "../repositories/types";
@@ -161,6 +163,112 @@ router.get("/:id", requirePermission("admissions.view"), async (req: Request, re
 
     if (!row) { res.status(404).json({ message: "Admission not found" }); return; }
     res.json(mapAdmission(row));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Timeline (historique ADT) ────────────────────────────────────────────────
+
+/** Libellés français des types de sortie (mêmes valeurs que l'enum discharge_type). */
+const DISCHARGE_TYPE_LABEL: Record<string, string> = {
+  domicile:          "retour à domicile",
+  transfert_interne: "transfert interne",
+  transfert_externe: "transfert externe",
+  deces:             "décès",
+  fugue:             "fugue",
+  contre_avis:       "sortie contre avis médical",
+};
+
+/** "2026-08-13" → "13/08/2026" (chaîne vide si absent/inattendu). */
+const frDate = (iso: unknown): string =>
+  typeof iso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split("-").reverse().join("/") : "";
+
+/**
+ * GET /admissions/:id/timeline (requires admissions.view)
+ *
+ * Historique réel de l'admission, reconstruit depuis audit_logs : les
+ * mouvements ADT (admitted / bed_transferred / discharged / cancelled) y sont
+ * journalisés par admissionService dans la même transaction que la mutation.
+ * Aucune table dédiée ni duplication — on ne fait que projeter le journal
+ * existant vers le contrat AdmissionTimelineEvent du frontend. Les actions
+ * d'UI (view/print…) vivent dans user_activity_logs et sont exclues d'office.
+ */
+router.get("/:id/timeline", requirePermission("admissions.view"), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+
+    const [adm] = await db
+      .select({ id: admissionsTable.id })
+      .from(admissionsTable)
+      .where(and(eq(admissionsTable.id, id), isNull(admissionsTable.deletedAt)))
+      .limit(1);
+    if (!adm) { res.status(404).json({ message: "Admission not found" }); return; }
+
+    const rows = await db
+      .select()
+      .from(auditLogsTable)
+      .where(and(
+        eq(auditLogsTable.resourceType, "admission"),
+        eq(auditLogsTable.resourceId, id),
+        inArray(auditLogsTable.action, ["admitted", "bed_transferred", "discharged", "cancelled"]),
+      ))
+      .orderBy(asc(auditLogsTable.timestamp));
+
+    const events = rows.map((r) => {
+      const oldV = (r.oldValue ?? {}) as Record<string, unknown>;
+      const newV = (r.newValue ?? {}) as Record<string, unknown>;
+
+      let type = "status_change";
+      let description: string = r.action;
+
+      switch (r.action) {
+        case "admitted": {
+          type = "admission";
+          const num = typeof newV.admissionNumber === "string" ? newV.admissionNumber : "";
+          const bed = typeof newV.bedNumber === "string" ? newV.bedNumber : "";
+          description = `Admission${num ? ` ${num}` : ""} créée${bed ? ` — lit ${bed}` : ""}`;
+          break;
+        }
+        case "bed_transferred": {
+          type = "bed_change";
+          const from    = typeof oldV.bedNumber === "string" && oldV.bedNumber ? oldV.bedNumber : "?";
+          const to      = typeof newV.bedNumber === "string" && newV.bedNumber ? newV.bedNumber : "?";
+          const svcFrom = typeof oldV.serviceName === "string" ? oldV.serviceName : "";
+          const svcTo   = typeof newV.serviceName === "string" ? newV.serviceName : "";
+          const svc     = svcTo && svcTo !== svcFrom ? ` (${svcFrom} → ${svcTo})` : "";
+          const motif   = typeof newV.motif === "string" && newV.motif ? ` — motif : ${newV.motif}` : "";
+          description = `Transfert de lit ${from} → ${to}${svc}${motif}`;
+          break;
+        }
+        case "discharged": {
+          type = "discharge";
+          const dt    = typeof newV.dischargeType === "string" ? newV.dischargeType : "";
+          const label = DISCHARGE_TYPE_LABEL[dt] ?? dt;
+          const d     = frDate(newV.dischargeDate);
+          const time  = typeof newV.dischargeTime === "string" ? newV.dischargeTime : "";
+          description = `Sortie${label ? ` : ${label}` : ""}${d ? ` — le ${d}${time ? ` à ${time}` : ""}` : ""}`;
+          break;
+        }
+        case "cancelled": {
+          type = "status_change";
+          description = "Admission annulée";
+          break;
+        }
+      }
+
+      return {
+        id:          r.id,
+        admissionId: id,
+        type,
+        description,
+        date:        r.timestamp?.toISOString() ?? new Date().toISOString(),
+        userId:      r.userId ?? "",
+        userName:    r.userName,
+      };
+    });
+
+    res.json(events);
   } catch (err) {
     next(err);
   }
