@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { MoreVertical, Eye, Pencil, LogOut, ArrowRight, Ban, Printer, FolderOpen } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import type { Admission } from '@/types/admission';
@@ -24,11 +25,53 @@ export function AdmissionQuickActions({
 }: Props) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Menu rendu dans un portal en position fixe : il échappe à l'overflow du
+  // conteneur du tableau. S'il n'y a pas assez d'espace sous le bouton, il
+  // s'ouvre automatiquement vers le haut.
+  const updatePosition = useCallback(() => {
+    const btn = btnRef.current;
+    const menu = menuRef.current;
+    if (!btn || !menu) return;
+    const rect = btn.getBoundingClientRect();
+    const menuH = menu.offsetHeight;
+    const menuW = menu.offsetWidth;
+    const margin = 4;
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const openUp = spaceBelow < menuH && spaceAbove > spaceBelow;
+    const top = openUp
+      ? Math.max(margin, rect.top - margin - menuH)
+      : rect.bottom + margin;
+    const left = Math.max(margin, Math.min(rect.right - menuW, window.innerWidth - menuW - margin));
+    setPos({ top, left });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (open) updatePosition();
+    else setPos(null);
+  }, [open, updatePosition]);
+
+  // Suit le bouton pendant un scroll (y compris celui du conteneur) ou un resize.
+  useEffect(() => {
+    if (!open) return;
+    const reposition = () => updatePosition();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [open, updatePosition]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -50,16 +93,21 @@ export function AdmissionQuickActions({
   );
 
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
+        ref={btnRef}
         onClick={() => setOpen(o => !o)}
         className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
       >
         <MoreVertical size={16} />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-8 z-20 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 w-44 min-w-max">
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}
+          className="z-50 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 w-44 min-w-max"
+        >
           {item(<Eye size={14} />,         t('adm.action.view'),      onView)}
           {onViewPatient && item(<FolderOpen size={14} />, t('adm.action.viewPatient'), onViewPatient)}
           {canEdit && item(<Pencil size={14} />, t('adm.action.edit'), onEdit)}
@@ -72,8 +120,9 @@ export function AdmissionQuickActions({
               {item(<Ban size={14} />, t('adm.action.cancel'), onCancel, true)}
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
