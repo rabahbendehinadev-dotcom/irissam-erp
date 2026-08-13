@@ -1,0 +1,72 @@
+Maintenant, audite et corrige uniquement l’onglet « Timeline » dans le détail d’une admission.
+
+J’ai testé une vraie admission existante :
+ADM-2026-00003
+
+Cette admission a réellement été :
+- créée/admise le 13/08/2026 à 13:56
+- affectée au lit 101
+- puis annulée
+
+Pourtant, dans :
+Admissions → Voir détail → Timeline
+
+l’interface affiche :
+« Aucun événement enregistré ».
+
+Donc ne crée pas immédiatement un nouveau système de timeline.
+
+Commence par auditer l’existant pour comprendre :
+- quelle API cet onglet appelle réellement ;
+- quelle table/source il utilise ;
+- où sont actuellement enregistrés les événements ADT/audit liés aux admissions ;
+- si les workflows Admission / Transfert / Sortie / Annulation écrivent déjà ces événements ailleurs ;
+- pourquoi ils ne remontent pas dans cette Timeline.
+
+Je veux réutiliser la source de vérité existante et éviter toute duplication.
+
+La Timeline d’une admission doit afficher les événements réels liés à CETTE admission uniquement, chronologiquement, par exemple lorsque ces événements existent réellement :
+- Admission créée
+- Patient hospitalisé / lit affecté
+- Transfert interne
+- changement de lit/chambre/service
+- Sortie patient
+- Annulation admission
+
+Chaque événement doit afficher uniquement les informations réellement disponibles :
+- date et heure
+- type d’événement
+- utilisateur/auteur si enregistré
+- service
+- chambre / lit
+- ancien → nouveau emplacement pour un transfert
+- motif lorsqu’il existe
+
+IMPORTANT :
+- aucune donnée mock/demo ;
+- ne fabrique aucun événement à partir de suppositions ;
+- ne mélange jamais les événements d’un autre patient ou d’une autre admission ;
+- filtrage strict par admission_id lorsque cette relation existe ;
+- conserver l’historique même si l’admission est sortie ou annulée ;
+- ne modifie pas les workflows Transférer et Sortie qui ont déjà été corrigés sauf si tu identifies précisément un problème de liaison avec la Timeline ;
+- ne crée pas de nouvelle table/migration si les données nécessaires existent déjà dans le système ;
+- si l’annulation actuelle ne produit réellement aucun événement exploitable, signale-le clairement avant d’ajouter quoi que ce soit.
+
+Vérifie également si le même historique est utilisé dans « Dossier patient ».
+Il ne faut pas avoir deux historiques ADT concurrents contenant des informations différentes.
+
+Après correction, ADM-2026-00003 ne doit plus afficher
+« Aucun événement enregistré »
+si ses événements existent réellement dans la base.
+
+À la fin, donne-moi :
+1. ce que l’onglet Timeline utilisait avant ;
+2. où les événements ADT sont réellement stockés ;
+3. pourquoi la Timeline était vide ;
+4. ce que tu as modifié ;
+5. les événements réellement retrouvés pour ADM-2026-00003, sans en créer artificiellement ;
+6. les fichiers modifiés ;
+7. les tests effectués ;
+8. le hash du commit.
+
+Ne fais pas git push, je le ferai moi-même.

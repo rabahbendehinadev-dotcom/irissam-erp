@@ -14,3 +14,11 @@ description: AdmissionDetail page is API-backed; legacy AdmissionsContext is a m
 - When de-mocking a module, grep ALL consumers of the legacy store — URL-routed detail pages are easy to miss because they're reached by navigation, not imports from the list page.
 - A "not found" UI must be reserved for a server-confirmed 404; store-miss or network failure shown as "introuvable" sends testers chasing phantom data bugs.
 - NotesTab/DocumentsTab in that page remain local-demo (inert for real UUIDs, gated on `adm-1`); no backend exists for admission notes/documents yet.
+
+## Timeline = projection of audit_logs (2026-08-13)
+
+**Rule:** `GET /admissions/:id/timeline` (admissions.view) projects `audit_logs` rows — `resourceType='admission'` + actions `admitted|bed_transferred|discharged|cancelled` only — into the frontend `AdmissionTimelineEvent` contract, with French descriptions built server-side from oldValue/newValue. No dedicated timeline table.
+
+**Why:** admissionService already journals every ADT movement in the same transaction as the mutation; a separate events table would duplicate data and drift. Frontend UI logs (view/print) live in user_activity_logs and POSTed frontend audit events use other action names — the strict action whitelist keeps noise/duplicates out.
+
+**How to apply:** new ADT movements that must appear in the fiche timeline ⇒ add the service audit action to the endpoint whitelist + its description mapping. Client merges `serverEvents` + session-local vitals events; fetch failure shows a retry state, never a fake "Aucun événement".
