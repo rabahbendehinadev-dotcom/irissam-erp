@@ -1,13 +1,9 @@
 import { toast } from "@/hooks/use-toast";
 import { useState, useCallback } from "react";
 import { useQuery } from "@/hooks/useQuery";
+import { useServices } from "@/hooks/useServices";
 import { stockApi } from "@/services/api/medical-stock";
 import { Plus, AlertTriangle, RefreshCw, Beaker, CheckCircle } from "lucide-react";
-
-const DEPARTMENTS = [
-  "Urgences","Réanimation","Bloc opératoire","Maternité","Hospitalisation",
-  "Laboratoire","Imagerie","Pharmacie","Consultations","Banque de sang","Autre"
-];
 
 const CONS_STATUS: Record<string, { label: string; className: string }> = {
   brouillon: { label: "Brouillon", className: "bg-gray-100 text-gray-600" },
@@ -16,6 +12,9 @@ const CONS_STATUS: Record<string, { label: string; className: string }> = {
 };
 
 export default function ConsumptionsPage() {
+  // Référentiel central des services (departments) + « Autre » pour les destinations hors référentiel
+  const { services } = useServices();
+  const departmentOptions = [...services.map(s => s.name), "Autre"];
   const [department, setDepartment] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(0);
@@ -56,7 +55,7 @@ export default function ConsumptionsPage() {
         <select value={department} onChange={e => { setDepartment(e.target.value); setPage(0); }}
           className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
           <option value="">Tous les services</option>
-          {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+          {departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
         <select value={status} onChange={e => { setStatus(e.target.value); setPage(0); }}
           className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
@@ -138,7 +137,7 @@ export default function ConsumptionsPage() {
                   <select value={form.department ?? ""} onChange={e => setForm((p: any) => ({ ...p, department: e.target.value }))}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg">
                     <option value="">Sélectionner…</option>
-                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    {departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div>

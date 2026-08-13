@@ -1,6 +1,6 @@
 import { Search, X } from 'lucide-react';
 import { useLanguage } from '@/i18n';
-import { MOCK_SERVICES } from '@/mock';
+import { useServices } from '@/hooks/useServices';
 import type { AdmissionType, AdmissionStatus, AdmissionPriority } from '@/types/admission';
 
 export interface AdmissionFiltersState {
@@ -26,6 +26,8 @@ interface Props {
 
 export function AdmissionFilters({ filters, onChange, resultCount, total }: Props) {
   const { t } = useLanguage();
+  // Référentiel central (departments) — les ids réels correspondent aux admissions
+  const { services } = useServices();
   const set = (key: keyof AdmissionFiltersState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     onChange({ ...filters, [key]: e.target.value });
   const isDefault = JSON.stringify(filters) === JSON.stringify(DEFAULT_ADM_FILTERS);
@@ -73,7 +75,7 @@ export function AdmissionFilters({ filters, onChange, resultCount, total }: Prop
         {/* Service */}
         <select value={filters.serviceId} onChange={set('serviceId')} className={selectCls}>
           <option value="all">{t('adm.filter.service')}</option>
-          {MOCK_SERVICES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
 

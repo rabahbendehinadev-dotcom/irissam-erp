@@ -5,6 +5,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useEmergencyDossier } from '@/contexts/EmergencyDossierContext';
 import { usePermission } from '@/hooks/usePermission';
+import { useServices } from '@/hooks/useServices';
 import { apiClient } from '@/services/api/client';
 import type { FinalDecisionType, FinalDecision } from '@/types/emergencyDossier';
 
@@ -131,13 +132,15 @@ function FormDomicile({ d, u }: { d: FinalDecision; u: (p: Partial<FinalDecision
 }
 
 function FormHospitalisation({ d, u }: { d: FinalDecision; u: (p: Partial<FinalDecision>) => void }) {
+  // Référentiel central des services (departments actifs) — aucune liste hardcodée
+  const { services } = useServices();
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div>
         <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Service d'admission</label>
         <select value={d.ward ?? ''} onChange={e => u({ ward: e.target.value })} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
           <option value="">Sélectionner…</option>
-          {['Médecine interne','Cardiologie','Pneumologie','Neurologie','Gastroentérologie','Chirurgie générale','Orthopédie','Pédiatrie','Maternité','Traumatologie'].map(s=><option key={s}>{s}</option>)}
+          {services.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
         </select>
       </div>
       <div>

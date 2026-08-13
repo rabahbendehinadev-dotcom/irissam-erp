@@ -3,7 +3,7 @@
  * Données de démonstration : structures physiques, lits, admissions.
  */
 import { MOCK_PATIENTS } from './patients';
-import type { HospitalRoom, Bed, Admission, AdmissionTimelineEvent, HospitalService, Doctor } from '@/types/admission';
+import type { HospitalRoom, Bed, Admission, AdmissionTimelineEvent, Doctor } from '@/types/admission';
 
 // Note: MOCK_BUILDINGS and MOCK_FLOORS come from ./sites (re-exported via mock/index.ts)
 // Admission beds reference buildingId 'bat-a/b/c' which map to the extended building set below.
@@ -114,20 +114,6 @@ export const MOCK_BEDS: Bed[] = [
   // C102 - Pédiatrie
   ...makeBeds('r-c04', 'C102', 'c-1', '1er étage', 'bat-c', 'Bâtiment C', 'C', 4,
     ['libre', 'libre', 'libre', 'libre']),
-];
-
-// ─── Services ─────────────────────────────────────────────────────────────────
-
-export const MOCK_SERVICES: HospitalService[] = [
-  { id: 'svc-card', name: 'Cardiologie',          code: 'CARD', buildingId: 'bat-a' },
-  { id: 'svc-med',  name: 'Médecine interne',     code: 'MED',  buildingId: 'bat-a' },
-  { id: 'svc-neur', name: 'Neurologie',            code: 'NEUR', buildingId: 'bat-a' },
-  { id: 'svc-chir', name: 'Chirurgie générale',   code: 'CHIR', buildingId: 'bat-b' },
-  { id: 'svc-pneu', name: 'Pneumologie',           code: 'PNEU', buildingId: 'bat-b' },
-  { id: 'svc-mat',  name: 'Maternité',             code: 'MAT',  buildingId: 'bat-c' },
-  { id: 'svc-ped',  name: 'Pédiatrie',             code: 'PED',  buildingId: 'bat-c' },
-  { id: 'svc-urg',  name: 'Urgences',              code: 'URG',  buildingId: 'bat-a' },
-  { id: 'svc-rea',  name: 'Réanimation',           code: 'REA',  buildingId: 'bat-b' },
 ];
 
 // ─── Médecins ──────────────────────────────────────────────────────────────────

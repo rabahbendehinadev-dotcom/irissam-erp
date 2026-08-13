@@ -24,7 +24,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requirePermission } from "../middleware/requirePermission";
-import type { AuthenticatedRequest } from "../middleware/requireAuth";
+import { requireAuth, type AuthenticatedRequest } from "../middleware/requireAuth";
 import { auditService } from "../services/audit";
 import { safeUuid } from "../repositories/types";
 import type { ActorCtx } from "../repositories/types";
@@ -152,8 +152,11 @@ router.get("/tree", requirePermission("admissions.view"), async (_req, res, next
   } catch (err) { next(err); }
 });
 
-/** GET /infrastructure/services — référentiel services actifs (departments). */
-router.get("/services", requirePermission("admissions.view"), async (_req, res, next) => {
+/** GET /infrastructure/services — référentiel services actifs (departments).
+ *  Lisible par tout le personnel authentifié : ce référentiel transverse alimente
+ *  les listes de services de tous les modules (admissions, consultations, urgences,
+ *  stock médical…) — la gestion (CRUD) reste réservée à infrastructure.manage. */
+router.get("/services", requireAuth, async (_req, res, next) => {
   try {
     const q = await pool.query(
       `SELECT id, name, code FROM departments
@@ -161,6 +164,184 @@ router.get("/services", requirePermission("admissions.view"), async (_req, res, 
     );
     res.json(q.rows.map((d: any) => ({ id: d.id, name: d.name, code: d.code })));
   } catch (err) { next(err); }
+});
+
+// ═══════════════════════ SERVICES (référentiel departments) ═══════════════════
+// Gestion centralisée du référentiel : la table `departments` est LA source
+// unique des services hospitaliers. Aucune seconde table, aucun doublon.
+// Un service utilisé par des données historiques n'est JAMAIS supprimé
+// physiquement — il est désactivé (is_active = false) et reste dans l'historique.
+
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+function mapDept(d: any) {
+  return {
+    id:                    d.id,
+    name:                  d.name,
+    code:                  d.code,
+    color:                 d.color,
+    isActive:              d.is_active,
+    roomsCount:            d.rooms_count ?? 0,
+    bedsCount:             d.beds_count ?? 0,
+    activeAdmissionsCount: d.active_admissions_count ?? 0,
+    staffCount:            d.staff_count ?? 0,
+    createdAt:             d.created_at ?? null,
+  };
+}
+
+/** GET /infrastructure/departments — liste de gestion (actifs + désactivés) avec compteurs d'usage. */
+router.get("/departments", requirePermission("infrastructure.manage"), async (_req, res, next) => {
+  try {
+    const q = await pool.query(
+      `SELECT d.id, d.name, d.code, d.color, d.is_active, d.created_at,
+              (SELECT COUNT(*)::int FROM rooms r          WHERE r.service_id = d.id AND r.deleted_at IS NULL)                        AS rooms_count,
+              (SELECT COUNT(*)::int FROM occupancy_beds b WHERE b.service_id = d.id AND b.deleted_at IS NULL)                        AS beds_count,
+              (SELECT COUNT(*)::int FROM admissions a     WHERE a.service_id = d.id AND a.deleted_at IS NULL AND a.status = 'active') AS active_admissions_count,
+              (SELECT COUNT(*)::int FROM users u          WHERE u.department_id = d.id AND u.deleted_at IS NULL)                     AS staff_count
+         FROM departments d
+        WHERE d.deleted_at IS NULL
+        ORDER BY d.name`,
+    );
+    res.json(q.rows.map(mapDept));
+  } catch (err) { next(err); }
+});
+
+/** POST /infrastructure/departments — ajouter un service (code auto-généré si absent). */
+router.post("/departments", requirePermission("infrastructure.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
+  try {
+    const { name, code, color } = req.body ?? {};
+    if (!nn(name)) return void res.status(400).json({ error: "Le nom du service est obligatoire." });
+    const cleanName = String(name).trim();
+    if (nn(color) !== null && !HEX_COLOR_RE.test(String(color).trim())) {
+      return void res.status(400).json({ error: "Couleur invalide (format #RRGGBB)." });
+    }
+
+    const dup = await pool.query(
+      `SELECT id FROM departments WHERE lower(name) = lower($1) AND deleted_at IS NULL`,
+      [cleanName],
+    );
+    if (dup.rows.length > 0) return void res.status(409).json({ error: "Un service portant ce nom existe déjà." });
+
+    let cleanCode = nn(code) ? String(code).trim().toUpperCase() : "";
+    if (cleanCode) {
+      const codeDup = await pool.query(
+        `SELECT id FROM departments WHERE site_id = $1 AND upper(code) = $2 AND deleted_at IS NULL`,
+        [DEFAULT_SITE, cleanCode],
+      );
+      if (codeDup.rows.length > 0) return void res.status(409).json({ error: "Ce code est déjà utilisé par un autre service." });
+    } else {
+      // Auto-génération : 4 lettres du nom sans accents, suffixe numérique si pris
+      const base = cleanName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 4) || "SVC";
+      const taken = new Set(
+        (await pool.query(`SELECT upper(code) AS code FROM departments WHERE site_id = $1 AND deleted_at IS NULL`, [DEFAULT_SITE]))
+          .rows.map((r: any) => r.code),
+      );
+      cleanCode = base;
+      for (let i = 2; taken.has(cleanCode); i++) cleanCode = `${base}${i}`;
+    }
+
+    const a = actor(req);
+    const q = await pool.query(
+      `INSERT INTO departments (site_id, name, code, color, created_by)
+       VALUES ($1, $2, $3, COALESCE($4, '#6366F1'), $5) RETURNING *`,
+      [DEFAULT_SITE, cleanName, cleanCode, nn(color) ? String(color).trim() : null, safeUuid(a.userId)],
+    );
+    const d = q.rows[0];
+    await auditService.log({
+      module: "hospitalisation", action: "department_created",
+      resourceType: "department", resourceId: d.id,
+      newValue: { name: d.name, code: d.code, color: d.color },
+    }, a);
+    res.status(201).json(mapDept({ ...d, rooms_count: 0, beds_count: 0, active_admissions_count: 0, staff_count: 0 }));
+  } catch (err: any) {
+    if (pgErrorResponse(err, res)) return;
+    next(err);
+  }
+});
+
+/** PATCH /infrastructure/departments/:id — nom, code, couleur, activation/désactivation.
+ *  Renommage : propagation du nom dénormalisé aux chambres et lits liés (même transaction).
+ *  Pas de DELETE : un service utilisé se désactive, l'historique est préservé. */
+router.patch("/departments/:id", requirePermission("infrastructure.manage"), async (req: AuthenticatedRequest, res, next): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    const id = String(req.params.id);
+    if (!UUID_RE.test(id)) return void res.status(400).json({ error: "Identifiant invalide." });
+    const body = req.body ?? {};
+
+    const existingQ = await client.query(`SELECT * FROM departments WHERE id = $1 AND deleted_at IS NULL`, [id]);
+    if (existingQ.rows.length === 0) return void res.status(404).json({ error: "Service introuvable." });
+    const existing = existingQ.rows[0];
+
+    const newName = nn(body.name) ? String(body.name).trim() : null;
+    if (newName && newName.toLowerCase() !== String(existing.name).toLowerCase()) {
+      const dup = await client.query(
+        `SELECT id FROM departments WHERE lower(name) = lower($1) AND deleted_at IS NULL AND id <> $2`,
+        [newName, id],
+      );
+      if (dup.rows.length > 0) return void res.status(409).json({ error: "Un service portant ce nom existe déjà." });
+    }
+    const newCode = nn(body.code) ? String(body.code).trim().toUpperCase() : null;
+    if (newCode && newCode !== String(existing.code).toUpperCase()) {
+      const dup = await client.query(
+        `SELECT id FROM departments WHERE site_id = $1 AND upper(code) = $2 AND deleted_at IS NULL AND id <> $3`,
+        [existing.site_id, newCode, id],
+      );
+      if (dup.rows.length > 0) return void res.status(409).json({ error: "Ce code est déjà utilisé par un autre service." });
+    }
+    if (nn(body.color) !== null && !HEX_COLOR_RE.test(String(body.color).trim())) {
+      return void res.status(400).json({ error: "Couleur invalide (format #RRGGBB)." });
+    }
+    const newActive = typeof body.active === "boolean" ? body.active : null;
+    const a = actor(req);
+
+    await client.query("BEGIN");
+    const q = await client.query(
+      `UPDATE departments SET
+         name       = COALESCE($2, name),
+         code       = COALESCE($3, code),
+         color      = COALESCE($4, color),
+         is_active  = COALESCE($5, is_active),
+         updated_at = now(),
+         updated_by = COALESCE($6, updated_by)
+       WHERE id = $1 RETURNING *`,
+      [id, newName, newCode, nn(body.color) ? String(body.color).trim() : null, newActive, safeUuid(a.userId)],
+    );
+    const d = q.rows[0];
+
+    // Renommage → propager le nom dénormalisé (chambres + lits) dans la même transaction
+    let propagatedRooms = 0, propagatedBeds = 0;
+    if (newName && newName !== existing.name) {
+      const r1 = await client.query(
+        `UPDATE rooms SET service_name = $1, updated_at = now() WHERE service_id = $2 AND deleted_at IS NULL`,
+        [newName, id],
+      );
+      const r2 = await client.query(
+        `UPDATE occupancy_beds SET service_name = $1, updated_at = now() WHERE service_id = $2 AND deleted_at IS NULL`,
+        [newName, id],
+      );
+      propagatedRooms = r1.rowCount ?? 0;
+      propagatedBeds  = r2.rowCount ?? 0;
+    }
+    await client.query("COMMIT");
+
+    const activeChanged = newActive !== null && newActive !== existing.is_active;
+    const onlyToggle = activeChanged && newName === null && newCode === null && nn(body.color) === null;
+    await auditService.log({
+      module: "hospitalisation",
+      action: onlyToggle ? (newActive ? "department_activated" : "department_deactivated") : "department_updated",
+      resourceType: "department", resourceId: id,
+      oldValue: { name: existing.name, code: existing.code, isActive: existing.is_active },
+      newValue: { name: d.name, code: d.code, color: d.color, isActive: d.is_active, propagatedRooms, propagatedBeds },
+    }, a);
+    res.json(mapDept(d));
+  } catch (err: any) {
+    try { await client.query("ROLLBACK"); } catch { /* pas de transaction ouverte */ }
+    if (pgErrorResponse(err, res)) return;
+    next(err);
+  } finally {
+    client.release();
+  }
 });
 
 /** GET /infrastructure/bed-cards — tous les lits, enrichis occupant + admission + médecin. */

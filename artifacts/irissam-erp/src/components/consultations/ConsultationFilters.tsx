@@ -1,4 +1,9 @@
 import { Search, X } from 'lucide-react';
+import { useServices } from '@/hooks/useServices';
+import { useQuery } from '@/hooks/useQuery';
+
+/** Médecin réel (users.role = doctor) — /directory/doctors. */
+interface DirectoryDoctor { id: string; fullName: string }
 
 export interface ConsultationFiltersState {
   search: string;
@@ -45,23 +50,6 @@ const ORIGINS = [
   { value: 'sans_rdv', label: 'Sans rendez-vous' },
 ];
 
-const DOCTORS = [
-  { value: 'Dr Karim Benamara', label: 'Dr Karim Benamara' },
-  { value: 'Dr Amira Douahi', label: 'Dr Amira Douahi' },
-  { value: 'Dr Mourad Settouf', label: 'Dr Mourad Settouf' },
-  { value: 'Dr Sofiane Boudali', label: 'Dr Sofiane Boudali' },
-  { value: 'Dr Nadia Ferhat', label: 'Dr Nadia Ferhat' },
-];
-
-const SPECIALTIES = [
-  { value: 'Médecine interne', label: 'Médecine interne' },
-  { value: 'Médecine générale', label: 'Médecine générale' },
-  { value: 'Cardiologie', label: 'Cardiologie' },
-  { value: 'Gynécologie', label: 'Gynécologie' },
-  { value: 'Pédiatrie', label: 'Pédiatrie' },
-  { value: 'Chirurgie', label: 'Chirurgie' },
-];
-
 const SELECT_CLS = 'px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white min-w-[150px]';
 
 interface Props {
@@ -71,6 +59,11 @@ interface Props {
 }
 
 export function ConsultationFilters({ filters, onChange, total }: Props) {
+  // Référentiels réels : services (departments) + médecins (users.role = doctor)
+  const { services } = useServices();
+  const doctorsQ = useQuery<DirectoryDoctor[]>('/directory/doctors');
+  const doctors = Array.isArray(doctorsQ.data) ? doctorsQ.data : [];
+
   const set = (k: keyof ConsultationFiltersState, v: string) =>
     onChange({ ...filters, [k]: v });
 
@@ -108,11 +101,11 @@ export function ConsultationFilters({ filters, onChange, total }: Props) {
       <div className="flex flex-wrap gap-3 items-center">
         <select value={filters.doctor} onChange={e => set('doctor', e.target.value)} className={SELECT_CLS}>
           <option value="all">Tous les médecins</option>
-          {DOCTORS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+          {doctors.map(d => <option key={d.id} value={d.fullName}>{d.fullName}</option>)}
         </select>
         <select value={filters.specialty} onChange={e => set('specialty', e.target.value)} className={SELECT_CLS}>
           <option value="all">Toutes les spécialités</option>
-          {SPECIALTIES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          {services.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
         </select>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500">Du</span>

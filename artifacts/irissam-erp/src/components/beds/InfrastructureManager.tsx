@@ -1,6 +1,8 @@
 /**
  * InfrastructureManager — modal d'administration de l'infrastructure hospitalière :
- * Bâtiments / Étages / Chambres / Lits — ajout, modification, activation/désactivation.
+ * Bâtiments / Étages / Chambres / Lits / Services — ajout, modification, activation/désactivation.
+ * L'onglet Services gère le référentiel central (table departments) — source unique
+ * de toutes les listes de services de l'application.
  * Structure stricte : Bâtiment → Étage → Chambre (service obligatoire) → Lit.
  * Le lit hérite automatiquement étage/bâtiment/service de sa chambre.
  * Réservé à la permission infrastructure.manage (API /infrastructure, PostgreSQL).
@@ -8,7 +10,7 @@
 import { useState } from 'react';
 import {
   X, Plus, Pencil, Power, AlertTriangle, Link2,
-  Building2, Layers, DoorOpen, BedDouble,
+  Building2, Layers, DoorOpen, BedDouble, Stethoscope,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import {
@@ -18,13 +20,14 @@ import {
 import {
   RoomCascade, EMPTY_CASCADE, findRoomChain, findFloorChain, type CascadeValue,
 } from './RoomCascade';
+import { ServicesTab } from './ServicesTab';
 
 const INPUT = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20';
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg px-3 py-2 hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap';
 const BTN_LIGHT = 'inline-flex items-center gap-1 text-xs font-medium border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50 text-gray-600 disabled:opacity-50 whitespace-nowrap';
 
-type Tab = 'buildings' | 'floors' | 'rooms' | 'beds';
-type Run = (fn: () => Promise<void>) => Promise<void>;
+type Tab = 'buildings' | 'floors' | 'rooms' | 'beds' | 'services';
+export type Run = (fn: () => Promise<void>) => Promise<void>;
 
 interface FlatFloor { id: string; name: string; level: number; active: boolean; buildingId: string; buildingName: string; }
 interface FlatRoom {
@@ -441,6 +444,7 @@ const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: 'floors',    label: 'Étages',    icon: Layers },
   { id: 'rooms',     label: 'Chambres',  icon: DoorOpen },
   { id: 'beds',      label: 'Lits',      icon: BedDouble },
+  { id: 'services',  label: 'Services',  icon: Stethoscope },
 ];
 
 export function InfrastructureManager({ open, onClose, tree, services, beds, onChanged }: {
@@ -500,6 +504,7 @@ export function InfrastructureManager({ open, onClose, tree, services, beds, onC
           {tab === 'floors'    && <FloorsTab tree={tree} run={run} busy={busy}/>}
           {tab === 'rooms'     && <RoomsTab tree={tree} services={services} run={run} busy={busy}/>}
           {tab === 'beds'      && <BedsTab tree={tree} beds={beds} run={run} busy={busy}/>}
+          {tab === 'services'  && <ServicesTab run={run} busy={busy}/>}
         </div>
       </div>
     </div>

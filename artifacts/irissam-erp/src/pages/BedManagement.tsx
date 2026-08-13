@@ -131,7 +131,7 @@ export default function BedManagement() {
   const [managerOpen, setManagerOpen] = useState(false);
   const [assignBed, setAssignBed] = useState<BedCardData | null>(null);
 
-  const refetchAll = () => { cardsQ.refetch(); treeQ.refetch(); };
+  const refetchAll = () => { cardsQ.refetch(); treeQ.refetch(); servicesQ.refetch(); };
 
   const floorOptions = useMemo(() => {
     const source = buildingF !== 'all' && buildingF !== 'none'
