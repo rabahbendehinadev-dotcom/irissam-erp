@@ -6,8 +6,16 @@ export interface LoginCredentials {
   password: string;
 }
 
+export interface MaintenanceStatus {
+  enabled: boolean;
+  message: string;
+  message_ar: string;
+  message_en: string;
+}
+
 export interface AuthServiceInterface {
   login(credentials: LoginCredentials): Promise<{ user: User; accessToken: string }>;
+  getMaintenanceStatus(): Promise<MaintenanceStatus>;
   logout(): Promise<void>;
   refresh(): Promise<{ user: User; accessToken: string } | null>;
   getMe(): Promise<User | null>;
@@ -24,6 +32,10 @@ export const authService: AuthServiceInterface = {
       { _skipRefresh: true },
     );
     return data;
+  },
+
+  async getMaintenanceStatus() {
+    return apiClient.get<MaintenanceStatus>('/auth/maintenance');
   },
 
   async logout() {

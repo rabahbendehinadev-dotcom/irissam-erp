@@ -26,6 +26,7 @@ import jwt from "jsonwebtoken";
 import type { Request, Response } from "express";
 import { pool } from "@workspace/db";
 import type { AuthenticatedRequest } from "../middleware/requireAuth";
+import { getMaintenanceConfig } from "../middleware/maintenanceGuard.js";
 
 const router = Router();
 
@@ -168,9 +169,36 @@ function clearRefreshCookie(res: Response): void {
   res.clearCookie(REFRESH_COOKIE, { path: "/api/auth" });
 }
 
+async function rejectDuringMaintenance(res: Response): Promise<boolean> {
+  const config = await getMaintenanceConfig();
+  if (!config?.enabled) return false;
+
+  res.status(503).json({
+    code: "SYSTEM_MAINTENANCE",
+    message: config.message,
+    message_ar: config.messageAr,
+    message_en: config.messageEn,
+  });
+  return true;
+}
+
+// ─── GET /auth/maintenance ────────────────────────────────────────────────────
+
+router.get("/maintenance", async (_req: Request, res: Response) => {
+  const config = await getMaintenanceConfig();
+  res.json({
+    enabled: config?.enabled ?? false,
+    message: config?.message ?? "Maintenance en cours. Veuillez réessayer ultérieurement.",
+    message_ar: config?.messageAr ?? "النظام في وضع الصيانة. يرجى المحاولة لاحقاً.",
+    message_en: config?.messageEn ?? "System is under maintenance. Please try again later.",
+  });
+});
+
 // ─── POST /auth/login ─────────────────────────────────────────────────────────
 
 router.post("/login", async (req: Request, res: Response) => {
+  if (await rejectDuringMaintenance(res)) return;
+
   const { email, password } = req.body as { email?: string; password?: string };
   const ip = req.ip;
 
@@ -296,6 +324,11 @@ router.post("/login", async (req: Request, res: Response) => {
 // ─── POST /auth/refresh ───────────────────────────────────────────────────────
 
 router.post("/refresh", async (req: Request, res: Response) => {
+  if (await rejectDuringMaintenance(res)) {
+    clearRefreshCookie(res);
+    return;
+  }
+
   const rawToken = (req.cookies as Record<string, string>)?.[REFRESH_COOKIE];
   if (!rawToken) {
     res.status(401).json({ message: "Refresh token manquant." });
@@ -424,6 +457,8 @@ router.post("/logout", async (req: AuthenticatedRequest, res: Response) => {
 // ─── GET /auth/me ─────────────────────────────────────────────────────────────
 
 router.get("/me", async (req: Request, res: Response) => {
+  if (await rejectDuringMaintenance(res)) return;
+
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ message: "Token manquant." });
@@ -473,6 +508,8 @@ router.get("/me", async (req: Request, res: Response) => {
 // ─── POST /auth/change-password ───────────────────────────────────────────────
 
 router.post("/change-password", async (req: AuthenticatedRequest, res: Response) => {
+  if (await rejectDuringMaintenance(res)) return;
+
   // Must have a valid Bearer token
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {

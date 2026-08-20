@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/store/AuthContext';
-import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
+import { authService, type MaintenanceStatus } from '@/services/authService';
+import { Eye, EyeOff, Lock, Mail, AlertCircle, Wrench } from 'lucide-react';
 
 // Demo shortcuts are only available in development builds.
 // In production, these are not rendered — credentials must be entered manually.
@@ -22,12 +23,29 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(true);
 
   useEffect(() => {
     if (isAuthenticated) {
       setLocation('/');
     }
   }, [isAuthenticated, setLocation]);
+
+  useEffect(() => {
+    let cancelled = false;
+    authService.getMaintenanceStatus()
+      .then(status => {
+        if (!cancelled) setMaintenance(status.enabled ? status : null);
+      })
+      .catch(() => {
+        // The login API remains the authoritative blocker if maintenance is on.
+      })
+      .finally(() => {
+        if (!cancelled) setMaintenanceLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +72,53 @@ export default function LoginPage() {
     setPassword(u.password);
     setError('');
   };
+
+  if (maintenanceLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#0a2540] via-[#0e3460] to-[#1a5c8a] flex items-center justify-center p-4">
+        <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (maintenance) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#0a2540] via-[#0e3460] to-[#1a5c8a] flex items-center justify-center p-4">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-white/5 blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-blue-400/10 blur-3xl" />
+        </div>
+        <div className="relative w-full max-w-md text-center">
+          <div className="flex justify-center mb-5">
+            <img src="/logo.png" alt="IRISSAM Hospital" className="w-28 h-28 object-contain drop-shadow-2xl" />
+          </div>
+          <h1 className="text-2xl font-bold text-white tracking-wide">IRISSAM HOSPITAL</h1>
+          <div className="mt-8 bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="h-1.5 bg-gradient-to-r from-amber-400 via-orange-400 to-red-400" />
+            <div className="p-8">
+              <div className="mx-auto mb-5 w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center">
+                <Wrench className="w-8 h-8 text-amber-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">النظام في الصيانة</h2>
+              <p className="mt-3 text-gray-600 leading-7" dir="rtl">
+                {maintenance.message_ar || 'النظام في وضع الصيانة. يرجى المحاولة لاحقاً.'}
+              </p>
+              <p className="mt-4 text-sm text-gray-400">
+                {maintenance.message || 'Maintenance en cours. Veuillez réessayer ultérieurement.'}
+              </p>
+              <div className="mt-6 flex items-center justify-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-4 py-3">
+                <Lock className="w-4 h-4" />
+                <span>تسجيل الدخول متوقف مؤقتاً لجميع المستخدمين</span>
+              </div>
+            </div>
+          </div>
+          <p className="text-center text-blue-200/60 text-xs mt-6">
+            © {new Date().getFullYear()} IRISSAM Hospital
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a2540] via-[#0e3460] to-[#1a5c8a] flex items-center justify-center p-4">

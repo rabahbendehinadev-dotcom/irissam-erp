@@ -48,3 +48,4 @@
 - [Fiche consommable (séjour)](consumables-sheet.md) — admission_consumables étape 1 AUTONOME (saisie libre, pas de stock); étape 2 = liaison Stock/Pharmacie par ALTER TABLE + chaîne FEFO
 - [Consultation professionnelle](consultation-pro.md) — walk-in = !patientId (pas de colonne), attach-patient tx + backfill, favoris self-scoped, rx via consultationId (champ `drug`), docs 2 temps sans delete
 - [Chunks après déploiement](deploy-chunk-reload.md) — onglet ouvert + nouvelle build = 404 sur pages lazy; gardes vite:preloadError + reload dans PageErrorBoundary — ne pas retirer
+- [Verrouillage maintenance](maintenance-lockdown.md) — mode maintenance global : aucun compte ne passe, y compris les administrateurs et les sessions déjà présentes.
