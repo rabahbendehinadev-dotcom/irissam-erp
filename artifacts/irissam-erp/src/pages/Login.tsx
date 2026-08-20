@@ -14,6 +14,15 @@ const DEMO_USERS = IS_DEV
     ]
   : [];
 
+// L'accès reste fermé jusqu'à la demande explicite de réouverture.
+const FORCE_MAINTENANCE = true;
+const LOCKED_MAINTENANCE: MaintenanceStatus = {
+  enabled: true,
+  message: 'Maintenance en cours. Veuillez réessayer ultérieurement.',
+  message_ar: 'النظام في وضع الصيانة. يرجى المحاولة لاحقاً.',
+  message_en: 'System is under maintenance. Please try again later.',
+};
+
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
@@ -23,8 +32,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
-  const [maintenanceLoading, setMaintenanceLoading] = useState(true);
+  const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(
+    FORCE_MAINTENANCE ? LOCKED_MAINTENANCE : null,
+  );
+  const [maintenanceLoading, setMaintenanceLoading] = useState(!FORCE_MAINTENANCE);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -33,6 +44,8 @@ export default function LoginPage() {
   }, [isAuthenticated, setLocation]);
 
   useEffect(() => {
+    if (FORCE_MAINTENANCE) return;
+
     let cancelled = false;
     authService.getMaintenanceStatus()
       .then(status => {
@@ -93,27 +106,29 @@ export default function LoginPage() {
             <img src="/logo.png" alt="IRISSAM Hospital" className="w-28 h-28 object-contain drop-shadow-2xl" />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-wide">IRISSAM HOSPITAL</h1>
+          <p className="text-blue-200 text-sm mt-1">Système de Gestion Hospitalière</p>
           <div className="mt-8 bg-white rounded-2xl shadow-2xl overflow-hidden">
             <div className="h-1.5 bg-gradient-to-r from-amber-400 via-orange-400 to-red-400" />
             <div className="p-8">
               <div className="mx-auto mb-5 w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center">
                 <Wrench className="w-8 h-8 text-amber-600" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">النظام في الصيانة</h2>
-              <p className="mt-3 text-gray-600 leading-7" dir="rtl">
-                {maintenance.message_ar || 'النظام في وضع الصيانة. يرجى المحاولة لاحقاً.'}
+              <h2 className="text-xl font-bold text-gray-900">Maintenance en cours</h2>
+              <p className="mt-3 text-gray-600 leading-7">
+                Le système est temporairement indisponible pour une opération de maintenance.
               </p>
-              <p className="mt-4 text-sm text-gray-400">
-                {maintenance.message || 'Maintenance en cours. Veuillez réessayer ultérieurement.'}
+              <p className="mt-3 text-sm text-gray-500">
+                {maintenance.message}
               </p>
               <div className="mt-6 flex items-center justify-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-4 py-3">
                 <Lock className="w-4 h-4" />
-                <span>تسجيل الدخول متوقف مؤقتاً لجميع المستخدمين</span>
+                <span>L'accès est temporairement suspendu pour tous les utilisateurs.</span>
               </div>
+              <p className="mt-5 text-xs text-gray-400">Merci de réessayer ultérieurement.</p>
             </div>
           </div>
           <p className="text-center text-blue-200/60 text-xs mt-6">
-            © {new Date().getFullYear()} IRISSAM Hospital
+            © {new Date().getFullYear()} IRISSAM Hospital — Accès temporairement suspendu
           </p>
         </div>
       </div>

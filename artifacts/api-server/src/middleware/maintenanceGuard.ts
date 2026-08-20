@@ -14,12 +14,27 @@ interface MaintenanceConfig {
 
 let cache: MaintenanceConfig | null = null;
 const CACHE_TTL_MS = 30_000; // 30 seconds
+// Verrouillage demandé par le propriétaire : aucun compte ne doit pouvoir
+// entrer avant sa demande explicite de réouverture.
+const FORCE_MAINTENANCE = true;
+const FORCED_MAINTENANCE: Omit<MaintenanceConfig, "fetchedAt"> = {
+  enabled: true,
+  message: "Maintenance en cours. Veuillez réessayer ultérieurement.",
+  messageAr: "النظام في وضع الصيانة. يرجى المحاولة لاحقاً.",
+  messageEn: "System is under maintenance. Please try again later.",
+  allowedRoles: [],
+  allowedIps: [],
+};
 
 export function invalidateMaintenanceCache(): void {
   cache = null;
 }
 
 export async function getMaintenanceConfig(): Promise<MaintenanceConfig | null> {
+  if (FORCE_MAINTENANCE) {
+    return { ...FORCED_MAINTENANCE, fetchedAt: Date.now() };
+  }
+
   if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) return cache;
   try {
     const { rows } = await pool.query<{
